@@ -24,10 +24,16 @@ class ProcedureStatus(str, enum.Enum):
 # ── Templates de procédure ────────────────────────────────────────────────────
 
 class ProcedureTemplate(UUIDMixin, TimestampMixin, Base):
-    """Template réutilisable définissant un type de procédure."""
+    """Template réutilisable définissant un type de procédure.
+
+    Deux usages :
+    - Template sectoriel (sector != NULL, tenant_id NULL) : master template géré par le super admin
+    - Template tenant (tenant_id != NULL) : copie locale créée lors du provisionnement
+    """
     __tablename__ = "procedure_templates"
 
-    tenant_id   = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    tenant_id   = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
+    sector      = Column(String(50), nullable=True, index=True)
     name        = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     # Template de document IA à générer en fin de procédure (nullable)

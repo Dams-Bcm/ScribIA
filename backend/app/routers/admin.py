@@ -155,6 +155,93 @@ def list_available_modules(_: User = Depends(require_super_admin)):
     return [{"key": k, "label": v} for k, v in AVAILABLE_MODULES.items()]
 
 
+# ── Sector workflow templates ────────────────────────────────────────────────
+
+@router.get("/sectors/{sector}/templates")
+def list_sector_templates(
+    sector: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Liste les templates de procédure sectoriels (master)."""
+    templates = (
+        db.query(ProcedureTemplate)
+        .options(joinedload(ProcedureTemplate.roles))
+        .filter(ProcedureTemplate.sector == sector, ProcedureTemplate.tenant_id.is_(None))
+        .order_by(ProcedureTemplate.created_at.desc())
+        .all()
+    )
+    return [_sector_template_response(t) for t in templates]
+
+
+@router.post("/sectors/{sector}/templates", status_code=201)
+def create_sector_template(
+    sector: str,
+    body: dict,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Crée un template de procédure sectoriel."""
+    tpl = ProcedureTemplate(
+        tenant_id=None,
+        sector=sector,
+        name=body["name"],
+        description=body.get("description"),
+    )
+    db.add(tpl)
+    db.flush()
+    for i, role in enumerate(body.get("roles", [])):
+        db.add(ProcedureTemplateRole(
+            template_id=tpl.id,
+            role_name=role["role_name"],
+            order_index=i,
+            invitation_delay_days=role.get("invitation_delay_days", 15),
+            form_questions=json.dumps(role.get("form_questions", []), ensure_ascii=False),
+        ))
+    db.commit()
+    db.refresh(tpl)
+    return _sector_template_response(tpl)
+
+
+@router.delete("/sectors/templates/{template_id}", status_code=204)
+def delete_sector_template(
+    template_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Supprime un template sectoriel."""
+    tpl = db.query(ProcedureTemplate).filter(
+        ProcedureTemplate.id == template_id,
+        ProcedureTemplate.tenant_id.is_(None),
+    ).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template introuvable")
+    db.delete(tpl)
+    db.commit()
+
+
+def _sector_template_response(tpl: ProcedureTemplate) -> dict:
+    return {
+        "id": tpl.id,
+        "name": tpl.name,
+        "description": tpl.description,
+        "sector": tpl.sector,
+        "is_active": tpl.is_active,
+        "created_at": str(tpl.created_at),
+        "updated_at": str(tpl.updated_at),
+        "roles": [
+            {
+                "id": r.id,
+                "role_name": r.role_name,
+                "order_index": r.order_index,
+                "invitation_delay_days": r.invitation_delay_days,
+                "form_questions": json.loads(r.form_questions) if r.form_questions else [],
+            }
+            for r in (tpl.roles or [])
+        ],
+    }
+
+
 # ── Provisioning ──────────────────────────────────────────────────────────────
 
 # Templates par secteur
@@ -373,21 +460,22 @@ def provision_tenant(
     db: Session = Depends(get_db),
     _: User = Depends(require_super_admin),
 ):
-    """Provisionne les templates de procédures et de documents IA pour un tenant selon son secteur."""
+    """Provisionne les templates de procédures et de documents IA pour un tenant selon son secteur.
+
+    1. Copie les templates de procédure sectoriels (DB) vers le tenant
+    2. Copie les templates de documents IA depuis les seeds hardcodées (fallback)
+    """
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Organisation introuvable")
     if not tenant.sector:
         raise HTTPException(status_code=400, detail="Ce tenant n'a pas de secteur défini")
 
-    seed = _SECTOR_SEEDS.get(tenant.sector)
-    if not seed:
-        raise HTTPException(status_code=400, detail=f"Aucun template disponible pour le secteur '{tenant.sector}'")
-
     created_proc_templates = []
     created_doc_templates = []
 
-    # Créer les templates de documents IA
+    # 1. Templates de documents IA (depuis les seeds hardcodées pour l'instant)
+    seed = _SECTOR_SEEDS.get(tenant.sector, {})
     for dt in seed.get("document_templates", []):
         doc_tmpl = AIDocumentTemplate(
             tenant_id=tenant_id,
@@ -402,29 +490,56 @@ def provision_tenant(
         db.flush()
         created_doc_templates.append({"id": doc_tmpl.id, "name": doc_tmpl.name})
 
-    # Créer les templates de procédures (avec lien vers le 1er doc template si disponible)
     first_doc_id = created_doc_templates[0]["id"] if created_doc_templates else None
 
-    for pt in seed.get("procedure_templates", []):
-        proc_tmpl = ProcedureTemplate(
-            tenant_id=tenant_id,
-            name=pt["name"],
-            description=pt.get("description"),
-            document_template_id=first_doc_id,
-        )
-        db.add(proc_tmpl)
-        db.flush()
+    # 2. Templates de procédure : copier depuis les templates sectoriels en DB
+    sector_templates = (
+        db.query(ProcedureTemplate)
+        .options(joinedload(ProcedureTemplate.roles))
+        .filter(ProcedureTemplate.sector == tenant.sector, ProcedureTemplate.tenant_id.is_(None))
+        .all()
+    )
 
-        for role in pt.get("roles", []):
-            db.add(ProcedureTemplateRole(
-                template_id=proc_tmpl.id,
-                role_name=role["role_name"],
-                order_index=role.get("order_index", 0),
-                invitation_delay_days=role.get("invitation_delay_days", 15),
-                form_questions=json.dumps(role.get("form_questions", []), ensure_ascii=False),
-            ))
-
-        created_proc_templates.append({"id": proc_tmpl.id, "name": proc_tmpl.name})
+    if sector_templates:
+        # Copier les templates sectoriels en DB vers le tenant
+        for st in sector_templates:
+            proc_tmpl = ProcedureTemplate(
+                tenant_id=tenant_id,
+                name=st.name,
+                description=st.description,
+                document_template_id=first_doc_id,
+            )
+            db.add(proc_tmpl)
+            db.flush()
+            for role in st.roles:
+                db.add(ProcedureTemplateRole(
+                    template_id=proc_tmpl.id,
+                    role_name=role.role_name,
+                    order_index=role.order_index,
+                    invitation_delay_days=role.invitation_delay_days,
+                    form_questions=role.form_questions,
+                ))
+            created_proc_templates.append({"id": proc_tmpl.id, "name": proc_tmpl.name})
+    else:
+        # Fallback : utiliser les seeds hardcodées
+        for pt in seed.get("procedure_templates", []):
+            proc_tmpl = ProcedureTemplate(
+                tenant_id=tenant_id,
+                name=pt["name"],
+                description=pt.get("description"),
+                document_template_id=first_doc_id,
+            )
+            db.add(proc_tmpl)
+            db.flush()
+            for role in pt.get("roles", []):
+                db.add(ProcedureTemplateRole(
+                    template_id=proc_tmpl.id,
+                    role_name=role["role_name"],
+                    order_index=role.get("order_index", 0),
+                    invitation_delay_days=role.get("invitation_delay_days", 15),
+                    form_questions=json.dumps(role.get("form_questions", []), ensure_ascii=False),
+                ))
+            created_proc_templates.append({"id": proc_tmpl.id, "name": proc_tmpl.name})
 
     db.commit()
 

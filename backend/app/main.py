@@ -75,6 +75,19 @@ def _add_missing_columns():
                 "ALTER TABLE tenants ADD sector VARCHAR(50) NULL"
             ))
 
+        # procedure_templates: sector + make tenant_id nullable
+        pt_cols = {c["name"] for c in insp.get_columns("procedure_templates")}
+        if "sector" not in pt_cols:
+            conn.execute(text(
+                "ALTER TABLE procedure_templates ADD sector VARCHAR(50) NULL"
+            ))
+        # Make tenant_id nullable (was NOT NULL)
+        pt_tenant_col = next((c for c in insp.get_columns("procedure_templates") if c["name"] == "tenant_id"), None)
+        if pt_tenant_col and not pt_tenant_col.get("nullable", True):
+            conn.execute(text(
+                "ALTER TABLE procedure_templates ALTER COLUMN tenant_id VARCHAR(36) NULL"
+            ))
+
         # ai_documents: extra_context
         ai_doc_cols = {c["name"] for c in insp.get_columns("ai_documents")}
         if "extra_context" not in ai_doc_cols:
