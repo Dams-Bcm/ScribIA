@@ -6,6 +6,10 @@ from app.models.transcription import TranscriptionJob, TranscriptionSegment, Tra
 from app.models.speaker import SpeakerProfile, SpeakerEnrollmentSegment
 from app.models.preparatory import PreparatoryDossier, AgendaPoint, DossierDocument, DossierStatus
 from app.models.ai_documents import AIDocumentTemplate, AIDocument
+from app.models.procedures import (
+    ProcedureTemplate, ProcedureTemplateRole,
+    Procedure, ProcedureParticipant, ProcedureStatus,
+)
 
 __all__ = [
     "Base", "Tenant", "TenantModule", "User", "AVAILABLE_MODULES",
@@ -15,4 +19,6 @@ __all__ = [
     "SpeakerProfile", "SpeakerEnrollmentSegment",
     "PreparatoryDossier", "AgendaPoint", "DossierDocument", "DossierStatus",
     "AIDocumentTemplate", "AIDocument",
+    "ProcedureTemplate", "ProcedureTemplateRole",
+    "Procedure", "ProcedureParticipant", "ProcedureStatus",
 ]

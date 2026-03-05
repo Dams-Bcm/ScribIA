@@ -18,6 +18,8 @@ import { RGPDPage } from "./pages/modules/RGPDPage";
 import { AIDocumentsPage } from "./pages/modules/AIDocumentsPage";
 import { ConvocationsPage } from "./pages/modules/ConvocationsPage";
 import { PreparatoryPhasesPage } from "./pages/modules/PreparatoryPhasesPage";
+import { ProceduresPage } from "./pages/modules/ProceduresPage";
+import { FormPage } from "./pages/public/FormPage";
 
 // Admin pages
 import { OrganizationsPage } from "./pages/admin/OrganizationsPage";
@@ -59,6 +61,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/form/:token" element={<FormPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
           {/* Dashboard */}
@@ -71,6 +74,7 @@ function AppRoutes() {
           <Route path="rgpd" element={<RGPDPage />} />
           <Route path="documents-ia" element={<AIDocumentsPage />} />
           <Route path="convocations" element={<ConvocationsPage />} />
+          <Route path="procedures" element={<ProceduresPage />} />
 
           {/* Compte */}
           <Route path="privacy" element={<PrivacyPage />} />

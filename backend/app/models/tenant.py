@@ -12,6 +12,7 @@ AVAILABLE_MODULES = {
     "rgpd":                       "RGPD",
     "ai_documents":               "Génération de documents IA",
     "convocations":               "Convocations",
+    "procedures":                 "Procédures collaboratives",
 }
 
 

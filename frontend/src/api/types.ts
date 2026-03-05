@@ -448,4 +448,123 @@ export const AVAILABLE_MODULES: ModuleDefinition[] = [
   { key: "rgpd", label: "RGPD" },
   { key: "ai_documents", label: "Génération de documents IA" },
   { key: "convocations", label: "Convocations" },
+  { key: "procedures", label: "Procédures collaboratives" },
 ];
+
+// ── Procédures ────────────────────────────────────────────────────────────────
+
+export type ProcedureStatus = "draft" | "collecting" | "scheduled" | "meeting" | "generating" | "done";
+
+export interface FormQuestion {
+  id: string;
+  label: string;
+  type: "text" | "textarea" | "select";
+  options: string[];
+  required: boolean;
+}
+
+export interface ProcedureTemplateRole {
+  id: string;
+  role_name: string;
+  order_index: number;
+  form_questions: FormQuestion[];
+  invitation_delay_days: number;
+}
+
+export interface ProcedureTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  document_template_id: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  roles: ProcedureTemplateRole[];
+}
+
+export interface ProcedureTemplateCreate {
+  name: string;
+  description?: string | null;
+  document_template_id?: string | null;
+  roles: Omit<ProcedureTemplateRole, "id">[];
+}
+
+export interface ProcedureTemplateUpdate {
+  name?: string;
+  description?: string | null;
+  document_template_id?: string | null;
+  is_active?: boolean;
+}
+
+export interface ProcedureParticipant {
+  id: string;
+  name: string;
+  email: string | null;
+  role_name: string;
+  form_questions: FormQuestion[];
+  form_token: string;
+  invited_at: string | null;
+  responded_at: string | null;
+  responses: Record<string, string> | null;
+  created_at: string;
+}
+
+export interface ProcedureListItem {
+  id: string;
+  title: string;
+  description: string | null;
+  status: ProcedureStatus;
+  meeting_date: string | null;
+  participant_count: number;
+  response_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Procedure {
+  id: string;
+  title: string;
+  description: string | null;
+  status: ProcedureStatus;
+  meeting_date: string | null;
+  template_id: string | null;
+  document_template_id: string | null;
+  source_session_id: string | null;
+  ai_document_id: string | null;
+  created_at: string;
+  updated_at: string;
+  participants: ProcedureParticipant[];
+}
+
+export interface ProcedureCreate {
+  title: string;
+  description?: string | null;
+  template_id?: string | null;
+  document_template_id?: string | null;
+  meeting_date?: string | null;
+}
+
+export interface ProcedureUpdate {
+  title?: string;
+  description?: string | null;
+  status?: ProcedureStatus;
+  meeting_date?: string | null;
+  document_template_id?: string | null;
+  source_session_id?: string | null;
+  ai_document_id?: string | null;
+}
+
+export interface ParticipantCreate {
+  name: string;
+  email?: string | null;
+  role_name: string;
+  form_questions: FormQuestion[];
+}
+
+export interface PublicFormData {
+  procedure_title: string;
+  participant_name: string;
+  role_name: string;
+  form_questions: FormQuestion[];
+  already_responded: boolean;
+}

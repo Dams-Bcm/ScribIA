@@ -14,6 +14,7 @@ import {
   Shield,
   Lock,
   FolderOpen,
+  ClipboardList,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../lib/utils";
@@ -41,6 +42,7 @@ export function Layout() {
     { to: "/rgpd", label: "RGPD", icon: Shield, visible: hasModule("rgpd"), section: "Modules" },
     { to: "/documents-ia", label: "Documents IA", icon: Sparkles, visible: hasModule("ai_documents"), section: "Modules" },
     { to: "/convocations", label: "Convocations", icon: Mail, visible: hasModule("convocations"), section: "Modules" },
+    { to: "/procedures", label: "Procédures", icon: ClipboardList, visible: hasModule("procedures"), section: "Modules" },
 
     // ── Administration ──
     { to: "/admin/organizations", label: "Organisations", icon: Building2, visible: isSuperAdmin, section: "Administration" },
