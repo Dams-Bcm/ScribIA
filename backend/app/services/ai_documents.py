@@ -58,22 +58,35 @@ def enqueue_generation(doc_id: str):
 
 # ── Extraction du contexte ────────────────────────────────────────────────────
 
-def _extract_transcription_context(session_id: str, db) -> str:
-    """Retourne le texte complet d'une session de transcription."""
-    from app.models.transcription import TranscriptionSegment
+def _extract_transcription_context(session_id: str, db) -> dict:
+    """Retourne le texte complet et la durée formatée d'une session de transcription."""
+    from app.models.transcription import TranscriptionJob, TranscriptionSegment
+    job = db.query(TranscriptionJob).filter_by(id=session_id).first()
     segments = (
         db.query(TranscriptionSegment)
         .filter_by(job_id=session_id)
         .order_by(TranscriptionSegment.start_time)
         .all()
     )
-    if not segments:
-        return ""
     lines = []
     for seg in segments:
         speaker = f"[{seg.speaker_label}] " if seg.speaker_label else ""
         lines.append(f"{speaker}{seg.text.strip()}")
-    return "\n".join(lines)
+    text = "\n".join(lines)
+
+    duree = ""
+    if job and job.duration_seconds:
+        total = int(job.duration_seconds)
+        h, rem = divmod(total, 3600)
+        m, s = divmod(rem, 60)
+        if h:
+            duree = f"{h}h{m:02d}min{s:02d}s"
+        elif m:
+            duree = f"{m}min{s:02d}s"
+        else:
+            duree = f"{s}s"
+
+    return {"text": text, "duree": duree}
 
 
 def _extract_dossier_context(dossier_id: str, db) -> dict:
@@ -240,7 +253,9 @@ def _run_generation(doc_id: str):
 
         if doc.source_session_id:
             event_bus.publish(doc_id, {"status": "generating", "step": "transcription"})
-            context["transcription"] = _extract_transcription_context(doc.source_session_id, db)
+            transcription_ctx = _extract_transcription_context(doc.source_session_id, db)
+            context["transcription"] = transcription_ctx["text"]
+            context["duree"] = transcription_ctx["duree"]
 
         if doc.source_dossier_id:
             event_bus.publish(doc_id, {"status": "generating", "step": "dossier"})
