@@ -125,6 +125,18 @@ export function useDeleteParticipant(procedureId: string) {
   });
 }
 
+export function useGenerateConvocation(procedureId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<{ id: string; title: string; status: string }>(
+        `/procedures/${procedureId}/generate-convocation`,
+        {}
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.procedure(procedureId) }),
+  });
+}
+
 export function useSendInvitations(procedureId: string) {
   const qc = useQueryClient();
   return useMutation({

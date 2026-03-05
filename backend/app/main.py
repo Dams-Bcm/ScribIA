@@ -74,6 +74,13 @@ def _add_missing_columns():
                 "ALTER TABLE tenants ADD sector VARCHAR(50) NULL"
             ))
 
+        # ai_documents: extra_context
+        ai_doc_cols = {c["name"] for c in insp.get_columns("ai_documents")}
+        if "extra_context" not in ai_doc_cols:
+            conn.execute(text(
+                "ALTER TABLE ai_documents ADD extra_context NVARCHAR(MAX) NULL"
+            ))
+
         conn.commit()
 
 

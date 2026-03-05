@@ -40,6 +40,9 @@ class AIDocument(UUIDMixin, Base):
     source_dossier_id = Column(String(36), ForeignKey("preparatory_dossiers.id", ondelete="NO ACTION"), nullable=True)
     source_session_id = Column(String(36), ForeignKey("transcription_jobs.id", ondelete="NO ACTION"), nullable=True)
 
+    # JSON dict of extra context variables injected at generation time (e.g. from procedure)
+    extra_context  = Column(Text, nullable=True)
+
     result_text    = Column(Text, nullable=True)
     error_message  = Column(Text, nullable=True)
 

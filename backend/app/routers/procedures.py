@@ -27,6 +27,8 @@ from app.schemas.procedures import (
     ProcedureTemplateCreate, ProcedureTemplateResponse, ProcedureTemplateUpdate,
     ProcedureUpdate, PublicFormResponse, TemplateRoleCreate, TemplateRoleResponse,
 )
+from app.models.ai_documents import AIDocument, AIDocumentTemplate
+from app.services.ai_documents import enqueue_generation
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/procedures", tags=["procedures"])
@@ -480,6 +482,90 @@ def send_invitations(
     db.commit()
     db.refresh(proc)
     return _to_detail(proc)
+
+
+# ── Génération de convocation ─────────────────────────────────────────────────
+
+@router.post(
+    "/{procedure_id}/generate-convocation",
+    dependencies=[Depends(require_module("procedures"))],
+)
+def generate_convocation(
+    procedure_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Génère la convocation à partir des réponses collectées et de la date de réunion."""
+    proc = _get_procedure(db, procedure_id, user.tenant_id)
+
+    if not proc.document_template_id:
+        raise HTTPException(status_code=400, detail="Aucun template de document configuré pour cette procédure")
+
+    tpl = db.query(AIDocumentTemplate).filter_by(
+        id=proc.document_template_id, tenant_id=user.tenant_id,
+    ).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template de document introuvable")
+
+    # Construire l'ordre du jour à partir des réponses des participants
+    odj_lines = []
+    for p in proc.participants:
+        if not p.responses:
+            continue
+        try:
+            responses = json.loads(p.responses)
+            questions = json.loads(p.form_questions) if p.form_questions else []
+        except Exception:
+            continue
+        for q in questions:
+            q_id = q.get("id", "")
+            val = responses.get(q_id, "")
+            if val:
+                odj_lines.append(f"• [{p.role_name} — {p.name}] {q.get('label', '')}: {val}")
+
+    odj_text = "\n".join(odj_lines) if odj_lines else "(aucune réponse collectée)"
+
+    date_str = ""
+    if proc.meeting_date:
+        date_str = proc.meeting_date.strftime("%d/%m/%Y à %H:%M")
+
+    # Snapshot du template
+    snapshot = {
+        "name": tpl.name,
+        "document_type": tpl.document_type,
+        "system_prompt": tpl.system_prompt,
+        "user_prompt_template": tpl.user_prompt_template,
+        "ollama_model": tpl.ollama_model,
+        "temperature": tpl.temperature,
+    }
+
+    extra_context = {
+        "title": proc.title,
+        "date": date_str,
+        "documents_text": odj_text,
+    }
+
+    doc = AIDocument(
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        template_id=tpl.id,
+        template_snapshot=json.dumps(snapshot, ensure_ascii=False),
+        title=f"Convocation — {proc.title}",
+        status="pending",
+        extra_context=json.dumps(extra_context, ensure_ascii=False),
+    )
+    db.add(doc)
+    db.flush()
+
+    # Lier le document à la procédure
+    proc.ai_document_id = doc.id
+    log_action(db, "generate_convocation", user_id=user.id, tenant_id=user.tenant_id,
+               resource="procedure", resource_id=procedure_id)
+    db.commit()
+    db.refresh(doc)
+
+    enqueue_generation(doc.id)
+    return {"id": doc.id, "title": doc.title, "status": doc.status}
 
 
 # ── Formulaires publics (sans authentification) ───────────────────────────────

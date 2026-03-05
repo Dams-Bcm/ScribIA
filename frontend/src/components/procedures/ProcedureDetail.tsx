@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { CalendarDays, Mic, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { CalendarDays, Mic, Sparkles, ChevronDown, ChevronUp, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useProcedure, useUpdateProcedure } from "@/api/hooks/useProcedures";
+import { useProcedure, useUpdateProcedure, useGenerateConvocation } from "@/api/hooks/useProcedures";
 import { ParticipantManager } from "./ParticipantManager";
 import type { ProcedureStatus } from "@/api/types";
 
@@ -27,6 +27,7 @@ interface Props {
 export function ProcedureDetail({ procedureId }: Props) {
   const { data: proc, isLoading } = useProcedure(procedureId);
   const update = useUpdateProcedure();
+  const generateConvocation = useGenerateConvocation(procedureId);
   const [meetingDate, setMeetingDate] = useState("");
   const [showResponses, setShowResponses] = useState<string | null>(null);
 
@@ -138,7 +139,50 @@ export function ProcedureDetail({ procedureId }: Props) {
         </div>
       )}
 
-      {/* Lien transcription */}
+      {/* Convocation (statut scheduled) */}
+      {proc.status === "scheduled" && proc.document_template_id && (
+        <div className="border border-border rounded-lg p-4 space-y-3">
+          <p className="text-sm font-medium flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Convocation
+          </p>
+          {proc.ai_document_id ? (
+            <p className="text-xs text-muted-foreground">
+              Convocation générée.{" "}
+              <a
+                href={`/ai-documents?doc=${proc.ai_document_id}`}
+                className="text-primary underline"
+              >
+                Voir le document
+              </a>
+            </p>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Génère la convocation à partir des points d'ordre du jour collectés et de la date de réunion.
+              </p>
+              <Button
+                size="sm"
+                onClick={() => generateConvocation.mutate()}
+                disabled={generateConvocation.isPending}
+              >
+                {generateConvocation.isPending ? (
+                  <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Génération…</>
+                ) : (
+                  <><Sparkles className="w-3 h-3 mr-1" /> Générer la convocation</>
+                )}
+              </Button>
+              {generateConvocation.isError && (
+                <p className="text-xs text-destructive">
+                  Erreur : {(generateConvocation.error as Error)?.message}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Réunion tenue */}
       {proc.status === "scheduled" && (
         <div className="border border-border rounded-lg p-4 space-y-2">
           <p className="text-sm font-medium flex items-center gap-2">
@@ -155,12 +199,12 @@ export function ProcedureDetail({ procedureId }: Props) {
         </div>
       )}
 
-      {/* Génération IA */}
+      {/* Génération PV (statut meeting) */}
       {proc.status === "meeting" && proc.document_template_id && (
         <div className="border border-border rounded-lg p-4 space-y-2">
           <p className="text-sm font-medium flex items-center gap-2">
             <Sparkles className="w-4 h-4" />
-            Document final
+            Document final (PV)
           </p>
           <p className="text-xs text-muted-foreground">
             Liez une transcription depuis le module Transcription, puis déclenchez la génération IA.

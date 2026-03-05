@@ -264,6 +264,13 @@ def _run_generation(doc_id: str):
             dossier_ctx = _extract_dossier_context(doc.source_dossier_id, db)
             context.update(dossier_ctx)
 
+        # Extra context injected at creation time (e.g. from procedure convocation)
+        if doc.extra_context:
+            try:
+                context.update(json.loads(doc.extra_context))
+            except Exception:
+                pass
+
         # Nom de la collectivité depuis le tenant
         from app.models.tenant import Tenant
         tenant = db.query(Tenant).filter_by(id=doc.tenant_id).first()
