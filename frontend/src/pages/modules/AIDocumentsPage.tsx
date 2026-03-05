@@ -75,7 +75,8 @@ export function AIDocumentsPage() {
               <span className="font-semibold">Placeholders automatiques :</span>{" "}
               <code>{"{organisation}"}</code>, <code>{"{date}"}</code>,{" "}
               <code>{"{titre}"}</code>, <code>{"{points}"}</code>,{" "}
-              <code>{"{transcription}"}</code>, <code>{"{documents}"}</code>
+              <code>{"{transcription}"}</code>, <code>{"{documents}"}</code>,{" "}
+              <code>{"{duree}"}</code>
             </p>
           </div>
         </div>
