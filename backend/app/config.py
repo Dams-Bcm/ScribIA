@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     min_speakers: int = 2
     max_speakers: int = 8
     clustering_threshold: float = 0.65
+    speaker_matching_threshold: float = 0.75  # cosine similarity threshold for auto-match
 
     # ── Preparatory Phases ──────────────────────────────────────────────────
     prep_docs_path: str = "/data/prep_docs"

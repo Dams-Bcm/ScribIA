@@ -584,14 +584,29 @@ def process_diarisation_job(job_id: str):
         if duration > 0:
             job.duration_seconds = duration
 
-        # ── Step 2: Diarize ──────────────────────────────────────────────
+        # ── Step 2: Diarize + pre-extract embeddings ─────────────────────
         _update_job(db, job,
                     status=TranscriptionJobStatus.DIARIZING,
                     progress=10,
                     progress_message="Identification des intervenants...")
 
+        speaker_embeddings: dict = {}
         try:
             diarization_segments = run_diarization(wav_path, num_speakers=job.num_speakers)
+
+            # Pre-extract per-speaker embeddings while pyannote is still in memory.
+            # Used later for automatic profile matching — non-critical.
+            try:
+                from app.services.speaker_enrollment import (
+                    extract_speaker_embeddings_from_diarisation,
+                )
+                speaker_embeddings = extract_speaker_embeddings_from_diarisation(
+                    wav_path, diarization_segments
+                )
+            except Exception as e_emb:
+                logger.warning(
+                    f"[MATCHING] Pre-extraction failed (non-critical): {e_emb}"
+                )
         except Exception as e:
             _update_job(db, job,
                         status=TranscriptionJobStatus.ERROR,
@@ -673,6 +688,22 @@ def process_diarisation_job(job_id: str):
 
         job.detected_speakers = len(unique_speakers)
         db.commit()
+
+        # ── Step 5.5: Auto-match detected speakers to known profiles ──────
+        if speaker_embeddings:
+            try:
+                from app.services.speaker_enrollment import match_speakers_to_profiles
+                match_speakers_to_profiles(
+                    job_id=job.id,
+                    tenant_id=job.tenant_id,
+                    speaker_embeddings=speaker_embeddings,
+                    db=db,
+                    threshold=settings.speaker_matching_threshold,
+                )
+            except Exception as e_match:
+                logger.warning(
+                    f"[MATCHING] Auto-match failed (non-critical): {e_match}"
+                )
 
         # ── Done ─────────────────────────────────────────────────────────
         _update_job(db, job,
