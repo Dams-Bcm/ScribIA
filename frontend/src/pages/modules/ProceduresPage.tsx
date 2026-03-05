@@ -2,8 +2,6 @@ import { useState } from "react";
 import { ProcedureList } from "@/components/procedures/ProcedureList";
 import { ProcedureDetail } from "@/components/procedures/ProcedureDetail";
 import { CreateProcedureDialog } from "@/components/procedures/CreateProcedureDialog";
-import { ProcedureTemplateManager } from "@/components/procedures/ProcedureTemplateManager";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Procedure } from "@/api/types";
 
 export function ProceduresPage() {
@@ -25,41 +23,26 @@ export function ProceduresPage() {
         <CreateProcedureDialog onCreated={handleCreated} />
       </div>
 
-      <Tabs defaultValue="procedures" className="flex-1 flex flex-col min-h-0">
-        <TabsList className="w-fit">
-          <TabsTrigger value="procedures">Procédures</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 flex-1 min-h-0">
+        {/* Liste */}
+        <div className="border border-border rounded-lg p-3 overflow-y-auto">
+          <ProcedureList
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
+        </div>
 
-        <TabsContent value="procedures" className="flex-1 min-h-0">
-          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 h-full">
-            {/* Liste */}
-            <div className="border border-border rounded-lg p-3 overflow-y-auto">
-              <ProcedureList
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-              />
+        {/* Détail */}
+        <div className="border border-border rounded-lg p-4 overflow-y-auto">
+          {selectedId ? (
+            <ProcedureDetail procedureId={selectedId} />
+          ) : (
+            <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+              Sélectionnez une procédure pour voir le détail
             </div>
-
-            {/* Détail */}
-            <div className="border border-border rounded-lg p-4 overflow-y-auto">
-              {selectedId ? (
-                <ProcedureDetail procedureId={selectedId} />
-              ) : (
-                <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                  Sélectionnez une procédure pour voir le détail
-                </div>
-              )}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="templates" className="flex-1 min-h-0 overflow-y-auto">
-          <div className="max-w-3xl">
-            <ProcedureTemplateManager />
-          </div>
-        </TabsContent>
-      </Tabs>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

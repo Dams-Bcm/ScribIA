@@ -23,11 +23,11 @@ const QUESTION_TYPES = [
   { value: "text", label: "Texte court" },
 ];
 
-export function ProcedureTemplateManager() {
-  const { data: templates = [] } = useProcedureTemplates();
+export function ProcedureTemplateManager({ tenantId }: { tenantId?: string } = {}) {
+  const { data: templates = [] } = useProcedureTemplates(tenantId);
   const { data: docTemplates = [] } = useTemplates();
-  const createTemplate = useCreateProcedureTemplate();
-  const deleteTemplate = useDeleteProcedureTemplate();
+  const createTemplate = useCreateProcedureTemplate(tenantId);
+  const deleteTemplate = useDeleteProcedureTemplate(tenantId);
   const [createOpen, setCreateOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 

@@ -14,43 +14,45 @@ import type {
 } from "@/api/types";
 
 const KEYS = {
-  templates: ["procedures", "templates"] as const,
+  templates: (tenantId?: string) => ["procedures", "templates", tenantId ?? "mine"] as const,
   procedures: ["procedures", "list"] as const,
   procedure: (id: string) => ["procedures", "detail", id] as const,
 };
 
 // ── Templates ─────────────────────────────────────────────────────────────────
 
-export function useProcedureTemplates() {
+export function useProcedureTemplates(tenantId?: string) {
+  const params = tenantId ? `?tenant_id=${tenantId}` : "";
   return useQuery({
-    queryKey: KEYS.templates,
-    queryFn: () => api.get<ProcedureTemplate[]>("/procedures/templates"),
+    queryKey: KEYS.templates(tenantId),
+    queryFn: () => api.get<ProcedureTemplate[]>(`/procedures/templates${params}`),
   });
 }
 
-export function useCreateProcedureTemplate() {
+export function useCreateProcedureTemplate(tenantId?: string) {
   const qc = useQueryClient();
+  const params = tenantId ? `?tenant_id=${tenantId}` : "";
   return useMutation({
     mutationFn: (body: ProcedureTemplateCreate) =>
-      api.post<ProcedureTemplate>("/procedures/templates", body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.templates }),
+      api.post<ProcedureTemplate>(`/procedures/templates${params}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.templates(tenantId) }),
   });
 }
 
-export function useUpdateProcedureTemplate() {
+export function useUpdateProcedureTemplate(tenantId?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...body }: ProcedureTemplateUpdate & { id: string }) =>
       api.patch<ProcedureTemplate>(`/procedures/templates/${id}`, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.templates }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.templates(tenantId) }),
   });
 }
 
-export function useDeleteProcedureTemplate() {
+export function useDeleteProcedureTemplate(tenantId?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete(`/procedures/templates/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.templates }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.templates(tenantId) }),
   });
 }
 

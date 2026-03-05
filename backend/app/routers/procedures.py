@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.deps import get_current_user, require_module
+from app.deps import get_current_user, require_module, require_super_admin
 from app.models.procedures import (
     Procedure, ProcedureParticipant, ProcedureTemplate,
     ProcedureTemplateRole, ProcedureStatus,
@@ -35,6 +35,13 @@ router = APIRouter(prefix="/procedures", tags=["procedures"])
 
 # Router séparé pour les formulaires publics (pas de require_module ni auth)
 public_router = APIRouter(prefix="/forms", tags=["procedures-public"])
+
+
+def _resolve_tenant_id(user: User, tenant_id: str | None) -> str:
+    """Super admin can target any tenant; others use their own."""
+    if tenant_id and user.is_super_admin:
+        return tenant_id
+    return user.tenant_id
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -126,13 +133,15 @@ def _to_template_response(tpl: ProcedureTemplate) -> ProcedureTemplateResponse:
     dependencies=[Depends(require_module("procedures"))],
 )
 def list_templates(
+    tenant_id: str | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    tid = _resolve_tenant_id(user, tenant_id)
     templates = (
         db.query(ProcedureTemplate)
         .options(joinedload(ProcedureTemplate.roles))
-        .filter(ProcedureTemplate.tenant_id == user.tenant_id)
+        .filter(ProcedureTemplate.tenant_id == tid)
         .order_by(ProcedureTemplate.created_at.desc())
         .all()
     )
@@ -147,11 +156,13 @@ def list_templates(
 )
 def create_template(
     body: ProcedureTemplateCreate,
-    user: User = Depends(get_current_user),
+    tenant_id: str | None = None,
+    user: User = Depends(require_super_admin),
     db: Session = Depends(get_db),
 ):
+    tid = _resolve_tenant_id(user, tenant_id)
     tpl = ProcedureTemplate(
-        tenant_id=user.tenant_id,
+        tenant_id=tid,
         name=body.name,
         description=body.description,
         document_template_id=body.document_template_id,
@@ -166,7 +177,7 @@ def create_template(
             form_questions=_dump_questions(role.form_questions),
             invitation_delay_days=role.invitation_delay_days,
         ))
-    log_action(db, "create_procedure_template", user_id=user.id, tenant_id=user.tenant_id,
+    log_action(db, "create_procedure_template", user_id=user.id, tenant_id=tid,
                resource="procedure_template", details={"name": body.name})
     db.commit()
     db.refresh(tpl)
@@ -181,13 +192,13 @@ def create_template(
 def update_template(
     template_id: str,
     body: ProcedureTemplateUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_super_admin),
     db: Session = Depends(get_db),
 ):
     tpl = (
         db.query(ProcedureTemplate)
         .options(joinedload(ProcedureTemplate.roles))
-        .filter(ProcedureTemplate.id == template_id, ProcedureTemplate.tenant_id == user.tenant_id)
+        .filter(ProcedureTemplate.id == template_id)
         .first()
     )
     if not tpl:
@@ -206,12 +217,11 @@ def update_template(
 )
 def delete_template(
     template_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_super_admin),
     db: Session = Depends(get_db),
 ):
     tpl = db.query(ProcedureTemplate).filter(
         ProcedureTemplate.id == template_id,
-        ProcedureTemplate.tenant_id == user.tenant_id,
     ).first()
     if not tpl:
         raise HTTPException(status_code=404, detail="Template introuvable")
@@ -228,12 +238,11 @@ def delete_template(
 def add_template_role(
     template_id: str,
     body: TemplateRoleCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_super_admin),
     db: Session = Depends(get_db),
 ):
     tpl = db.query(ProcedureTemplate).filter(
         ProcedureTemplate.id == template_id,
-        ProcedureTemplate.tenant_id == user.tenant_id,
     ).first()
     if not tpl:
         raise HTTPException(status_code=404, detail="Template introuvable")
@@ -265,12 +274,11 @@ def add_template_role(
 def delete_template_role(
     template_id: str,
     role_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_super_admin),
     db: Session = Depends(get_db),
 ):
     tpl = db.query(ProcedureTemplate).filter(
         ProcedureTemplate.id == template_id,
-        ProcedureTemplate.tenant_id == user.tenant_id,
     ).first()
     if not tpl:
         raise HTTPException(status_code=404, detail="Template introuvable")

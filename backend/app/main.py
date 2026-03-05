@@ -124,7 +124,7 @@ def _sync_tenant_modules():
             existing_keys = {m.module_key for m in tenant.modules}
             for key in AVAILABLE_MODULES:
                 if key not in existing_keys:
-                    db.add(TenantModule(tenant_id=tenant.id, module_key=key, enabled=True))
+                    db.add(TenantModule(tenant_id=tenant.id, module_key=key, enabled=False))
         db.commit()
     finally:
         db.close()
