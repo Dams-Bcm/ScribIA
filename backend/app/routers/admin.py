@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Tenant, TenantModule, User, AVAILABLE_MODULES, AuditLog
+import json
+from app.models import Tenant, TenantModule, User, AVAILABLE_MODULES, AuditLog, AIDocumentTemplate, ProcedureTemplate, ProcedureTemplateRole
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantModuleUpdate
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.services.auth import hash_password
@@ -152,6 +153,286 @@ def update_tenant_modules(
 @router.get("/modules")
 def list_available_modules(_: User = Depends(require_super_admin)):
     return [{"key": k, "label": v} for k, v in AVAILABLE_MODULES.items()]
+
+
+# ── Provisioning ──────────────────────────────────────────────────────────────
+
+# Templates par secteur
+_SECTOR_SEEDS: dict[str, dict] = {
+    "syndic_copro": {
+        "procedure_templates": [
+            {
+                "name": "AG Copropriété",
+                "description": "Assemblée générale annuelle ou extraordinaire de copropriété",
+                "roles": [
+                    {
+                        "role_name": "Copropriétaire",
+                        "order_index": 0,
+                        "invitation_delay_days": 21,
+                        "form_questions": [
+                            {"id": "q1", "label": "Points que vous souhaitez inscrire à l'ordre du jour", "type": "textarea", "required": True, "options": []},
+                            {"id": "q2", "label": "Questions sur la gestion ou les comptes de l'exercice", "type": "textarea", "required": False, "options": []},
+                            {"id": "q3", "label": "Souhaitez-vous voter par correspondance ? Si oui, précisez vos positions sur les résolutions connues.", "type": "textarea", "required": False, "options": []},
+                        ],
+                    },
+                    {
+                        "role_name": "Conseil syndical",
+                        "order_index": 1,
+                        "invitation_delay_days": 30,
+                        "form_questions": [
+                            {"id": "q4", "label": "Points de contrôle ou observations sur la gestion de l'exercice", "type": "textarea", "required": False, "options": []},
+                            {"id": "q5", "label": "Travaux ou prestations à inscrire à l'ordre du jour", "type": "textarea", "required": False, "options": []},
+                        ],
+                    },
+                ],
+            },
+        ],
+        "document_templates": [
+            {
+                "name": "Convocation AG",
+                "document_type": "custom",
+                "description": "Convocation à l'assemblée générale de copropriété (délai légal 21 jours)",
+                "system_prompt": "Tu es un assistant juridique spécialisé en droit de la copropriété. Rédige des convocations formelles, précises et conformes à la loi du 10 juillet 1965 et au décret du 17 mars 1967.",
+                "user_prompt_template": "Rédige une convocation à l'assemblée générale pour la copropriété suivante.\n\nTitre : {titre}\nDate de réunion : {date}\nOrganisation : {organisation}\n\nPoints d'ordre du jour collectés auprès des participants :\n{documents}\n\nLa convocation doit mentionner :\n- Lieu, date et heure de la réunion\n- L'ordre du jour complet et structuré\n- La possibilité de voter par correspondance\n- Les modalités de consultation des pièces\n- Le délai légal de convocation (21 jours minimum)\n\nStyle : formel, juridique.",
+                "temperature": 0.2,
+            },
+            {
+                "name": "PV d'AG",
+                "document_type": "pv",
+                "description": "Procès-verbal d'assemblée générale de copropriété",
+                "system_prompt": "Tu es un assistant juridique spécialisé en droit de la copropriété. Rédige des procès-verbaux d'AG conformes aux exigences légales : structure formelle, résolutions clairement identifiées, résultats de vote mentionnés.",
+                "user_prompt_template": "Rédige le procès-verbal de l'assemblée générale à partir de la transcription et des informations ci-dessous.\n\nTitre : {titre}\nDate : {date}\nOrganisation : {organisation}\n\nTranscription de la réunion :\n{transcription}\n\nInformations collectées en amont :\n{documents}\n\nStructure attendue du PV :\n1. En-tête (immeuble, date, heure d'ouverture/clôture)\n2. Présences et pouvoirs (présents, représentés, absents)\n3. Résolutions : pour chaque point de l'ordre du jour → intitulé, débat résumé, résultat du vote (pour/contre/abstention), résolution adoptée ou rejetée\n4. Questions diverses\n5. Clôture de séance\n6. Mentions légales (notification dans le mois, contestation sous 2 mois)\n\nStyle : juridique, neutre, factuel.",
+                "temperature": 0.2,
+            },
+        ],
+    },
+    "collectivite": {
+        "procedure_templates": [
+            {
+                "name": "Conseil municipal / séance délibérante",
+                "description": "Séance du conseil municipal ou de tout organe délibérant d'une collectivité",
+                "roles": [
+                    {
+                        "role_name": "Élu / Conseiller",
+                        "order_index": 0,
+                        "invitation_delay_days": 7,
+                        "form_questions": [
+                            {"id": "q1", "label": "Points que vous souhaitez ajouter à l'ordre du jour", "type": "textarea", "required": False, "options": []},
+                            {"id": "q2", "label": "Questions ou observations sur les dossiers inscrits", "type": "textarea", "required": False, "options": []},
+                        ],
+                    },
+                    {
+                        "role_name": "Service instructeur",
+                        "order_index": 1,
+                        "invitation_delay_days": 10,
+                        "form_questions": [
+                            {"id": "q3", "label": "Éléments de contexte ou précisions sur les dossiers à délibérer", "type": "textarea", "required": False, "options": []},
+                        ],
+                    },
+                ],
+            },
+        ],
+        "document_templates": [
+            {
+                "name": "Compte-rendu de séance",
+                "document_type": "summary",
+                "description": "Compte-rendu de séance d'un organe délibérant",
+                "system_prompt": "Tu es un assistant spécialisé en rédaction administrative pour les collectivités territoriales. Rédige des comptes-rendus clairs, neutres et structurés.",
+                "user_prompt_template": "Rédige le compte-rendu de la séance à partir de la transcription.\n\nTitre : {titre}\nDate : {date}\nOrganisation : {organisation}\n\nTranscription :\n{transcription}\n\nInformations collectées :\n{documents}\n\nStructure : présences, points abordés, décisions prises, prochaines étapes.",
+                "temperature": 0.3,
+            },
+        ],
+    },
+    "education_spe": {
+        "procedure_templates": [
+            {
+                "name": "Réunion ESS / équipe pluridisciplinaire",
+                "description": "Réunion d'équipe de suivi de scolarisation ou réunion pluridisciplinaire",
+                "roles": [
+                    {
+                        "role_name": "Enseignant référent",
+                        "order_index": 0,
+                        "invitation_delay_days": 15,
+                        "form_questions": [
+                            {"id": "q1", "label": "Observations sur la scolarité et les apprentissages", "type": "textarea", "required": True, "options": []},
+                            {"id": "q2", "label": "Aménagements mis en place et résultats observés", "type": "textarea", "required": False, "options": []},
+                        ],
+                    },
+                    {
+                        "role_name": "Famille / représentant légal",
+                        "order_index": 1,
+                        "invitation_delay_days": 15,
+                        "form_questions": [
+                            {"id": "q3", "label": "Observations de la famille sur l'évolution de l'enfant", "type": "textarea", "required": False, "options": []},
+                            {"id": "q4", "label": "Attentes ou demandes particulières pour cette réunion", "type": "textarea", "required": False, "options": []},
+                        ],
+                    },
+                    {
+                        "role_name": "Professionnel spécialisé",
+                        "order_index": 2,
+                        "invitation_delay_days": 15,
+                        "form_questions": [
+                            {"id": "q5", "label": "Bilan de suivi et préconisations", "type": "textarea", "required": False, "options": []},
+                        ],
+                    },
+                ],
+            },
+        ],
+        "document_templates": [
+            {
+                "name": "Compte-rendu ESS",
+                "document_type": "summary",
+                "description": "Compte-rendu de réunion d'équipe de suivi de scolarisation",
+                "system_prompt": "Tu es un assistant spécialisé en éducation inclusive et accompagnement des élèves à besoins particuliers. Rédige des comptes-rendus bienveillants, précis et centrés sur l'élève.",
+                "user_prompt_template": "Rédige le compte-rendu de la réunion ESS à partir de la transcription et des informations collectées.\n\nTitre : {titre}\nDate : {date}\nOrganisation : {organisation}\n\nTranscription :\n{transcription}\n\nInformations collectées auprès des participants :\n{documents}\n\nStructure : participants présents, bilan de la période, points abordés, décisions et aménagements retenus, objectifs pour la prochaine période, prochaine échéance.",
+                "temperature": 0.3,
+            },
+        ],
+    },
+    "chantier": {
+        "procedure_templates": [
+            {
+                "name": "Réunion de chantier",
+                "description": "Réunion de suivi de chantier avec les intervenants",
+                "roles": [
+                    {
+                        "role_name": "Entreprise / Sous-traitant",
+                        "order_index": 0,
+                        "invitation_delay_days": 7,
+                        "form_questions": [
+                            {"id": "q1", "label": "Avancement des travaux depuis la dernière réunion", "type": "textarea", "required": True, "options": []},
+                            {"id": "q2", "label": "Points bloquants ou réserves à signaler", "type": "textarea", "required": False, "options": []},
+                            {"id": "q3", "label": "Besoins ou demandes pour la prochaine période", "type": "textarea", "required": False, "options": []},
+                        ],
+                    },
+                    {
+                        "role_name": "Maître d'œuvre / Conducteur de travaux",
+                        "order_index": 1,
+                        "invitation_delay_days": 7,
+                        "form_questions": [
+                            {"id": "q4", "label": "Points à aborder en réunion", "type": "textarea", "required": False, "options": []},
+                        ],
+                    },
+                ],
+            },
+        ],
+        "document_templates": [
+            {
+                "name": "Compte-rendu de chantier",
+                "document_type": "summary",
+                "description": "Compte-rendu de réunion de chantier",
+                "system_prompt": "Tu es un assistant spécialisé en gestion de chantier. Rédige des comptes-rendus précis, factuels et structurés pour le suivi de travaux.",
+                "user_prompt_template": "Rédige le compte-rendu de la réunion de chantier à partir de la transcription.\n\nTitre : {titre}\nDate : {date}\nOrganisation : {organisation}\n\nTranscription :\n{transcription}\n\nInformations collectées auprès des intervenants :\n{documents}\n\nStructure : intervenants présents, avancement par lot, réserves et points bloquants, décisions prises, actions à mener avant la prochaine réunion, date de la prochaine réunion.",
+                "temperature": 0.2,
+            },
+        ],
+    },
+    "sante": {
+        "procedure_templates": [
+            {
+                "name": "Réunion pluridisciplinaire",
+                "description": "Réunion d'équipe médico-sociale ou pluridisciplinaire",
+                "roles": [
+                    {
+                        "role_name": "Professionnel de santé",
+                        "order_index": 0,
+                        "invitation_delay_days": 10,
+                        "form_questions": [
+                            {"id": "q1", "label": "Points à aborder concernant le patient/résident", "type": "textarea", "required": False, "options": []},
+                            {"id": "q2", "label": "Observations cliniques ou sociales récentes", "type": "textarea", "required": False, "options": []},
+                        ],
+                    },
+                    {
+                        "role_name": "Coordinateur / Référent",
+                        "order_index": 1,
+                        "invitation_delay_days": 10,
+                        "form_questions": [
+                            {"id": "q3", "label": "Éléments de suivi et coordination à partager", "type": "textarea", "required": False, "options": []},
+                        ],
+                    },
+                ],
+            },
+        ],
+        "document_templates": [
+            {
+                "name": "Compte-rendu de réunion pluridisciplinaire",
+                "document_type": "summary",
+                "description": "Compte-rendu de réunion d'équipe médico-sociale",
+                "system_prompt": "Tu es un assistant spécialisé en rédaction médico-sociale. Rédige des comptes-rendus professionnels, bienveillants et respectueux de la confidentialité.",
+                "user_prompt_template": "Rédige le compte-rendu de la réunion pluridisciplinaire à partir de la transcription.\n\nTitre : {titre}\nDate : {date}\nOrganisation : {organisation}\n\nTranscription :\n{transcription}\n\nInformations collectées :\n{documents}\n\nStructure : participants, situation présentée, échanges synthétisés, décisions et orientations retenues, prochaines étapes.",
+                "temperature": 0.3,
+            },
+        ],
+    },
+}
+
+
+@router.post("/tenants/{tenant_id}/provision")
+def provision_tenant(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Provisionne les templates de procédures et de documents IA pour un tenant selon son secteur."""
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Organisation introuvable")
+    if not tenant.sector:
+        raise HTTPException(status_code=400, detail="Ce tenant n'a pas de secteur défini")
+
+    seed = _SECTOR_SEEDS.get(tenant.sector)
+    if not seed:
+        raise HTTPException(status_code=400, detail=f"Aucun template disponible pour le secteur '{tenant.sector}'")
+
+    created_proc_templates = []
+    created_doc_templates = []
+
+    # Créer les templates de documents IA
+    for dt in seed.get("document_templates", []):
+        doc_tmpl = AIDocumentTemplate(
+            tenant_id=tenant_id,
+            name=dt["name"],
+            description=dt.get("description"),
+            document_type=dt.get("document_type", "custom"),
+            system_prompt=dt["system_prompt"],
+            user_prompt_template=dt["user_prompt_template"],
+            temperature=dt.get("temperature", 0.3),
+        )
+        db.add(doc_tmpl)
+        db.flush()
+        created_doc_templates.append({"id": doc_tmpl.id, "name": doc_tmpl.name})
+
+    # Créer les templates de procédures (avec lien vers le 1er doc template si disponible)
+    first_doc_id = created_doc_templates[0]["id"] if created_doc_templates else None
+
+    for pt in seed.get("procedure_templates", []):
+        proc_tmpl = ProcedureTemplate(
+            tenant_id=tenant_id,
+            name=pt["name"],
+            description=pt.get("description"),
+            document_template_id=first_doc_id,
+        )
+        db.add(proc_tmpl)
+        db.flush()
+
+        for role in pt.get("roles", []):
+            db.add(ProcedureTemplateRole(
+                template_id=proc_tmpl.id,
+                role_name=role["role_name"],
+                order_index=role.get("order_index", 0),
+                invitation_delay_days=role.get("invitation_delay_days", 15),
+                form_questions=json.dumps(role.get("form_questions", []), ensure_ascii=False),
+            ))
+
+        created_proc_templates.append({"id": proc_tmpl.id, "name": proc_tmpl.name})
+
+    db.commit()
+
+    return {
+        "sector": tenant.sector,
+        "procedure_templates": created_proc_templates,
+        "document_templates": created_doc_templates,
+    }
 
 
 # ── Users ─────────────────────────────────────────────────────────────────────

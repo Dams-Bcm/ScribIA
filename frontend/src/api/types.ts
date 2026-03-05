@@ -93,6 +93,12 @@ export interface TenantCreate {
   modules?: string[];
 }
 
+export interface ProvisionResult {
+  sector: string;
+  procedure_templates: { id: string; name: string }[];
+  document_templates: { id: string; name: string }[];
+}
+
 export interface TenantUpdate {
   name?: string;
   slug?: string;

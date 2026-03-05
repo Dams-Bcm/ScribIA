@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../client";
-import type { Tenant, TenantCreate, TenantUpdate, ModuleDefinition } from "../types";
+import type { Tenant, TenantCreate, TenantUpdate, ModuleDefinition, ProvisionResult } from "../types";
 
 export function useTenants() {
   return useQuery<Tenant[]>({
@@ -47,5 +47,11 @@ export function useUpdateTenantModules() {
     mutationFn: ({ tenantId, modules }: { tenantId: string; modules: { module_key: string; enabled: boolean }[] }) =>
       api.put(`/admin/tenants/${tenantId}/modules`, modules),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "tenants"] }),
+  });
+}
+
+export function useProvisionTenant() {
+  return useMutation({
+    mutationFn: (tenantId: string) => api.post<ProvisionResult>(`/admin/tenants/${tenantId}/provision`, {}),
   });
 }

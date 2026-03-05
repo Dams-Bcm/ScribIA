@@ -4,19 +4,22 @@ import {
   useCreateTenant,
   useDeleteTenant,
   useUpdateTenantModules,
+  useProvisionTenant,
 } from "../../api/hooks/useTenants";
-import { AVAILABLE_MODULES, SECTOR_PRESETS, type Tenant, type TenantSector } from "../../api/types";
-import { Building2, Plus, Trash2, X } from "lucide-react";
+import { AVAILABLE_MODULES, SECTOR_PRESETS, type Tenant, type TenantSector, type ProvisionResult } from "../../api/types";
+import { Building2, Plus, Trash2, X, CheckCircle2, Sparkles } from "lucide-react";
 
 export function OrganizationsPage() {
   const { data: tenants = [], isLoading } = useTenants();
   const createTenant = useCreateTenant();
   const deleteTenant = useDeleteTenant();
   const updateModules = useUpdateTenantModules();
+  const provisionTenant = useProvisionTenant();
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", slug: "", tenant_type: "organization" as string, sector: null as TenantSector | null, modules: [] as string[] });
+  const [provisionResult, setProvisionResult] = useState<ProvisionResult | null>(null);
 
   function handleSectorChange(sector: TenantSector | null) {
     const preset = sector ? SECTOR_PRESETS.find((p) => p.key === sector) : null;
@@ -32,9 +35,22 @@ export function OrganizationsPage() {
     createTenant.mutate(
       { name: form.name, slug: form.slug.toLowerCase().replace(/\s+/g, "-"), tenant_type: form.tenant_type, sector: form.sector, modules: form.modules },
       {
-        onSuccess: () => {
-          setShowCreate(false);
-          setForm({ name: "", slug: "", tenant_type: "organization", sector: null, modules: [] });
+        onSuccess: (newTenant) => {
+          if (form.sector) {
+            provisionTenant.mutate(newTenant.id, {
+              onSuccess: (result) => {
+                setProvisionResult(result);
+                setForm({ name: "", slug: "", tenant_type: "organization", sector: null, modules: [] });
+              },
+              onError: () => {
+                setShowCreate(false);
+                setForm({ name: "", slug: "", tenant_type: "organization", sector: null, modules: [] });
+              },
+            });
+          } else {
+            setShowCreate(false);
+            setForm({ name: "", slug: "", tenant_type: "organization", sector: null, modules: [] });
+          }
         },
       },
     );
@@ -73,7 +89,7 @@ export function OrganizationsPage() {
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Nouvelle organisation
+          Nouveau client
         </button>
       </div>
 
@@ -114,6 +130,17 @@ export function OrganizationsPage() {
                 )}
               </p>
 
+              {selected.sector && (
+                <button
+                  onClick={() => provisionTenant.mutate(selected.id, { onSuccess: setProvisionResult })}
+                  disabled={provisionTenant.isPending}
+                  className="flex items-center gap-2 mb-4 px-3 py-1.5 rounded-lg border border-border text-sm hover:bg-accent transition-colors disabled:opacity-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {provisionTenant.isPending ? "Provisionnement…" : "Provisionner les templates"}
+                </button>
+              )}
+
               <h3 className="text-sm font-semibold mb-3">Modules activés</h3>
               <div className="space-y-2">
                 {AVAILABLE_MODULES.map((mod) => {
@@ -141,108 +168,166 @@ export function OrganizationsPage() {
         </div>
       </div>
 
-      {/* Create modal */}
-      {showCreate && (
+      {/* Create / Provision modal */}
+      {(showCreate || provisionResult) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-background rounded-xl border border-border p-6 w-full max-w-md shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Nouvelle organisation</h2>
-              <button onClick={() => setShowCreate(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
-            </div>
+          <div className="bg-background rounded-xl border border-border p-6 w-full max-w-md shadow-lg max-h-[90vh] overflow-y-auto">
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Nom</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="Mon organisation"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Slug</label>
-                <input
-                  type="text"
-                  value={form.slug}
-                  onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="mon-organisation"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Type</label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setForm({ ...form, tenant_type: "organization" })}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${form.tenant_type === "organization" ? "bg-primary text-primary-foreground border-primary" : "border-input hover:bg-accent"}`}
-                  >
-                    Organisation
-                  </button>
-                  <button
-                    onClick={() => setForm({ ...form, tenant_type: "group" })}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${form.tenant_type === "group" ? "bg-primary text-primary-foreground border-primary" : "border-input hover:bg-accent"}`}
-                  >
-                    Groupe
-                  </button>
+            {/* ── Résultat de provisionnement ── */}
+            {provisionResult ? (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold">Client créé</h2>
+                  <button onClick={() => setProvisionResult(null)}><X className="w-5 h-5 text-muted-foreground" /></button>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Secteur <span className="text-muted-foreground font-normal">(pré-configure les modules)</span></label>
-                <select
-                  value={form.sector ?? ""}
-                  onChange={(e) => handleSectorChange((e.target.value as TenantSector) || null)}
-                  className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                <div className="flex flex-col items-center gap-2 py-4 text-center">
+                  <CheckCircle2 className="w-10 h-10 text-green-500" />
+                  <p className="font-semibold">Provisionnement terminé</p>
+                  <p className="text-sm text-muted-foreground">
+                    {SECTOR_PRESETS.find((s) => s.key === provisionResult.sector)?.label ?? provisionResult.sector}
+                  </p>
+                </div>
+                <div className="space-y-3 mt-2">
+                  {provisionResult.procedure_templates.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Templates de procédure</p>
+                      {provisionResult.procedure_templates.map((t) => (
+                        <div key={t.id} className="flex items-center gap-2 text-sm py-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                          {t.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {provisionResult.document_templates.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Templates de documents IA</p>
+                      {provisionResult.document_templates.map((t) => (
+                        <div key={t.id} className="flex items-center gap-2 text-sm py-1">
+                          <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+                          {t.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setProvisionResult(null)}
+                  className="w-full mt-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
                 >
-                  <option value="">— Générique —</option>
-                  {SECTOR_PRESETS.map((s) => (
-                    <option key={s.key} value={s.key}>{s.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Modules</label>
-                <div className="space-y-2">
-                  {AVAILABLE_MODULES.map((mod) => (
-                    <label key={mod.key} className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={form.modules.includes(mod.key)}
-                        onChange={(e) => {
-                          setForm({
-                            ...form,
-                            modules: e.target.checked
-                              ? [...form.modules, mod.key]
-                              : form.modules.filter((m) => m !== mod.key),
-                          });
-                        }}
-                        className="w-4 h-4 rounded border-input"
-                      />
-                      <span className="text-sm">{mod.label}</span>
-                    </label>
-                  ))}
+                  Fermer
+                </button>
+              </>
+            ) : (
+              /* ── Formulaire de création ── */
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold">Nouveau client</h2>
+                  <button onClick={() => setShowCreate(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
                 </div>
-              </div>
 
-              {createTenant.isError && (
-                <p className="text-sm text-destructive">
-                  {createTenant.error instanceof Error ? createTenant.error.message : "Erreur"}
-                </p>
-              )}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Nom</label>
+                    <input
+                      type="text"
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="Cabinet Gestion ABC"
+                    />
+                  </div>
 
-              <button
-                onClick={handleCreate}
-                disabled={!form.name || !form.slug || createTenant.isPending}
-                className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {createTenant.isPending ? "Création..." : "Créer"}
-              </button>
-            </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Slug</label>
+                    <input
+                      type="text"
+                      value={form.slug}
+                      onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="cabinet-gestion-abc"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Type</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setForm({ ...form, tenant_type: "organization" })}
+                        className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${form.tenant_type === "organization" ? "bg-primary text-primary-foreground border-primary" : "border-input hover:bg-accent"}`}
+                      >
+                        Organisation
+                      </button>
+                      <button
+                        onClick={() => setForm({ ...form, tenant_type: "group" })}
+                        className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${form.tenant_type === "group" ? "bg-primary text-primary-foreground border-primary" : "border-input hover:bg-accent"}`}
+                      >
+                        Groupe
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">
+                      Secteur <span className="text-muted-foreground font-normal">(génère les templates automatiquement)</span>
+                    </label>
+                    <select
+                      value={form.sector ?? ""}
+                      onChange={(e) => handleSectorChange((e.target.value as TenantSector) || null)}
+                      className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">— Générique (sans provisionnement) —</option>
+                      {SECTOR_PRESETS.map((s) => (
+                        <option key={s.key} value={s.key}>{s.label}</option>
+                      ))}
+                    </select>
+                    {form.sector && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Les templates de procédures et de documents IA seront créés automatiquement.
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Modules</label>
+                    <div className="space-y-2">
+                      {AVAILABLE_MODULES.map((mod) => (
+                        <label key={mod.key} className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={form.modules.includes(mod.key)}
+                            onChange={(e) => {
+                              setForm({
+                                ...form,
+                                modules: e.target.checked
+                                  ? [...form.modules, mod.key]
+                                  : form.modules.filter((m) => m !== mod.key),
+                              });
+                            }}
+                            className="w-4 h-4 rounded border-input"
+                          />
+                          <span className="text-sm">{mod.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {createTenant.isError && (
+                    <p className="text-sm text-destructive">
+                      {createTenant.error instanceof Error ? createTenant.error.message : "Erreur"}
+                    </p>
+                  )}
+
+                  <button
+                    onClick={handleCreate}
+                    disabled={!form.name || !form.slug || createTenant.isPending || provisionTenant.isPending}
+                    className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    {provisionTenant.isPending ? "Provisionnement…" : createTenant.isPending ? "Création…" : form.sector ? "Créer et provisionner" : "Créer"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
