@@ -1,12 +1,16 @@
 import { useState } from "react";
-import { Check, Pencil, X } from "lucide-react";
+import { Check, Pencil, X, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/stores/auth";
 import type { DiarisationSpeaker } from "@/api/types";
 import { getSpeakerColor } from "./speakerColors";
+import { EnrollSpeakerModal } from "./EnrollSpeakerModal";
 
 interface SpeakerPanelProps {
   speakers: DiarisationSpeaker[];
+  jobId: string;
   onRename: (speakerId: string, displayName: string) => void;
+  onEnrolled?: () => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -15,9 +19,11 @@ function formatDuration(seconds: number): string {
   return `${m}m${s.toString().padStart(2, "0")}s`;
 }
 
-export function SpeakerPanel({ speakers, onRename }: SpeakerPanelProps) {
+export function SpeakerPanel({ speakers, jobId, onRename, onEnrolled }: SpeakerPanelProps) {
+  const { isAdmin } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [enrollingSpeaker, setEnrollingSpeaker] = useState<DiarisationSpeaker | null>(null);
 
   const startEdit = (speaker: DiarisationSpeaker) => {
     setEditingId(speaker.speaker_id);
@@ -41,6 +47,7 @@ export function SpeakerPanel({ speakers, onRename }: SpeakerPanelProps) {
       {speakers.map((speaker) => {
         const color = getSpeakerColor(speaker.color_index);
         const isEditing = editingId === speaker.speaker_id;
+        const isLinked = !!speaker.profile_id;
 
         return (
           <div
@@ -77,16 +84,42 @@ export function SpeakerPanel({ speakers, onRename }: SpeakerPanelProps) {
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => startEdit(speaker)}>
                     <Pencil className="w-3 h-3" />
                   </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`h-6 w-6 ${isLinked ? "text-green-600 hover:text-green-700" : "text-muted-foreground"}`}
+                      title={isLinked ? "Profil lié — modifier" : "Lier à un profil intervenant"}
+                      onClick={() => setEnrollingSpeaker(speaker)}
+                    >
+                      <UserCheck className="w-3 h-3" />
+                    </Button>
+                  )}
                 </>
               )}
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground ml-5">
               <span>{speaker.segment_count} segments</span>
               <span>{formatDuration(speaker.total_duration)}</span>
+              {isLinked && (
+                <span className="text-green-600 font-medium">Profil lié</span>
+              )}
             </div>
           </div>
         );
       })}
+
+      {enrollingSpeaker && (
+        <EnrollSpeakerModal
+          speaker={enrollingSpeaker}
+          jobId={jobId}
+          onClose={() => setEnrollingSpeaker(null)}
+          onSuccess={() => {
+            setEnrollingSpeaker(null);
+            onEnrolled?.();
+          }}
+        />
+      )}
     </div>
   );
 }

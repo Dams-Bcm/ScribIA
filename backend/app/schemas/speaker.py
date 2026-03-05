@@ -40,3 +40,9 @@ class SpeakerProfileResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class EnrollFromDiarisationRequest(BaseModel):
+    job_id: str
+    diarisation_speaker_id: str  # DiarisationSpeaker.id (UUID)
+    compute_embedding: bool = True

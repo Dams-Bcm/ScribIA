@@ -23,6 +23,7 @@ class DiarisationSpeakerResponse(BaseModel):
     color_index: int
     segment_count: int
     total_duration: float
+    profile_id: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

@@ -154,7 +154,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
       <div className="flex gap-4">
         {/* Speaker panel */}
         <div className="w-64 flex-shrink-0">
-          <SpeakerPanel speakers={speakers} onRename={onRenameSpeaker} />
+          <SpeakerPanel speakers={speakers} jobId={jobId} onRename={onRenameSpeaker} />
         </div>
 
         {/* Segments */}

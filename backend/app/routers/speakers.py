@@ -5,7 +5,10 @@ from app.database import get_db
 from app.deps import require_admin, get_current_user
 from app.models import User
 from app.models.speaker import SpeakerProfile
-from app.schemas.speaker import SpeakerProfileCreate, SpeakerProfileUpdate, SpeakerProfileResponse
+from app.schemas.speaker import (
+    SpeakerProfileCreate, SpeakerProfileUpdate, SpeakerProfileResponse,
+    EnrollFromDiarisationRequest,
+)
 
 router = APIRouter(prefix="/speakers", tags=["speakers"])
 
@@ -89,6 +92,109 @@ def delete_speaker(
     profile = _get_profile_or_404(profile_id, user, db)
     db.delete(profile)
     db.commit()
+
+
+@router.post("/{profile_id}/enroll-from-diarisation", response_model=SpeakerProfileResponse)
+def enroll_from_diarisation(
+    profile_id: str,
+    body: EnrollFromDiarisationRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    """
+    Link a detected speaker (DiarisationSpeaker) to a SpeakerProfile.
+    Optionally compute the voice embedding from all segments of that speaker.
+    """
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from app.config import settings
+    from app.models.speaker import SpeakerEnrollmentSegment
+    from app.models.transcription import DiarisationSpeaker, TranscriptionJob, TranscriptionSegment
+    from app.services.transcription import convert_to_wav
+
+    profile = _get_profile_or_404(profile_id, user, db)
+
+    # Load the DiarisationSpeaker
+    diar_speaker = (
+        db.query(DiarisationSpeaker)
+        .filter(DiarisationSpeaker.id == body.diarisation_speaker_id)
+        .first()
+    )
+    if not diar_speaker:
+        raise HTTPException(status_code=404, detail="Locuteur introuvable dans la diarisation")
+
+    # Load & authorise the job
+    job_q = db.query(TranscriptionJob).filter(TranscriptionJob.id == diar_speaker.job_id)
+    if not user.is_super_admin:
+        job_q = job_q.filter(TranscriptionJob.tenant_id == user.tenant_id)
+    job = job_q.first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job introuvable")
+
+    # Link DiarisationSpeaker → SpeakerProfile
+    diar_speaker.profile_id = profile_id
+
+    if body.compute_embedding:
+        # Fetch all segments for this speaker in this job
+        segments = (
+            db.query(TranscriptionSegment)
+            .filter(
+                TranscriptionSegment.job_id == job.id,
+                TranscriptionSegment.speaker_id == diar_speaker.speaker_id,
+            )
+            .all()
+        )
+        if not segments:
+            raise HTTPException(status_code=400, detail="Aucun segment trouvé pour ce locuteur")
+
+        audio_path = Path(settings.audio_path) / job.tenant_id / job.audio_filename
+        if not audio_path.exists():
+            raise HTTPException(status_code=400, detail="Fichier audio introuvable pour l'enrollment")
+
+        # Convert to WAV if the original is not already a WAV
+        wav_path = audio_path
+        temp_wav: Path | None = None
+        if audio_path.suffix.lower() != ".wav":
+            temp_wav = Path(tempfile.mktemp(suffix="_enroll.wav"))
+            convert_to_wav(audio_path, temp_wav)
+            wav_path = temp_wav
+
+        try:
+            from app.services.speaker_enrollment import extract_embedding_from_audio_segments
+
+            seg_times = [(s.start_time, s.end_time) for s in segments]
+            embedding = extract_embedding_from_audio_segments(wav_path, seg_times)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        finally:
+            if temp_wav and temp_wav.exists():
+                temp_wav.unlink()
+
+        profile.embedding = json.dumps(embedding)
+        profile.enrollment_status = "enrolled"
+        profile.enrollment_method = "operator"
+        profile.enrolled_at = datetime.now(timezone.utc)
+
+        # Replace previous enrollment segments for this profile
+        db.query(SpeakerEnrollmentSegment).filter(
+            SpeakerEnrollmentSegment.speaker_profile_id == profile_id
+        ).delete()
+
+        for seg in segments:
+            db.add(SpeakerEnrollmentSegment(
+                speaker_profile_id=profile_id,
+                job_id=job.id,
+                segment_id=seg.id,
+                start_time=seg.start_time,
+                end_time=seg.end_time,
+            ))
+
+    db.commit()
+    db.refresh(profile)
+    return profile
 
 
 @router.post("/{profile_id}/send-consent", response_model=SpeakerProfileResponse)

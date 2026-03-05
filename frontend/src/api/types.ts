@@ -148,6 +148,7 @@ export interface DiarisationSpeaker {
   color_index: number;
   segment_count: number;
   total_duration: number;
+  profile_id: string | null;
 }
 
 export interface DiarisationJob {
