@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarDays, Mic, Sparkles, ChevronDown, ChevronUp, FileText, Loader2 } from "lucide-react";
+import { CalendarDays, Mic, Sparkles, ChevronDown, ChevronUp, FileText, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,27 @@ export function ProcedureDetail({ procedureId }: Props) {
   const generateConvocation = useGenerateConvocation(procedureId);
   const [meetingDate, setMeetingDate] = useState("");
   const [showResponses, setShowResponses] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  async function downloadConvocationPdf(docId: string) {
+    setPdfLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/ai-documents/documents/${docId}/export?format=pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Erreur téléchargement PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Convocation — ${proc?.title ?? "AG"}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setPdfLoading(false);
+    }
+  }
 
   if (isLoading || !proc) return (
     <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
@@ -147,15 +168,24 @@ export function ProcedureDetail({ procedureId }: Props) {
             Convocation
           </p>
           {proc.ai_document_id ? (
-            <p className="text-xs text-muted-foreground">
-              Convocation générée.{" "}
-              <a
-                href={`/ai-documents?doc=${proc.ai_document_id}`}
-                className="text-primary underline"
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-xs text-muted-foreground">Convocation générée.</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => downloadConvocationPdf(proc.ai_document_id!)}
+                disabled={pdfLoading}
               >
-                Voir le document
+                {pdfLoading ? (
+                  <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> PDF…</>
+                ) : (
+                  <><Download className="w-3 h-3 mr-1" /> Télécharger PDF</>
+                )}
+              </Button>
+              <a href={`/ai-documents?doc=${proc.ai_document_id}`} className="text-xs text-primary underline">
+                Voir dans Documents IA
               </a>
-            </p>
+            </div>
           ) : (
             <>
               <p className="text-xs text-muted-foreground">

@@ -7,6 +7,7 @@ Module requis : ai_documents
 import asyncio
 import json
 import logging
+import re
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -262,6 +263,62 @@ def delete_document(
 
 # ── Export ─────────────────────────────────────────────────────────────────────
 
+def _markdown_to_pdf(title: str, text: str) -> bytes:
+    """Convertit un texte Markdown en PDF via fpdf2."""
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.set_margins(20, 20, 20)
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=20)
+
+    # Titre du document
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.multi_cell(0, 10, title)
+    pdf.ln(4)
+    pdf.set_draw_color(180, 180, 180)
+    pdf.line(20, pdf.get_y(), 190, pdf.get_y())
+    pdf.ln(6)
+
+    for line in text.split("\n"):
+        stripped = line.strip()
+
+        if stripped.startswith("### "):
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.multi_cell(0, 7, stripped[4:])
+            pdf.ln(1)
+        elif stripped.startswith("## "):
+            pdf.set_font("Helvetica", "B", 13)
+            pdf.multi_cell(0, 8, stripped[3:])
+            pdf.ln(2)
+        elif stripped.startswith("# "):
+            pdf.set_font("Helvetica", "B", 15)
+            pdf.multi_cell(0, 9, stripped[2:])
+            pdf.ln(3)
+        elif stripped in ("---", "***", "___"):
+            pdf.ln(2)
+            pdf.set_draw_color(200, 200, 200)
+            pdf.line(20, pdf.get_y(), 190, pdf.get_y())
+            pdf.ln(3)
+        elif stripped == "":
+            pdf.ln(4)
+        else:
+            # Retirer le formatage Markdown inline (**bold**, *italic*, `code`)
+            clean = re.sub(r"\*\*(.+?)\*\*", r"\1", stripped)
+            clean = re.sub(r"\*(.+?)\*", r"\1", clean)
+            clean = re.sub(r"`(.+?)`", r"\1", clean)
+
+            if stripped.startswith(("- ", "* ", "• ")):
+                pdf.set_font("Helvetica", size=10)
+                pdf.set_x(25)
+                pdf.multi_cell(0, 6, "\u2022 " + clean[2:])
+            else:
+                pdf.set_font("Helvetica", size=10)
+                pdf.multi_cell(0, 6, clean)
+
+    return bytes(pdf.output())
+
+
 @router.get("/documents/{doc_id}/export")
 def export_document(
     doc_id: str,
@@ -269,16 +326,30 @@ def export_document(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Télécharge le document généré au format texte (md ou txt)."""
+    """Télécharge le document généré (md, txt ou pdf)."""
     doc = _get_document_or_404(doc_id, user.tenant_id, db)
     if doc.status != "completed" or not doc.result_text:
         raise HTTPException(status_code=409, detail="Document pas encore disponible")
+
+    safe_title = doc.title.replace("/", "-").replace("\\", "-")
+
+    if format == "pdf":
+        try:
+            pdf_bytes = _markdown_to_pdf(doc.title, doc.result_text)
+        except Exception as exc:
+            logger.error(f"[PDF] Erreur génération PDF pour {doc_id}: {exc}")
+            raise HTTPException(status_code=500, detail="Erreur lors de la génération du PDF")
+        return StreamingResponse(
+            iter([pdf_bytes]),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{safe_title}.pdf"'},
+        )
+
     ext = "md" if format == "md" else "txt"
-    filename = f"{doc.title}.{ext}".replace("/", "-")
     return StreamingResponse(
-        iter([doc.result_text]),
+        iter([doc.result_text.encode("utf-8")]),
         media_type="text/plain; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.{ext}"'},
     )
 
 
