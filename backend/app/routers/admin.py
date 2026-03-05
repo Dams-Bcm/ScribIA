@@ -1,13 +1,21 @@
+import json
+import logging
+import uuid
+
+import requests
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
+from app.config import settings
 from app.database import get_db
-import json
 from app.models import Tenant, TenantModule, User, AVAILABLE_MODULES, AuditLog, AIDocumentTemplate, ProcedureTemplate, ProcedureTemplateRole
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantModuleUpdate
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.services.auth import hash_password
 from app.deps import require_super_admin
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -240,6 +248,97 @@ def _sector_template_response(tpl: ProcedureTemplate) -> dict:
             for r in (tpl.roles or [])
         ],
     }
+
+
+# ── Workflow generation via LLM ───────────────────────────────────────────────
+
+_GENERATE_SYSTEM_PROMPT = """Tu es un expert en modélisation de workflows et procédures métier.
+On te donne une description textuelle d'un processus / workflow.
+Tu dois produire un JSON structuré représentant un ou plusieurs templates de procédure.
+
+Chaque template contient :
+- name : nom court du template
+- description : description du template
+- roles : liste de rôles participants, chacun avec :
+  - role_name : nom du rôle
+  - invitation_delay_days : délai d'invitation en jours avant la réunion
+  - form_questions : liste de questions du formulaire de collecte, chacune avec :
+    - id : identifiant unique (ex: "q1", "q2"...)
+    - label : texte de la question
+    - type : "textarea" ou "text"
+    - required : true ou false
+    - options : [] (vide)
+
+IMPORTANT : Retourne UNIQUEMENT du JSON valide, sans commentaire, sans markdown, sans texte avant ou après.
+Le JSON doit être un tableau de templates : [{"name": ..., "roles": [...]}, ...]"""
+
+
+class WorkflowGenerateRequest(BaseModel):
+    description: str
+    sector: str
+
+
+@router.post("/sectors/generate-workflow")
+def generate_workflow(
+    body: WorkflowGenerateRequest,
+    _: User = Depends(require_super_admin),
+):
+    """Génère un workflow structuré via LLM à partir d'une description textuelle."""
+    sector_label = body.sector
+    for sp in [("syndic_copro", "Syndic de copropriété"), ("collectivite", "Collectivité territoriale"),
+               ("education_spe", "Éducation spécialisée / MDPH"), ("chantier", "Gestion de chantier"),
+               ("sante", "Santé / Médico-social")]:
+        if sp[0] == body.sector:
+            sector_label = sp[1]
+            break
+
+    user_prompt = (
+        f"Secteur d'activité : {sector_label}\n\n"
+        f"Description du workflow :\n{body.description}\n\n"
+        "Génère le JSON structuré des templates de procédure correspondants."
+    )
+
+    payload = {
+        "model": settings.ollama_default_model,
+        "system": _GENERATE_SYSTEM_PROMPT,
+        "prompt": user_prompt,
+        "stream": False,
+        "keep_alive": 0,
+        "options": {"temperature": 0.3},
+    }
+
+    try:
+        resp = requests.post(f"{settings.ollama_url}/api/generate", json=payload, timeout=120)
+        resp.raise_for_status()
+        raw = resp.json().get("response", "")
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"Erreur Ollama : {exc}")
+
+    # Parse JSON from LLM response (handle markdown code blocks)
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        # Remove ```json ... ``` wrapper
+        lines = cleaned.split("\n")
+        lines = [l for l in lines if not l.strip().startswith("```")]
+        cleaned = "\n".join(lines).strip()
+
+    try:
+        templates = json.loads(cleaned)
+    except json.JSONDecodeError:
+        logger.warning(f"[Workflow Gen] Failed to parse LLM response: {raw[:500]}")
+        raise HTTPException(status_code=422, detail="Le LLM n'a pas retourné un JSON valide. Essayez de reformuler.")
+
+    if isinstance(templates, dict):
+        templates = [templates]
+
+    # Assign unique IDs to questions if missing
+    for tpl in templates:
+        for role in tpl.get("roles", []):
+            for i, q in enumerate(role.get("form_questions", [])):
+                if not q.get("id"):
+                    q["id"] = f"q{i+1}_{uuid.uuid4().hex[:6]}"
+
+    return {"templates": templates}
 
 
 # ── Provisioning ──────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { SECTOR_PRESETS, type TenantSector } from "../../api/types";
 import type { FormQuestion, ProcedureTemplateRole } from "../../api/types";
-import { Settings2, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Settings2, Plus, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +57,12 @@ function useDeleteSectorTemplate(sector: string) {
   });
 }
 
+interface GeneratedTemplate {
+  name: string;
+  description?: string | null;
+  roles: { role_name: string; invitation_delay_days: number; form_questions: FormQuestion[] }[];
+}
+
 // ── Template manager for a sector ───────────────────────────────────────────
 
 function SectorTemplateManager({ sector }: { sector: TenantSector }) {
@@ -65,6 +71,42 @@ function SectorTemplateManager({ sector }: { sector: TenantSector }) {
   const deleteTemplate = useDeleteSectorTemplate(sector);
   const [createOpen, setCreateOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // AI generation
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const [genDescription, setGenDescription] = useState("");
+  const [genResults, setGenResults] = useState<GeneratedTemplate[] | null>(null);
+  const [genError, setGenError] = useState<string | null>(null);
+  const generateMutation = useMutation({
+    mutationFn: (description: string) =>
+      api.post<{ templates: GeneratedTemplate[] }>("/admin/sectors/generate-workflow", { description, sector }),
+  });
+
+  async function handleGenerate() {
+    if (!genDescription.trim()) return;
+    setGenError(null);
+    setGenResults(null);
+    try {
+      const result = await generateMutation.mutateAsync(genDescription);
+      setGenResults(result.templates);
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : "Erreur de génération");
+    }
+  }
+
+  async function handleSaveGenerated() {
+    if (!genResults) return;
+    for (const tpl of genResults) {
+      await createTemplate.mutateAsync({
+        name: tpl.name,
+        description: tpl.description || null,
+        roles: tpl.roles,
+      });
+    }
+    setGenerateOpen(false);
+    setGenDescription("");
+    setGenResults(null);
+  }
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -113,9 +155,14 @@ function SectorTemplateManager({ sector }: { sector: TenantSector }) {
         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           Templates de procédure
         </p>
-        <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
-          <Plus className="w-3.5 h-3.5 mr-1" /> Nouveau template
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setGenerateOpen(true)}>
+            <Sparkles className="w-3.5 h-3.5 mr-1" /> Générer avec IA
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
+            <Plus className="w-3.5 h-3.5 mr-1" /> Nouveau template
+          </Button>
+        </div>
       </div>
 
       {templates.length === 0 ? (
@@ -245,6 +292,85 @@ function SectorTemplateManager({ sector }: { sector: TenantSector }) {
               {createTemplate.isPending ? "Création…" : "Créer le template"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Generate with AI dialog */}
+      <Dialog open={generateOpen} onOpenChange={(open) => { setGenerateOpen(open); if (!open) { setGenResults(null); setGenError(null); } }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              Générer un workflow avec l'IA
+            </DialogTitle>
+          </DialogHeader>
+
+          {!genResults ? (
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label>Décrivez le workflow souhaité</Label>
+                <Textarea
+                  value={genDescription}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setGenDescription(e.target.value)}
+                  rows={12}
+                  placeholder={"Décrivez les étapes du processus, les rôles impliqués, les délais, les documents à produire...\n\nExemple : Workflow d'AG de copropriété avec convocation J-21, collecte des questions des copropriétaires, vote par correspondance, tenue de l'AG, rédaction du PV..."}
+                  className="font-mono text-xs"
+                />
+              </div>
+              {genError && (
+                <p className="text-sm text-destructive">{genError}</p>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setGenerateOpen(false)}>Annuler</Button>
+                <Button onClick={handleGenerate} disabled={!genDescription.trim() || generateMutation.isPending}>
+                  {generateMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Génération en cours…</>
+                  ) : (
+                    <><Sparkles className="w-4 h-4 mr-1" /> Générer</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                L'IA a généré {genResults.length} template(s). Vérifiez et ajustez si nécessaire avant de sauvegarder.
+              </p>
+
+              {genResults.map((tpl, ti) => (
+                <div key={ti} className="border border-border rounded-lg p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-bold">{tpl.name}</p>
+                    {tpl.description && <p className="text-xs text-muted-foreground">{tpl.description}</p>}
+                  </div>
+                  {tpl.roles.map((role, ri) => (
+                    <div key={ri} className="bg-muted rounded p-3 space-y-1">
+                      <p className="text-sm font-medium">{role.role_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Invitation J-{role.invitation_delay_days} · {role.form_questions.length} question(s)
+                      </p>
+                      {role.form_questions.map((q, qi) => (
+                        <p key={qi} className="text-xs text-muted-foreground pl-2 border-l border-border">
+                          {q.label}
+                        </p>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setGenResults(null)}>Modifier la description</Button>
+                <Button onClick={handleSaveGenerated} disabled={createTemplate.isPending}>
+                  {createTemplate.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Sauvegarde…</>
+                  ) : (
+                    <>Sauvegarder {genResults.length} template(s)</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
