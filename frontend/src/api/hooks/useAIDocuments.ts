@@ -106,6 +106,18 @@ export function useGenerateDocument() {
   });
 }
 
+export function useUpdateAIDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; result_text: string }) =>
+      api.patch<AIDocument>(`/ai-documents/documents/${id}`, body),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: KEYS.document(vars.id) });
+      qc.invalidateQueries({ queryKey: KEYS.documents });
+    },
+  });
+}
+
 export function useDeleteAIDocument() {
   const qc = useQueryClient();
   return useMutation({

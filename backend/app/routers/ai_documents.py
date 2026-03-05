@@ -250,6 +250,22 @@ def get_document(
     return _get_document_or_404(doc_id, user.tenant_id, db)
 
 
+@router.patch("/documents/{doc_id}", response_model=AIDocumentResponse)
+def update_document(
+    doc_id: str,
+    body: dict,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Met à jour le contenu du document (result_text après édition)."""
+    doc = _get_document_or_404(doc_id, user.tenant_id, db)
+    if "result_text" in body:
+        doc.result_text = body["result_text"]
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
 @router.delete("/documents/{doc_id}", status_code=204)
 def delete_document(
     doc_id: str,
@@ -319,6 +335,59 @@ def _markdown_to_pdf(title: str, text: str) -> bytes:
     return bytes(pdf.output())
 
 
+def _text_to_docx(title: str, text: str) -> bytes:
+    """Convertit un texte Markdown/HTML en DOCX via python-docx."""
+    import io
+    from docx import Document
+    from docx.shared import Pt
+
+    doc = Document()
+    doc.add_heading(title, level=0)
+
+    # Handle both HTML (from editor save) and Markdown (from AI generation)
+    is_html = "<p>" in text or "<h" in text
+
+    if is_html:
+        # Strip HTML tags for DOCX (basic approach)
+        import html as html_mod
+        clean = re.sub(r"<br\s*/?>", "\n", text)
+        clean = re.sub(r"</p>", "\n", clean)
+        clean = re.sub(r"</?(h[1-6])[^>]*>", "\n", clean)
+        clean = re.sub(r"</?(ul|ol|li|div|blockquote)[^>]*>", "\n", clean)
+        clean = re.sub(r"<[^>]+>", "", clean)
+        clean = html_mod.unescape(clean)
+        lines = clean.split("\n")
+    else:
+        lines = text.split("\n")
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        if not is_html and stripped.startswith("### "):
+            doc.add_heading(stripped[4:], level=3)
+        elif not is_html and stripped.startswith("## "):
+            doc.add_heading(stripped[3:], level=2)
+        elif not is_html and stripped.startswith("# "):
+            doc.add_heading(stripped[2:], level=1)
+        elif not is_html and stripped.startswith(("- ", "* ", "\u2022 ")):
+            clean = re.sub(r"\*\*(.+?)\*\*", r"\1", stripped[2:])
+            doc.add_paragraph(clean, style="List Bullet")
+        elif not is_html and stripped in ("---", "***", "___"):
+            doc.add_paragraph("_" * 50)
+        else:
+            clean = re.sub(r"\*\*(.+?)\*\*", r"\1", stripped)
+            clean = re.sub(r"\*(.+?)\*", r"\1", clean)
+            clean = re.sub(r"`(.+?)`", r"\1", clean)
+            p = doc.add_paragraph(clean)
+            p.style.font.size = Pt(10)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
 @router.get("/documents/{doc_id}/export")
 def export_document(
     doc_id: str,
@@ -343,6 +412,18 @@ def export_document(
             iter([pdf_bytes]),
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{safe_title}.pdf"'},
+        )
+
+    if format == "docx":
+        try:
+            docx_bytes = _text_to_docx(doc.title, doc.result_text)
+        except Exception as exc:
+            logger.error(f"[DOCX] Erreur génération DOCX pour {doc_id}: {exc}")
+            raise HTTPException(status_code=500, detail="Erreur lors de la génération du DOCX")
+        return StreamingResponse(
+            iter([docx_bytes]),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename="{safe_title}.docx"'},
         )
 
     ext = "md" if format == "md" else "txt"

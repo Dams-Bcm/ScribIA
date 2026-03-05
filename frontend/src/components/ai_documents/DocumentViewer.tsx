@@ -1,13 +1,28 @@
-import { Download, Loader2, XCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useAIDocument } from "@/api/hooks/useAIDocuments";
+import { Loader2, XCircle } from "lucide-react";
+import { useAIDocument, useUpdateAIDocument } from "@/api/hooks/useAIDocuments";
+import { RichTextEditor } from "@/components/editor/RichTextEditor";
 
 interface Props {
   docId: string;
 }
 
+function downloadBlob(url: string, filename: string) {
+  const token = localStorage.getItem("token") ?? "";
+  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    .then((r) => r.blob())
+    .then((blob) => {
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(href);
+    });
+}
+
 export function DocumentViewer({ docId }: Props) {
   const { data: doc, isLoading } = useAIDocument(docId);
+  const updateDoc = useUpdateAIDocument();
 
   if (isLoading || !doc) {
     return (
@@ -17,53 +32,36 @@ export function DocumentViewer({ docId }: Props) {
     );
   }
 
-  function handleExport(format: "md" | "txt") {
-    const token = localStorage.getItem("token") ?? "";
-    fetch(`/api/ai-documents/documents/${docId}/export?format=${format}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.blob())
-      .then((blob) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${doc!.title}.${format}`;
-        a.click();
-        URL.revokeObjectURL(url);
-      });
+  function handleSave(html: string) {
+    updateDoc.mutate({ id: docId, result_text: html });
+  }
+
+  function handleExport(format: "pdf" | "docx") {
+    const safeTitle = doc!.title.replace(/[/\\]/g, "-");
+    downloadBlob(
+      `/api/ai-documents/documents/${docId}/export?format=${format}`,
+      `${safeTitle}.${format}`,
+    );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="font-semibold">{doc.title}</h3>
-          <p className="text-xs text-muted-foreground">
-            Créé le{" "}
-            {new Date(doc.created_at).toLocaleDateString("fr-FR", {
-              day: "2-digit", month: "long", year: "numeric",
-            })}
-            {doc.generation_completed_at && (
-              <> · Généré en{" "}
-                {Math.round(
-                  (new Date(doc.generation_completed_at).getTime() -
-                    new Date(doc.created_at).getTime()) / 1000
-                )}s
-              </>
-            )}
-          </p>
-        </div>
-
-        {doc.status === "completed" && (
-          <div className="flex gap-2 flex-shrink-0">
-            <Button variant="outline" size="sm" onClick={() => handleExport("md")}>
-              <Download className="w-3.5 h-3.5 mr-1" /> .md
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleExport("txt")}>
-              <Download className="w-3.5 h-3.5 mr-1" /> .txt
-            </Button>
-          </div>
-        )}
+      <div>
+        <h3 className="font-semibold">{doc.title}</h3>
+        <p className="text-xs text-muted-foreground">
+          Créé le{" "}
+          {new Date(doc.created_at).toLocaleDateString("fr-FR", {
+            day: "2-digit", month: "long", year: "numeric",
+          })}
+          {doc.generation_completed_at && (
+            <> · Généré en{" "}
+              {Math.round(
+                (new Date(doc.generation_completed_at).getTime() -
+                  new Date(doc.created_at).getTime()) / 1000
+              )}s
+            </>
+          )}
+        </p>
       </div>
 
       {doc.status === "pending" && (
@@ -88,11 +86,11 @@ export function DocumentViewer({ docId }: Props) {
       )}
 
       {doc.status === "completed" && doc.result_text && (
-        <div className="border border-border rounded-lg bg-background">
-          <pre className="p-4 text-sm whitespace-pre-wrap break-words font-sans leading-relaxed max-h-[60vh] overflow-y-auto">
-            {doc.result_text}
-          </pre>
-        </div>
+        <RichTextEditor
+          initialContent={doc.result_text}
+          onSave={handleSave}
+          onExport={handleExport}
+        />
       )}
     </div>
   );
