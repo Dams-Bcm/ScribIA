@@ -67,6 +67,13 @@ def _add_missing_columns():
                 "ALTER TABLE diarisation_speakers ADD embedding NVARCHAR(MAX) NULL"
             ))
 
+        # tenants: sector
+        tenant_cols = {c["name"] for c in insp.get_columns("tenants")}
+        if "sector" not in tenant_cols:
+            conn.execute(text(
+                "ALTER TABLE tenants ADD sector VARCHAR(50) NULL"
+            ))
+
         conn.commit()
 
 
