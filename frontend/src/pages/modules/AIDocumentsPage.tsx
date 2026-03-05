@@ -72,7 +72,7 @@ export function AIDocumentsPage() {
 
           <div className="bg-muted/30 rounded-xl border border-border p-4">
             <p className="text-xs text-muted-foreground">
-              <span className="font-semibold">Placeholders disponibles dans les templates :</span>{" "}
+              <span className="font-semibold">Placeholders automatiques :</span>{" "}
               <code>{"{organisation}"}</code>, <code>{"{date}"}</code>,{" "}
               <code>{"{titre}"}</code>, <code>{"{points}"}</code>,{" "}
               <code>{"{transcription}"}</code>, <code>{"{documents}"}</code>

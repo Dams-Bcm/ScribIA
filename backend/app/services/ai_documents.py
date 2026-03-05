@@ -156,18 +156,21 @@ def _extract_file_text(doc) -> str:
 
 # ── Construction du prompt ────────────────────────────────────────────────────
 
-def _build_prompt(template_data: dict, context: dict) -> tuple[str, str]:
+def _build_prompt(
+    template_data: dict,
+    context: dict,
+) -> tuple[str, str]:
     """Remplace les placeholders du template et retourne (system, user)."""
-    placeholders = {
-        "titre":        context.get("title", ""),
-        "date":         context.get("date", ""),
-        "organisation": context.get("organisation", ""),
-        "points":       context.get("agenda", ""),
+    builtin = {
+        "titre":         context.get("title", ""),
+        "date":          context.get("date", ""),
+        "organisation":  context.get("organisation", ""),
+        "points":        context.get("agenda", ""),
         "transcription": context.get("transcription", ""),
-        "documents":    context.get("documents_text", ""),
+        "documents":     context.get("documents_text", ""),
     }
     user_prompt = template_data["user_prompt_template"]
-    for key, value in placeholders.items():
+    for key, value in builtin.items():
         user_prompt = user_prompt.replace("{" + key + "}", value or "(non disponible)")
 
     return template_data["system_prompt"], user_prompt
@@ -300,13 +303,12 @@ def _fail(db, doc, event_bus, message: str):
 
 DEFAULT_TEMPLATES = [
     {
-        "name": "Procès-verbal standard",
+        "name": "Procès-verbal",
         "description": "PV complet d'une séance à partir de la transcription et de l'ordre du jour",
         "document_type": "pv",
         "system_prompt": (
-            "Tu es un rédacteur spécialisé dans la rédaction de procès-verbaux de réunions institutionnelles françaises. "
-            "Tu rédiges des documents clairs, formels et précis en français. "
-            "Tu utilises le vouvoiement et le style administratif français."
+            "Tu es un rédacteur spécialisé dans la rédaction de procès-verbaux de réunions. "
+            "Tu rédiges des documents clairs, formels et précis en français."
         ),
         "user_prompt_template": (
             "Rédige le procès-verbal de la séance suivante.\n\n"
@@ -340,23 +342,25 @@ DEFAULT_TEMPLATES = [
         "temperature": 0.4,
     },
     {
-        "name": "Délibération",
-        "description": "Rédaction d'une délibération formelle à partir des documents préparatoires",
-        "document_type": "deliberation",
+        "name": "Compte-rendu de réunion",
+        "description": "Compte-rendu structuré à partir de la transcription et des documents fournis",
+        "document_type": "custom",
         "system_prompt": (
-            "Tu es un juriste spécialisé dans la rédaction de délibérations des collectivités territoriales françaises. "
-            "Tu rédiges des actes administratifs formels, précis et conformes aux usages juridiques français."
+            "Tu es un assistant spécialisé dans la rédaction de comptes-rendus de réunions en français. "
+            "Tu rédiges des documents structurés, fidèles aux échanges et accessibles."
         ),
         "user_prompt_template": (
-            "Rédige une délibération pour l'organisation suivante.\n\n"
+            "Rédige un compte-rendu de la réunion suivante.\n\n"
             "Organisation : {organisation}\n"
-            "Date : {date}\n\n"
-            "POINTS À DÉLIBÉRER :\n{points}\n\n"
+            "Date : {date}\n"
+            "Titre : {titre}\n\n"
+            "ORDRE DU JOUR :\n{points}\n\n"
+            "TRANSCRIPTION :\n{transcription}\n\n"
             "DOCUMENTS FOURNIS :\n{documents}\n\n"
-            "Rédige une délibération formelle avec : "
-            "VU les textes de référence, CONSIDÉRANT les éléments du dossier, DÉCIDE (dispositif)."
+            "Rédige un compte-rendu clair et structuré par point à l'ordre du jour. "
+            "Indique les participants, les échanges principaux et les décisions ou actions à suivre."
         ),
-        "temperature": 0.2,
+        "temperature": 0.3,
     },
 ]
 

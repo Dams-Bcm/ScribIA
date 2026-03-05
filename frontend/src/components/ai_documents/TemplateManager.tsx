@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +62,7 @@ export function TemplateManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AIDocumentTemplateCreate>(EMPTY_FORM);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const userPromptRef = useRef<HTMLTextAreaElement>(null);
 
   function openCreate() {
     setEditingId(null);
@@ -97,6 +98,25 @@ export function TemplateManager() {
 
   function set(field: keyof AIDocumentTemplateCreate, value: unknown) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function insertPlaceholder(ph: string) {
+    const ta = userPromptRef.current;
+    const current = form.user_prompt_template ?? "";
+    if (!ta) {
+      set("user_prompt_template", current + ph);
+      return;
+    }
+    const start = ta.selectionStart ?? current.length;
+    const end = ta.selectionEnd ?? current.length;
+    const updated = current.slice(0, start) + ph + current.slice(end);
+    set("user_prompt_template", updated);
+    // Restore cursor after React re-render
+    requestAnimationFrame(() => {
+      ta.selectionStart = start + ph.length;
+      ta.selectionEnd = start + ph.length;
+      ta.focus();
+    });
   }
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Chargement…</p>;
@@ -187,7 +207,7 @@ export function TemplateManager() {
                 <Input
                   value={form.name}
                   onChange={(e) => set("name", e.target.value)}
-                  placeholder="Ex : Procès-verbal standard"
+                  placeholder="Ex : Compte-rendu de réunion"
                 />
               </div>
               <div className="space-y-1">
@@ -233,17 +253,22 @@ export function TemplateManager() {
                     key={ph}
                     type="button"
                     className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded hover:bg-primary hover:text-primary-foreground transition-colors"
-                    onClick={() => set("user_prompt_template", (form.user_prompt_template ?? "") + ph)}
+                    onClick={() => insertPlaceholder(ph)}
                   >
                     {ph}
                   </button>
                 ))}
+                <span className="text-xs text-muted-foreground self-center ml-1">
+                  — cliquer pour insérer au curseur · ajoutez vos propres{" "}
+                  <code className="font-mono">{"{variables}"}</code>
+                </span>
               </div>
               <textarea
+                ref={userPromptRef}
                 className="w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y"
                 value={form.user_prompt_template}
                 onChange={(e) => set("user_prompt_template", e.target.value)}
-                placeholder="Rédige un procès-verbal pour {nom_collectivite} le {date_seance}…"
+                placeholder="Rédige un document pour {organisation} le {date}.\n\nORDRE DU JOUR :\n{points}\n\nTRANSCRIPTION :\n{transcription}"
               />
             </div>
 

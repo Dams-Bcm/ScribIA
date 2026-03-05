@@ -21,7 +21,6 @@ import { useTemplates, useGenerateDocument } from "@/api/hooks/useAIDocuments";
 import { useDossiers } from "@/api/hooks/usePreparatoryPhases";
 import type { AIDocument } from "@/api/types";
 
-// Hook pour les sessions de transcription
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 
@@ -43,9 +42,8 @@ export function GenerateDialog({ onGenerated }: Props) {
   const [open, setOpen] = useState(false);
   const [templateId, setTemplateId] = useState("");
   const [title, setTitle] = useState("");
-  const [dossierId, setDossierId] = useState("");
-  const [sessionId, setSessionId] = useState("");
-
+  const [dossierId, setDossierId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const { data: templates = [] } = useTemplates();
   const { data: dossiers = [] } = useDossiers();
   const { data: sessions = [] } = useTranscriptionSessions();
@@ -58,16 +56,15 @@ export function GenerateDialog({ onGenerated }: Props) {
     const result = await generate.mutateAsync({
       template_id: templateId,
       title,
-      source_dossier_id: dossierId || null,
-      source_session_id: sessionId || null,
+      source_dossier_id: dossierId,
+      source_session_id: sessionId,
     });
     onGenerated(result);
     setOpen(false);
-    // reset
     setTemplateId("");
     setTitle("");
-    setDossierId("");
-    setSessionId("");
+    setDossierId(null);
+    setSessionId(null);
   }
 
   return (
@@ -78,7 +75,7 @@ export function GenerateDialog({ onGenerated }: Props) {
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Générer un document IA</DialogTitle>
           </DialogHeader>
@@ -106,7 +103,7 @@ export function GenerateDialog({ onGenerated }: Props) {
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex : PV du Conseil Municipal du 15/03/2026"
+                placeholder="Ex : Réunion du 15/03/2026"
               />
             </div>
 
@@ -117,12 +114,15 @@ export function GenerateDialog({ onGenerated }: Props) {
 
               <div className="space-y-1">
                 <Label>Dossier préparatoire</Label>
-                <Select value={dossierId} onValueChange={setDossierId}>
+                <Select
+                  value={dossierId ?? "__none__"}
+                  onValueChange={(v) => setDossierId(v === "__none__" ? null : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Aucun dossier" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucun</SelectItem>
+                    <SelectItem value="__none__">Aucun</SelectItem>
                     {dossiers.map((d) => (
                       <SelectItem key={d.id} value={d.id}>
                         {d.title}
@@ -139,12 +139,15 @@ export function GenerateDialog({ onGenerated }: Props) {
 
               <div className="space-y-1">
                 <Label>Session de transcription</Label>
-                <Select value={sessionId} onValueChange={setSessionId}>
+                <Select
+                  value={sessionId ?? "__none__"}
+                  onValueChange={(v) => setSessionId(v === "__none__" ? null : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Aucune transcription" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucune</SelectItem>
+                    <SelectItem value="__none__">Aucune</SelectItem>
                     {sessions.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
                         {s.original_filename}
