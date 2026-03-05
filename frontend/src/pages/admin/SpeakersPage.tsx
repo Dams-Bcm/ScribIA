@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../../api/client";
 import type { SpeakerProfile, SpeakerProfileCreate } from "../../api/types";
-import { Mic2, Plus, Trash2, X, Mail, CheckCircle2, Clock, XCircle, UserCheck } from "lucide-react";
+import { Mic2, Plus, Trash2, X, Mail, CheckCircle2, Clock, XCircle, UserCheck, ChevronDown, ChevronUp } from "lucide-react";
 
 const CONSENT_LABELS: Record<string, { label: string; className: string; icon: React.ElementType }> = {
   sent:     { label: "Email envoyé",  className: "bg-yellow-50 text-yellow-700", icon: Clock },
@@ -48,6 +48,7 @@ const emptyForm: SpeakerProfileCreate = {
 export function SpeakersPage() {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+  const [showExtra, setShowExtra] = useState(false);
   const [form, setForm] = useState<SpeakerProfileCreate>(emptyForm);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +62,7 @@ export function SpeakersPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "speakers"] });
       setShowCreate(false);
+      setShowExtra(false);
       setForm(emptyForm);
       setError(null);
     },
@@ -88,7 +90,7 @@ export function SpeakersPage() {
         <div>
           <h1 className="text-2xl font-bold">Intervenants</h1>
           <p className="text-sm text-muted-foreground">
-            {speakers.length} intervenant{speakers.length !== 1 ? "s" : ""} — profils vocaux pour la diarisation
+            {speakers.length} intervenant{speakers.length !== 1 ? "s" : ""} — profils vocaux pour l'identification des locuteurs
           </p>
         </div>
         <button
@@ -168,12 +170,13 @@ export function SpeakersPage() {
           <div className="bg-background rounded-xl border border-border p-6 w-full max-w-md shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold">Nouvel intervenant</h2>
-              <button onClick={() => { setShowCreate(false); setError(null); }}>
+              <button onClick={() => { setShowCreate(false); setShowExtra(false); setError(null); }}>
                 <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
 
             <div className="space-y-4">
+              {/* Champs obligatoires */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium mb-1.5">Prénom *</label>
@@ -192,32 +195,46 @@ export function SpeakersPage() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Fonction</label>
-                <input
-                  type="text" value={form.fonction ?? ""}
-                  onChange={(e) => setForm({ ...form, fonction: e.target.value })}
-                  placeholder="ex: Maire, Conseiller municipal..."
-                  className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Email</label>
-                <input
-                  type="email" value={form.email ?? ""}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  placeholder="pour l'envoi du lien de consentement"
-                  className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Téléphone</label>
-                <input
-                  type="tel" value={form.phone_number ?? ""}
-                  onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
+
+              {/* Champs optionnels */}
+              <button
+                type="button"
+                onClick={() => setShowExtra(!showExtra)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showExtra ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                Informations supplémentaires
+              </button>
+
+              {showExtra && (
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Fonction / Rôle</label>
+                    <input
+                      type="text" value={form.fonction ?? ""}
+                      onChange={(e) => setForm({ ...form, fonction: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Email</label>
+                    <input
+                      type="email" value={form.email ?? ""}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      placeholder="nécessaire pour l'envoi du lien de consentement"
+                      className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Téléphone</label>
+                    <input
+                      type="tel" value={form.phone_number ?? ""}
+                      onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+              )}
 
               {error && <p className="text-sm text-destructive">{error}</p>}
 
