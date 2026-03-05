@@ -22,6 +22,7 @@ import { PreparatoryPhasesPage } from "./pages/modules/PreparatoryPhasesPage";
 // Admin pages
 import { OrganizationsPage } from "./pages/admin/OrganizationsPage";
 import { UsersPage } from "./pages/admin/UsersPage";
+import { SpeakersPage } from "./pages/admin/SpeakersPage";
 import { AuditLogsPage } from "./pages/admin/AuditLogsPage";
 
 const queryClient = new QueryClient({
@@ -77,6 +78,7 @@ function AppRoutes() {
           {/* Administration */}
           <Route path="admin/organizations" element={<OrganizationsPage />} />
           <Route path="admin/users" element={<UsersPage />} />
+          <Route path="admin/speakers" element={<SpeakersPage />} />
           <Route path="admin/audit-logs" element={<AuditLogsPage />} />
         </Route>
       </Route>

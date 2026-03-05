@@ -401,6 +401,43 @@ export interface AuditLogEntry {
   ip_address: string | null;
 }
 
+// ── Speakers / Intervenants ───────────────────────────────────────────────────
+
+export type ConsentStatus = "sent" | "accepted" | "declined";
+export type ConsentType = "email" | "oral_recording";
+export type ConsentScope = "individual" | "collective";
+export type EnrollmentStatus = "pending_online" | "enrolled";
+export type EnrollmentMethod = "online" | "operator";
+
+export interface SpeakerProfile {
+  id: string;
+  tenant_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  display_name: string | null;
+  fonction: string | null;
+  email: string | null;
+  phone_number: string | null;
+  consent_status: ConsentStatus | null;
+  consent_type: ConsentType | null;
+  consent_scope: ConsentScope | null;
+  consent_date: string | null;
+  enrollment_status: EnrollmentStatus | null;
+  enrollment_method: EnrollmentMethod | null;
+  enrolled_at: string | null;
+  share_with_parent_tenant: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpeakerProfileCreate {
+  first_name: string;
+  last_name: string;
+  fonction?: string | null;
+  email?: string | null;
+  phone_number?: string | null;
+}
+
 // ── Modules ──────────────────────────────────────────────────────────────────
 
 export const AVAILABLE_MODULES: ModuleDefinition[] = [

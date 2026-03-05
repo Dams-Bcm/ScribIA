@@ -27,7 +27,7 @@ interface NavItem {
 }
 
 export function Layout() {
-  const { user, isSuperAdmin, hasModule, logout } = useAuth();
+  const { user, isSuperAdmin, isAdmin, hasModule, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navItems: NavItem[] = [
@@ -45,6 +45,7 @@ export function Layout() {
     // ── Administration ──
     { to: "/admin/organizations", label: "Organisations", icon: Building2, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/users", label: "Utilisateurs", icon: Users, visible: isSuperAdmin, section: "Administration" },
+    { to: "/admin/speakers", label: "Intervenants", icon: Mic, visible: isAdmin, section: "Administration" },
     { to: "/admin/audit-logs", label: "Journal d'audit", icon: Shield, visible: isSuperAdmin, section: "Administration" },
 
     // ── Compte ──

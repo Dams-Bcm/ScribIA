@@ -7,7 +7,7 @@ from app.config import settings
 from app.database import engine
 from app.models import Base, Tenant, TenantModule, User, AVAILABLE_MODULES
 from app.services.auth import hash_password
-from app.routers import health, auth, admin, privacy, transcription, diarisation, compliance, preparatory_phases, ai_documents
+from app.routers import health, auth, admin, privacy, transcription, diarisation, compliance, preparatory_phases, ai_documents, speakers
 
 
 @asynccontextmanager
@@ -53,6 +53,17 @@ def _add_missing_columns():
         if "speaker_label" not in seg_cols:
             conn.execute(text(
                 "ALTER TABLE transcription_segments ADD speaker_label VARCHAR(255) NULL"
+            ))
+
+        # diarisation_speakers: profile_id, embedding
+        ds_cols = {c["name"] for c in insp.get_columns("diarisation_speakers")}
+        if "profile_id" not in ds_cols:
+            conn.execute(text(
+                "ALTER TABLE diarisation_speakers ADD profile_id VARCHAR(36) NULL"
+            ))
+        if "embedding" not in ds_cols:
+            conn.execute(text(
+                "ALTER TABLE diarisation_speakers ADD embedding NVARCHAR(MAX) NULL"
             ))
 
         conn.commit()
@@ -112,3 +123,4 @@ app.include_router(diarisation.router)
 app.include_router(compliance.router)
 app.include_router(preparatory_phases.router)
 app.include_router(ai_documents.router)
+app.include_router(speakers.router)
