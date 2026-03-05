@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     _add_missing_columns()
     _seed_super_admin()
+    _sync_tenant_modules()
     yield
 
 
@@ -108,6 +109,22 @@ def _seed_super_admin():
             tenant_id=tenant.id,
         )
         db.add(user)
+        db.commit()
+    finally:
+        db.close()
+
+
+def _sync_tenant_modules():
+    """Ensure every tenant has a row for every module in AVAILABLE_MODULES."""
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        tenants = db.query(Tenant).all()
+        for tenant in tenants:
+            existing_keys = {m.module_key for m in tenant.modules}
+            for key in AVAILABLE_MODULES:
+                if key not in existing_keys:
+                    db.add(TenantModule(tenant_id=tenant.id, module_key=key, enabled=True))
         db.commit()
     finally:
         db.close()
