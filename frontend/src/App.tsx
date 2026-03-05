@@ -19,6 +19,7 @@ import { AIDocumentsPage } from "./pages/modules/AIDocumentsPage";
 import { ConvocationsPage } from "./pages/modules/ConvocationsPage";
 import { PreparatoryPhasesPage } from "./pages/modules/PreparatoryPhasesPage";
 import { ProceduresPage } from "./pages/modules/ProceduresPage";
+import { ContactsPage } from "./pages/modules/ContactsPage";
 import { FormPage } from "./pages/public/FormPage";
 
 // Admin pages
@@ -75,6 +76,7 @@ function AppRoutes() {
           <Route path="documents-ia" element={<AIDocumentsPage />} />
           <Route path="convocations" element={<ConvocationsPage />} />
           <Route path="procedures" element={<ProceduresPage />} />
+          <Route path="contacts" element={<ContactsPage />} />
 
           {/* Compte */}
           <Route path="privacy" element={<PrivacyPage />} />

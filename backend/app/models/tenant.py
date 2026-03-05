@@ -13,6 +13,7 @@ AVAILABLE_MODULES = {
     "ai_documents":               "Génération de documents IA",
     "convocations":               "Convocations",
     "procedures":                 "Procédures collaboratives",
+    "contacts":                   "Carnet de contacts",
 }
 
 
