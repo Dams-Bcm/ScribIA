@@ -22,6 +22,8 @@ dist/
 # ── OS ──
 .DS_Store
 Thumbs.db
+nul
+frontend/nul
 
 # ── Docker ──
 docker-compose.override.yml
