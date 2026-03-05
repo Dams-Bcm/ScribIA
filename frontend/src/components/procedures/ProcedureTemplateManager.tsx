@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Plus, Trash2, Settings2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,18 +57,18 @@ export function ProcedureTemplateManager() {
       options: [],
       required: false,
     };
-    updateRole(roleIdx, "form_questions", [...roles[roleIdx].form_questions, newQ]);
+    updateRole(roleIdx, "form_questions", [...(roles[roleIdx]?.form_questions ?? []), newQ]);
   }
 
   function updateQuestion(roleIdx: number, qIdx: number, field: string, value: unknown) {
-    const qs = roles[roleIdx].form_questions.map((q, i) =>
+    const qs = (roles[roleIdx]?.form_questions ?? []).map((q, i) =>
       i === qIdx ? { ...q, [field]: value } : q
     );
     updateRole(roleIdx, "form_questions", qs);
   }
 
   function removeQuestion(roleIdx: number, qIdx: number) {
-    updateRole(roleIdx, "form_questions", roles[roleIdx].form_questions.filter((_, i) => i !== qIdx));
+    updateRole(roleIdx, "form_questions", (roles[roleIdx]?.form_questions ?? []).filter((_, i) => i !== qIdx));
   }
 
   async function handleCreate() {
@@ -165,7 +165,7 @@ export function ProcedureTemplateManager() {
             </div>
             <div className="space-y-1">
               <Label>Description</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+              <Textarea value={description} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)} rows={2} />
             </div>
             <div className="space-y-1">
               <Label>Document à générer par défaut</Label>

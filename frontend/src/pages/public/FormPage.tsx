@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useParams } from "react-router";
 import { CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -93,7 +93,7 @@ export function FormPage() {
                   <Textarea
                     id={q.id}
                     value={responses[q.id] ?? ""}
-                    onChange={(e) => setResponse(q.id, e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setResponse(q.id, e.target.value)}
                     rows={4}
                     required={q.required}
                     placeholder="Votre réponse…"
