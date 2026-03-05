@@ -1,50 +1,63 @@
-import React, { useState } from "react";
-import { ClipboardList } from "lucide-react";
+import { useState } from "react";
+import { ClipboardList, CheckCircle2, ChevronLeft, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { useProcedureTemplates, useCreateProcedure } from "@/api/hooks/useProcedures";
-import { useTemplates } from "@/api/hooks/useAIDocuments";
-import type { Procedure } from "@/api/types";
+import type { Procedure, ProcedureTemplate } from "@/api/types";
 
 interface Props {
   onCreated: (proc: Procedure) => void;
 }
 
+function autoTitle(templateName: string): string {
+  const now = new Date();
+  const month = now.toLocaleDateString("fr-FR", { month: "long" });
+  const year = now.getFullYear();
+  return `${templateName} — ${month.charAt(0).toUpperCase() + month.slice(1)} ${year}`;
+}
+
 export function CreateProcedureDialog({ onCreated }: Props) {
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"pick" | "confirm">("pick");
+  const [selected, setSelected] = useState<ProcedureTemplate | null>(null);
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [templateId, setTemplateId] = useState<string | null>(null);
-  const [docTemplateId, setDocTemplateId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
 
   const { data: procTemplates = [] } = useProcedureTemplates();
-  const { data: docTemplates = [] } = useTemplates();
   const create = useCreateProcedure();
 
-  const selectedProcTemplate = procTemplates.find((t) => t.id === templateId);
+  const activeTemplates = procTemplates.filter((t) => t.is_active);
+
+  function handlePickTemplate(tpl: ProcedureTemplate) {
+    setSelected(tpl);
+    setTitle(autoTitle(tpl.name));
+    setEditingTitle(false);
+    setStep("confirm");
+  }
+
+  function handleOpenChange(v: boolean) {
+    setOpen(v);
+    if (!v) {
+      setStep("pick");
+      setSelected(null);
+      setTitle("");
+      setEditingTitle(false);
+    }
+  }
 
   async function handleCreate() {
     if (!title.trim()) return;
     const proc = await create.mutateAsync({
       title: title.trim(),
-      description: description.trim() || null,
-      template_id: templateId,
-      document_template_id: docTemplateId ?? selectedProcTemplate?.document_template_id ?? null,
+      description: null,
+      template_id: selected?.id ?? null,
+      document_template_id: selected?.document_template_id ?? null,
     });
     onCreated(proc);
-    setOpen(false);
-    setTitle("");
-    setDescription("");
-    setTemplateId(null);
-    setDocTemplateId(null);
+    handleOpenChange(false);
   }
 
   return (
@@ -54,77 +67,109 @@ export function CreateProcedureDialog({ onCreated }: Props) {
         Nouvelle procédure
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nouvelle procédure</DialogTitle>
+            <DialogTitle>
+              {step === "pick" ? "Quel type de procédure ?" : "Confirmer"}
+            </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label>Titre *</Label>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex : Réunion de chantier — lot 3 — mars 2026"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label>Description</Label>
-              <Textarea
-                value={description}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
-                placeholder="Objet de la réunion, contexte…"
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label>Template de procédure</Label>
-              <Select
-                value={templateId ?? "__none__"}
-                onValueChange={(v) => setTemplateId(v === "__none__" ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Aucun template" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Aucun</SelectItem>
-                  {procTemplates.filter((t) => t.is_active).map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+          {step === "pick" && (
+            <div className="space-y-3">
+              {activeTemplates.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  Aucun template disponible. Créez-en un dans l'onglet Templates.
+                </p>
+              ) : (
+                <div className="grid gap-2">
+                  {activeTemplates.map((tpl) => (
+                    <button
+                      key={tpl.id}
+                      onClick={() => handlePickTemplate(tpl)}
+                      className="flex items-start gap-3 w-full text-left rounded-lg border border-border p-3 hover:bg-accent hover:border-primary transition-colors"
+                    >
+                      <ClipboardList className="w-5 h-5 mt-0.5 text-primary shrink-0" />
+                      <div>
+                        <p className="font-medium text-sm">{tpl.name}</p>
+                        {tpl.description && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{tpl.description}</p>
+                        )}
+                        {tpl.roles.length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {tpl.roles.map((r) => r.role_name).join(", ")}
+                          </p>
+                        )}
+                      </div>
+                    </button>
                   ))}
-                </SelectContent>
-              </Select>
-              {selectedProcTemplate?.description && (
-                <p className="text-xs text-muted-foreground">{selectedProcTemplate.description}</p>
+                </div>
               )}
-            </div>
 
-            <div className="space-y-1">
-              <Label>Document à générer</Label>
-              <Select
-                value={docTemplateId ?? selectedProcTemplate?.document_template_id ?? "__none__"}
-                onValueChange={(v) => setDocTemplateId(v === "__none__" ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Aucun document" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Aucun</SelectItem>
-                  {docTemplates.filter((t) => t.is_active).map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="pt-1">
+                <button
+                  onClick={() => {
+                    setSelected(null);
+                    setTitle("");
+                    setStep("confirm");
+                  }}
+                  className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                >
+                  Créer sans template
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
-            <Button onClick={handleCreate} disabled={!title.trim() || create.isPending}>
-              {create.isPending ? "Création…" : "Créer"}
-            </Button>
+          {step === "confirm" && (
+            <div className="space-y-4">
+              {selected && (
+                <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                  <span className="text-sm font-medium">{selected.name}</span>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                {editingTitle ? (
+                  <Input
+                    autoFocus
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    onBlur={() => setEditingTitle(false)}
+                    onKeyDown={(e) => e.key === "Enter" && setEditingTitle(false)}
+                  />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium flex-1">{title || "Sans titre"}</p>
+                    <button
+                      onClick={() => setEditingTitle(true)}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Modifier le titre"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Cliquez sur le crayon pour personnaliser le titre
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            {step === "confirm" && (
+              <Button variant="ghost" size="sm" onClick={() => setStep("pick")} className="mr-auto">
+                <ChevronLeft className="w-4 h-4 mr-1" /> Retour
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => handleOpenChange(false)}>Annuler</Button>
+            {step === "confirm" && (
+              <Button onClick={handleCreate} disabled={!title.trim() || create.isPending}>
+                {create.isPending ? "Création…" : "Créer"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
