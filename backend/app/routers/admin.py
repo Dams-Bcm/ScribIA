@@ -53,6 +53,7 @@ def create_tenant(
         name=body.name,
         slug=body.slug.strip().lower().replace(" ", "-"),
         tenant_type=body.tenant_type,
+        sector=body.sector,
         parent_id=body.parent_id,
         is_large=body.is_large,
     )
@@ -88,6 +89,8 @@ def update_tenant(
         tenant.slug = body.slug
     if body.tenant_type is not None:
         tenant.tenant_type = body.tenant_type
+    if body.sector is not None:
+        tenant.sector = body.sector
     if body.parent_id is not None:
         tenant.parent_id = body.parent_id or None
     if body.is_large is not None:

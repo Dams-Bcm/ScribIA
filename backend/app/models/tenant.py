@@ -22,6 +22,7 @@ class Tenant(UUIDMixin, TimestampMixin, Base):
     name        = Column(String(255), nullable=False)
     slug        = Column(String(100), nullable=False, unique=True)
     tenant_type = Column(String(50), nullable=False, default="organization")  # 'organization' | 'group'
+    sector      = Column(String(50), nullable=True)  # e.g. 'syndic_copro', 'education_spe', 'collectivite', 'chantier', 'sante'
     parent_id   = Column(String(36), ForeignKey("tenants.id"), nullable=True)
     is_large    = Column(Boolean, nullable=False, default=False)
     config      = Column(Text, nullable=True)   # JSON string

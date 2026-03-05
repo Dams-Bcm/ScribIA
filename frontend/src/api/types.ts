@@ -30,11 +30,53 @@ export interface TenantModule {
   enabled: boolean;
 }
 
+export type TenantSector =
+  | "syndic_copro"
+  | "education_spe"
+  | "collectivite"
+  | "chantier"
+  | "sante";
+
+export interface SectorDefinition {
+  key: TenantSector;
+  label: string;
+  defaultModules: string[];
+}
+
+export const SECTOR_PRESETS: SectorDefinition[] = [
+  {
+    key: "syndic_copro",
+    label: "Syndic de copropriété",
+    defaultModules: ["procedures", "ai_documents", "convocations", "transcription"],
+  },
+  {
+    key: "education_spe",
+    label: "Éducation spécialisée / MDPH",
+    defaultModules: ["preparatory_phases", "ai_documents", "transcription", "transcription_diarisation", "procedures"],
+  },
+  {
+    key: "collectivite",
+    label: "Collectivité territoriale",
+    defaultModules: ["transcription", "transcription_diarisation", "ai_documents", "procedures"],
+  },
+  {
+    key: "chantier",
+    label: "Gestion de chantier",
+    defaultModules: ["procedures", "transcription", "ai_documents"],
+  },
+  {
+    key: "sante",
+    label: "Santé / Médico-social",
+    defaultModules: ["transcription", "transcription_diarisation", "ai_documents", "rgpd", "procedures"],
+  },
+];
+
 export interface Tenant {
   id: string;
   name: string;
   slug: string;
   tenant_type: "organization" | "group";
+  sector: TenantSector | null;
   parent_id: string | null;
   is_large: boolean;
   is_active: boolean;
@@ -45,6 +87,7 @@ export interface TenantCreate {
   name: string;
   slug: string;
   tenant_type?: string;
+  sector?: TenantSector | null;
   parent_id?: string | null;
   is_large?: boolean;
   modules?: string[];

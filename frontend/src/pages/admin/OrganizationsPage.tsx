@@ -5,7 +5,7 @@ import {
   useDeleteTenant,
   useUpdateTenantModules,
 } from "../../api/hooks/useTenants";
-import { AVAILABLE_MODULES, type Tenant } from "../../api/types";
+import { AVAILABLE_MODULES, SECTOR_PRESETS, type Tenant, type TenantSector } from "../../api/types";
 import { Building2, Plus, Trash2, X } from "lucide-react";
 
 export function OrganizationsPage() {
@@ -16,7 +16,12 @@ export function OrganizationsPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", slug: "", tenant_type: "organization" as string, modules: [] as string[] });
+  const [form, setForm] = useState({ name: "", slug: "", tenant_type: "organization" as string, sector: null as TenantSector | null, modules: [] as string[] });
+
+  function handleSectorChange(sector: TenantSector | null) {
+    const preset = sector ? SECTOR_PRESETS.find((p) => p.key === sector) : null;
+    setForm((f) => ({ ...f, sector, modules: preset ? preset.defaultModules : [] }));
+  }
 
   const selected = tenants.find((t) => t.id === selectedId) ?? null;
 
@@ -25,11 +30,11 @@ export function OrganizationsPage() {
 
   function handleCreate() {
     createTenant.mutate(
-      { name: form.name, slug: form.slug.toLowerCase().replace(/\s+/g, "-"), tenant_type: form.tenant_type, modules: form.modules },
+      { name: form.name, slug: form.slug.toLowerCase().replace(/\s+/g, "-"), tenant_type: form.tenant_type, sector: form.sector, modules: form.modules },
       {
         onSuccess: () => {
           setShowCreate(false);
-          setForm({ name: "", slug: "", tenant_type: "organization", modules: [] });
+          setForm({ name: "", slug: "", tenant_type: "organization", sector: null, modules: [] });
         },
       },
     );
@@ -102,7 +107,12 @@ export function OrganizationsPage() {
           {selected ? (
             <div className="bg-background rounded-xl border border-border p-6">
               <h2 className="text-lg font-bold mb-1">{selected.name}</h2>
-              <p className="text-sm text-muted-foreground mb-4">{selected.slug} &middot; {selected.tenant_type === "group" ? "Groupe" : "Organisation"}</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {selected.slug} &middot; {selected.tenant_type === "group" ? "Groupe" : "Organisation"}
+                {selected.sector && (
+                  <> &middot; <span className="font-medium text-foreground">{SECTOR_PRESETS.find((s) => s.key === selected.sector)?.label ?? selected.sector}</span></>
+                )}
+              </p>
 
               <h3 className="text-sm font-semibold mb-3">Modules activés</h3>
               <div className="space-y-2">
@@ -179,6 +189,20 @@ export function OrganizationsPage() {
                     Groupe
                   </button>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Secteur <span className="text-muted-foreground font-normal">(pré-configure les modules)</span></label>
+                <select
+                  value={form.sector ?? ""}
+                  onChange={(e) => handleSectorChange((e.target.value as TenantSector) || null)}
+                  className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">— Générique —</option>
+                  {SECTOR_PRESETS.map((s) => (
+                    <option key={s.key} value={s.key}>{s.label}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
