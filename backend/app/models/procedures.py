@@ -33,7 +33,7 @@ class ProcedureTemplate(UUIDMixin, TimestampMixin, Base):
     # Template de document IA à générer en fin de procédure (nullable)
     document_template_id = Column(
         String(36),
-        ForeignKey("ai_document_templates.id", ondelete="SET NULL"),
+        ForeignKey("ai_document_templates.id", ondelete="NO ACTION"),
         nullable=True,
     )
     is_active   = Column(Boolean, nullable=False, default=True)
@@ -69,7 +69,7 @@ class Procedure(UUIDMixin, TimestampMixin, Base):
 
     tenant_id   = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id     = Column(String(36), ForeignKey("users.id", ondelete="NO ACTION"), nullable=True)
-    template_id = Column(String(36), ForeignKey("procedure_templates.id", ondelete="SET NULL"), nullable=True)
+    template_id = Column(String(36), ForeignKey("procedure_templates.id", ondelete="NO ACTION"), nullable=True)
 
     title       = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
@@ -79,19 +79,19 @@ class Procedure(UUIDMixin, TimestampMixin, Base):
     # Document IA à générer (peut différer du template par défaut)
     document_template_id = Column(
         String(36),
-        ForeignKey("ai_document_templates.id", ondelete="SET NULL"),
+        ForeignKey("ai_document_templates.id", ondelete="NO ACTION"),
         nullable=True,
     )
 
     # Liens vers les ressources produites
     source_session_id = Column(
         String(36),
-        ForeignKey("transcription_jobs.id", ondelete="SET NULL"),
+        ForeignKey("transcription_jobs.id", ondelete="NO ACTION"),
         nullable=True,
     )
     ai_document_id = Column(
         String(36),
-        ForeignKey("ai_documents.id", ondelete="SET NULL"),
+        ForeignKey("ai_documents.id", ondelete="NO ACTION"),
         nullable=True,
     )
 
