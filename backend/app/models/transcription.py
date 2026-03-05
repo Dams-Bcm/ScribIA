@@ -69,10 +69,16 @@ class DiarisationSpeaker(UUIDMixin, Base):
     __tablename__ = "diarisation_speakers"
 
     job_id         = Column(String(36), ForeignKey("transcription_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
-    speaker_id     = Column(String(50), nullable=False)
+    speaker_id     = Column(String(50), nullable=False)   # label pyannote ex: "SPEAKER_00"
     display_name   = Column(String(255), nullable=True)
     color_index    = Column(Integer, nullable=False, default=0)
     segment_count  = Column(Integer, nullable=False, default=0)
     total_duration = Column(Float, nullable=False, default=0.0)
 
-    job = relationship("TranscriptionJob", back_populates="speakers")
+    # Lien vers le profil vocal identifié (null si locuteur non identifié)
+    profile_id = Column(String(36), ForeignKey("speaker_profiles.id"), nullable=True)
+    # Embedding extrait pour ce locuteur dans ce job (JSON float array)
+    embedding  = Column(Text, nullable=True)
+
+    job     = relationship("TranscriptionJob", back_populates="speakers")
+    profile = relationship("SpeakerProfile", back_populates="diarisation_speakers")

@@ -27,9 +27,10 @@ class Tenant(UUIDMixin, TimestampMixin, Base):
     is_active   = Column(Boolean, nullable=False, default=True)
 
     # Relationships
-    parent   = relationship("Tenant", remote_side="Tenant.id", backref="children")
-    modules  = relationship("TenantModule", back_populates="tenant", cascade="all, delete-orphan")
-    users    = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
+    parent           = relationship("Tenant", remote_side="Tenant.id", backref="children")
+    modules          = relationship("TenantModule", back_populates="tenant", cascade="all, delete-orphan")
+    users            = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
+    speaker_profiles = relationship("SpeakerProfile", back_populates="tenant", cascade="all, delete-orphan")
 
 
 class TenantModule(UUIDMixin, Base):
