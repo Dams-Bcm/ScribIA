@@ -77,6 +77,11 @@ export function useAIDocuments() {
   return useQuery({
     queryKey: KEYS.documents,
     queryFn: () => api.get<AIDocumentListItem[]>("/ai-documents/documents"),
+    refetchInterval: (query) => {
+      const docs = query.state.data as AIDocumentListItem[] | undefined;
+      const hasActive = docs?.some((d) => d.status === "pending" || d.status === "generating");
+      return hasActive ? 2000 : false;
+    },
   });
 }
 
