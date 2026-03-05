@@ -47,7 +47,7 @@ export const SECTOR_PRESETS: SectorDefinition[] = [
   {
     key: "syndic_copro",
     label: "Syndic de copropriété",
-    defaultModules: ["procedures", "ai_documents", "convocations", "transcription"],
+    defaultModules: ["procedures", "ai_documents", "convocations", "transcription", "contacts"],
   },
   {
     key: "education_spe",
@@ -498,6 +498,7 @@ export const AVAILABLE_MODULES: ModuleDefinition[] = [
   { key: "ai_documents", label: "Génération de documents IA" },
   { key: "convocations", label: "Convocations" },
   { key: "procedures", label: "Procédures collaboratives" },
+  { key: "contacts", label: "Carnet de contacts" },
 ];
 
 // ── Procédures ────────────────────────────────────────────────────────────────
@@ -616,4 +617,62 @@ export interface PublicFormData {
   role_name: string;
   form_questions: FormQuestion[];
   already_responded: boolean;
+}
+
+// ── Contacts ─────────────────────────────────────────────────────────────────
+
+export interface ContactGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  address: string | null;
+  metadata: Record<string, unknown> | null;
+  contact_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Contact {
+  id: string;
+  group_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: string | null;
+  custom_fields: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface ContactGroupDetail extends ContactGroup {
+  contacts: Contact[];
+}
+
+export interface ContactGroupCreate {
+  name: string;
+  description?: string | null;
+  address?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface ContactGroupUpdate {
+  name?: string;
+  description?: string | null;
+  address?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface ContactCreate {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  role?: string | null;
+  custom_fields?: Record<string, unknown> | null;
+}
+
+export interface ContactUpdate {
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+  role?: string | null;
+  custom_fields?: Record<string, unknown> | null;
 }

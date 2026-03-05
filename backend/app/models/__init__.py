@@ -10,6 +10,7 @@ from app.models.procedures import (
     ProcedureTemplate, ProcedureTemplateRole,
     Procedure, ProcedureParticipant, ProcedureStatus,
 )
+from app.models.contacts import ContactGroup, Contact
 
 __all__ = [
     "Base", "Tenant", "TenantModule", "User", "AVAILABLE_MODULES",
@@ -21,4 +22,5 @@ __all__ = [
     "AIDocumentTemplate", "AIDocument",
     "ProcedureTemplate", "ProcedureTemplateRole",
     "Procedure", "ProcedureParticipant", "ProcedureStatus",
+    "ContactGroup", "Contact",
 ]
