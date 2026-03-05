@@ -37,7 +37,7 @@ const DOC_TYPE_LABELS: Record<AIDocumentType, string> = {
 
 const PLACEHOLDER_HELP = [
   "{organisation}", "{date}", "{titre}",
-  "{points}", "{transcription}", "{documents}",
+  "{points}", "{transcription}", "{documents}", "{duree}",
 ];
 
 const EMPTY_FORM: AIDocumentTemplateCreate = {

@@ -181,6 +181,7 @@ def _build_prompt(
         "points":        context.get("agenda", ""),
         "transcription": context.get("transcription", ""),
         "documents":     context.get("documents_text", ""),
+        "duree":         context.get("duree", ""),
     }
     user_prompt = template_data["user_prompt_template"]
     for key, value in builtin.items():
