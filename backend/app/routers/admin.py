@@ -9,11 +9,12 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
 from app.database import get_db
-from app.models import Tenant, TenantModule, User, AVAILABLE_MODULES, AuditLog, AIDocumentTemplate, ProcedureTemplate, ProcedureTemplateRole
+from app.models import Tenant, TenantModule, User, AVAILABLE_MODULES, AuditLog, AIDocumentTemplate, ProcedureTemplate, ProcedureTemplateRole, AISetting, AI_USAGES
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantModuleUpdate
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.services.auth import hash_password
 from app.deps import require_super_admin
+from app.services.ai_config import get_model_for_usage
 
 logger = logging.getLogger(__name__)
 
@@ -254,15 +255,22 @@ def _sector_template_response(tpl: ProcedureTemplate) -> dict:
 
 _GENERATE_SYSTEM_PROMPT = """Tu es un expert en modélisation de workflows et procédures métier.
 On te donne une description textuelle d'un processus / workflow.
-Tu dois produire un JSON structuré représentant un ou plusieurs templates de procédure.
+Tu dois produire UN SEUL template de procédure qui représente l'ensemble du workflow décrit.
 
-Chaque template contient :
-- name : nom court du template
-- description : description du template
-- roles : liste de rôles participants, chacun avec :
-  - role_name : nom du rôle
+RÈGLE FONDAMENTALE : Un workflow = UN SEUL template. Ne découpe JAMAIS un workflow en plusieurs templates.
+Les différentes étapes/phases du workflow doivent être résumées dans la description du template,
+pas transformées en templates séparés.
+
+Les "roles" représentent les PARTICIPANTS / ACTEURS du workflow (ex: "Syndic", "Copropriétaire",
+"Conseil syndical"), PAS les étapes du processus.
+
+Le template contient :
+- name : nom court du template (ex: "AG Copropriété")
+- description : description complète du workflow, incluant les grandes étapes/phases
+- roles : liste des ACTEURS participants (personnes ou groupes), chacun avec :
+  - role_name : nom du rôle/acteur
   - invitation_delay_days : délai d'invitation en jours avant la réunion
-  - form_questions : liste de questions du formulaire de collecte, chacune avec :
+  - form_questions : liste de questions du formulaire de collecte pour CE rôle, chacune avec :
     - id : identifiant unique (ex: "q1", "q2"...)
     - label : texte de la question
     - type : "textarea" ou "text"
@@ -270,7 +278,7 @@ Chaque template contient :
     - options : [] (vide)
 
 IMPORTANT : Retourne UNIQUEMENT du JSON valide, sans commentaire, sans markdown, sans texte avant ou après.
-Le JSON doit être un tableau de templates : [{"name": ..., "roles": [...]}, ...]"""
+Le JSON doit être un tableau contenant UN SEUL template : [{"name": ..., "description": ..., "roles": [...]}]"""
 
 
 class WorkflowGenerateRequest(BaseModel):
@@ -299,7 +307,7 @@ def generate_workflow(
     )
 
     payload = {
-        "model": settings.ollama_default_model,
+        "model": get_model_for_usage("workflow_generation"),
         "system": _GENERATE_SYSTEM_PROMPT,
         "prompt": user_prompt,
         "stream": False,
@@ -737,6 +745,74 @@ def delete_user(
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     db.delete(user)
     db.commit()
+
+
+# ── AI Settings ──────────────────────────────────────────────────────────────
+
+
+@router.get("/ai-settings")
+def get_ai_settings(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Retourne la config IA : usages disponibles + modèle assigné + modèles Ollama."""
+    # Current settings from DB
+    db_settings = db.query(AISetting).all()
+    settings_map = {s.usage_key: s.model_name for s in db_settings}
+
+    # Build response with all known usages
+    usages = []
+    for key, label in AI_USAGES.items():
+        usages.append({
+            "usage_key": key,
+            "label": label,
+            "model_name": settings_map.get(key, None),  # None = use default
+        })
+
+    # Available Ollama models
+    ollama_models = []
+    try:
+        resp = requests.get(f"{settings.ollama_url}/api/tags", timeout=5)
+        resp.raise_for_status()
+        ollama_models = [m["name"] for m in resp.json().get("models", [])]
+    except Exception:
+        pass
+
+    return {
+        "usages": usages,
+        "ollama_models": ollama_models,
+        "default_model": settings.ollama_default_model,
+        "ollama_url": settings.ollama_url,
+    }
+
+
+class AISettingUpdate(BaseModel):
+    usage_key: str
+    model_name: str | None  # None = revert to default
+
+
+@router.put("/ai-settings")
+def update_ai_settings(
+    body: list[AISettingUpdate],
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Met à jour les affectations modèle par usage."""
+    for item in body:
+        if item.usage_key not in AI_USAGES:
+            continue
+        existing = db.query(AISetting).filter_by(usage_key=item.usage_key).first()
+        if item.model_name:
+            if existing:
+                existing.model_name = item.model_name
+            else:
+                db.add(AISetting(usage_key=item.usage_key, model_name=item.model_name))
+        else:
+            # Remove override → use default
+            if existing:
+                db.delete(existing)
+    db.commit()
+    return {"message": "Configuration IA mise à jour"}
 
 
 # ── Audit logs ────────────────────────────────────────────────────────────────

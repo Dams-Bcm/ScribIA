@@ -11,6 +11,7 @@ from app.models.procedures import (
     Procedure, ProcedureParticipant, ProcedureStatus,
 )
 from app.models.contacts import ContactGroup, Contact
+from app.models.ai_settings import AISetting, AI_USAGES
 
 __all__ = [
     "Base", "Tenant", "TenantModule", "User", "AVAILABLE_MODULES",
@@ -23,4 +24,5 @@ __all__ = [
     "ProcedureTemplate", "ProcedureTemplateRole",
     "Procedure", "ProcedureParticipant", "ProcedureStatus",
     "ContactGroup", "Contact",
+    "AISetting", "AI_USAGES",
 ]

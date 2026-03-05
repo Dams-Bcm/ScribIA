@@ -280,7 +280,8 @@ def _run_generation(doc_id: str):
         # Construction du prompt
         system_prompt, user_prompt = _build_prompt(template_data, context)
 
-        model = template_data.get("ollama_model") or settings.ollama_default_model
+        from app.services.ai_config import get_model_for_usage
+        model = template_data.get("ollama_model") or get_model_for_usage("ai_documents")
         temperature = float(template_data.get("temperature", 0.3))
 
         # Génération en streaming
