@@ -1,18 +1,16 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
 import { useLogin } from "../api/hooks/useAuth";
 
 export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const login = useLogin();
-  const navigate = useNavigate();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     try {
       await login.mutateAsync({ username, password });
-      navigate("/", { replace: true });
+      window.location.href = "/";
     } catch {
       // error handled by mutation state
     }

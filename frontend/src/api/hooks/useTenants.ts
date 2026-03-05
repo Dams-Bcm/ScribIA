@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../client";
-import type { Tenant, TenantCreate, TenantUpdate, TenantModule, ModuleDefinition } from "../types";
+import type { Tenant, TenantCreate, TenantUpdate, ModuleDefinition } from "../types";
 
 export function useTenants() {
   return useQuery<Tenant[]>({

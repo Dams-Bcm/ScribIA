@@ -1,6 +1,7 @@
+import { Link } from "react-router";
 import { useAuth } from "../stores/auth";
 import { ModuleGuard } from "../components/ModuleGuard";
-import { Mic, FileText, Scale, Sparkles, Mail } from "lucide-react";
+import { Mic, FileText, FolderOpen, Scale, Sparkles, Mail } from "lucide-react";
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ export function DashboardPage() {
       description: "Convertissez vos fichiers audio en texte",
       icon: Mic,
       color: "bg-blue-50 text-blue-600",
+      to: "/transcription",
     },
     {
       key: "transcription_diarisation",
@@ -19,6 +21,15 @@ export function DashboardPage() {
       description: "Transcription avec identification des intervenants",
       icon: FileText,
       color: "bg-purple-50 text-purple-600",
+      to: "/transcription-diarisation",
+    },
+    {
+      key: "preparatory_phases",
+      label: "Phase(s) préparatoire(s)",
+      description: "Préparation de documents avant convocation",
+      icon: FolderOpen,
+      color: "bg-orange-50 text-orange-600",
+      to: "/phases-preparatoires",
     },
     {
       key: "legal_compliance",
@@ -26,6 +37,7 @@ export function DashboardPage() {
       description: "Vérification et suivi de conformité",
       icon: Scale,
       color: "bg-amber-50 text-amber-600",
+      to: "/conformite",
     },
     {
       key: "ai_documents",
@@ -33,6 +45,7 @@ export function DashboardPage() {
       description: "Résumés, procès-verbaux et documents générés par IA",
       icon: Sparkles,
       color: "bg-emerald-50 text-emerald-600",
+      to: "/documents-ia",
     },
     {
       key: "convocations",
@@ -40,6 +53,7 @@ export function DashboardPage() {
       description: "Création et envoi de convocations",
       icon: Mail,
       color: "bg-rose-50 text-rose-600",
+      to: "/convocations",
     },
   ];
 
@@ -53,13 +67,15 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {modules.map((mod) => (
           <ModuleGuard key={mod.key} module={mod.key}>
-            <div className="bg-background rounded-xl border border-border p-5 hover:shadow-sm transition-shadow cursor-pointer">
-              <div className={`w-10 h-10 rounded-lg ${mod.color} flex items-center justify-center mb-3`}>
-                <mod.icon className="w-5 h-5" />
+            <Link to={mod.to}>
+              <div className="bg-background rounded-xl border border-border p-5 hover:shadow-sm transition-shadow cursor-pointer">
+                <div className={`w-10 h-10 rounded-lg ${mod.color} flex items-center justify-center mb-3`}>
+                  <mod.icon className="w-5 h-5" />
+                </div>
+                <h3 className="font-semibold text-sm mb-1">{mod.label}</h3>
+                <p className="text-xs text-muted-foreground">{mod.description}</p>
               </div>
-              <h3 className="font-semibold text-sm mb-1">{mod.label}</h3>
-              <p className="text-xs text-muted-foreground">{mod.description}</p>
-            </div>
+            </Link>
           </ModuleGuard>
         ))}
       </div>

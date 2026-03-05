@@ -8,7 +8,8 @@ from app.models.base import Base, UUIDMixin, TimestampMixin
 AVAILABLE_MODULES = {
     "transcription":              "Transcription simple",
     "transcription_diarisation":  "Transcription + Diarisation",
-    "legal_compliance":           "Conformité légale",
+    "preparatory_phases":         "Phase(s) préparatoire(s)",
+    "rgpd":                       "RGPD",
     "ai_documents":               "Génération de documents IA",
     "convocations":               "Convocations",
 }

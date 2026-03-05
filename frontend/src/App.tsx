@@ -14,9 +14,10 @@ import { PrivacyPage } from "./pages/PrivacyPage";
 // Module pages
 import { TranscriptionPage } from "./pages/modules/TranscriptionPage";
 import { TranscriptionDiarisationPage } from "./pages/modules/TranscriptionDiarisationPage";
-import { LegalCompliancePage } from "./pages/modules/LegalCompliancePage";
+import { RGPDPage } from "./pages/modules/RGPDPage";
 import { AIDocumentsPage } from "./pages/modules/AIDocumentsPage";
 import { ConvocationsPage } from "./pages/modules/ConvocationsPage";
+import { PreparatoryPhasesPage } from "./pages/modules/PreparatoryPhasesPage";
 
 // Admin pages
 import { OrganizationsPage } from "./pages/admin/OrganizationsPage";
@@ -65,7 +66,8 @@ function AppRoutes() {
           {/* Modules */}
           <Route path="transcription" element={<TranscriptionPage />} />
           <Route path="transcription-diarisation" element={<TranscriptionDiarisationPage />} />
-          <Route path="conformite" element={<LegalCompliancePage />} />
+          <Route path="phases-preparatoires" element={<PreparatoryPhasesPage />} />
+          <Route path="rgpd" element={<RGPDPage />} />
           <Route path="documents-ia" element={<AIDocumentsPage />} />
           <Route path="convocations" element={<ConvocationsPage />} />
 

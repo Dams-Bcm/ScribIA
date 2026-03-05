@@ -24,6 +24,31 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24  # 24 hours
 
+    # ── Transcription ──────────────────────────────────────────────────────────
+    whisper_model: str = "medium"
+    device: str = "cuda"
+    compute_type: str = "float16"
+    audio_path: str = "/data/audio"
+    max_audio_size_mb: int = 500
+    whisper_language: str = "fr"
+    whisper_beam_size: int = 5
+    whisper_no_speech_threshold: float = 0.45
+
+    # ── Diarisation ────────────────────────────────────────────────────────────
+    hf_token: str = ""
+    min_speakers: int = 2
+    max_speakers: int = 8
+    clustering_threshold: float = 0.65
+
+    # ── Preparatory Phases ──────────────────────────────────────────────────
+    prep_docs_path: str = "/data/prep_docs"
+    max_doc_size_mb: int = 50
+
+    # ── AI Documents / Ollama ───────────────────────────────────────────────────
+    ollama_url: str = "http://localhost:11434"
+    ollama_default_model: str = "llama3.1:8b"
+    ai_docs_path: str = "/data/ai_docs"
+
     # ── App ────────────────────────────────────────────────────────────────────
     app_name: str = "ScribIA"
     debug: bool = False

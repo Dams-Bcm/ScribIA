@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   useTenants,
   useCreateTenant,
-  useUpdateTenant,
   useDeleteTenant,
   useUpdateTenantModules,
 } from "../../api/hooks/useTenants";
@@ -12,13 +11,14 @@ import { Building2, Plus, Trash2, X } from "lucide-react";
 export function OrganizationsPage() {
   const { data: tenants = [], isLoading } = useTenants();
   const createTenant = useCreateTenant();
-  const updateTenant = useUpdateTenant();
   const deleteTenant = useDeleteTenant();
   const updateModules = useUpdateTenantModules();
 
   const [showCreate, setShowCreate] = useState(false);
-  const [selected, setSelected] = useState<Tenant | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", slug: "", tenant_type: "organization" as string, modules: [] as string[] });
+
+  const selected = tenants.find((t) => t.id === selectedId) ?? null;
 
   const groups = tenants.filter((t) => t.tenant_type === "group");
   const organizations = tenants.filter((t) => t.tenant_type === "organization");
@@ -38,7 +38,7 @@ export function OrganizationsPage() {
   function handleDelete(id: string) {
     if (confirm("Supprimer cette organisation et toutes ses données ?")) {
       deleteTenant.mutate(id);
-      if (selected?.id === id) setSelected(null);
+      if (selectedId === id) setSelectedId(null);
     }
   }
 
@@ -80,10 +80,10 @@ export function OrganizationsPage() {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-1">Groupes</p>
               {groups.map((g) => (
                 <div key={g.id}>
-                  <OrgRow tenant={g} selected={selected?.id === g.id} onSelect={setSelected} onDelete={handleDelete} />
+                  <OrgRow tenant={g} selected={selectedId === g.id} onSelect={(t) => setSelectedId(t.id)} onDelete={handleDelete} />
                   {organizations.filter((o) => o.parent_id === g.id).map((o) => (
                     <div key={o.id} className="ml-4">
-                      <OrgRow tenant={o} selected={selected?.id === o.id} onSelect={setSelected} onDelete={handleDelete} />
+                      <OrgRow tenant={o} selected={selectedId === o.id} onSelect={(t) => setSelectedId(t.id)} onDelete={handleDelete} />
                     </div>
                   ))}
                 </div>
@@ -93,7 +93,7 @@ export function OrganizationsPage() {
 
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-1 mt-4">Organisations</p>
           {organizations.filter((o) => !o.parent_id).map((o) => (
-            <OrgRow key={o.id} tenant={o} selected={selected?.id === o.id} onSelect={setSelected} onDelete={handleDelete} />
+            <OrgRow key={o.id} tenant={o} selected={selectedId === o.id} onSelect={(t) => setSelectedId(t.id)} onDelete={handleDelete} />
           ))}
         </div>
 

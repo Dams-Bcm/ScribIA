@@ -31,7 +31,9 @@ async function request<T>(
 
   if (res.status === 401) {
     localStorage.removeItem("token");
-    window.location.href = "/login";
+    if (window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
     throw new ApiError(401, "Session expirée");
   }
 
@@ -44,6 +46,88 @@ async function request<T>(
   return res.json();
 }
 
+async function upload<T>(path: string, file: File | Blob, filename?: string): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file, filename ?? (file instanceof File ? file.name : "recording.webm"));
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (res.status === 401) {
+    localStorage.removeItem("token");
+    if (window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
+    throw new ApiError(401, "Session expirée");
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new ApiError(res.status, body.detail ?? res.statusText);
+  }
+
+  return res.json();
+}
+
+function streamSSE(
+  path: string,
+  onMessage: (data: Record<string, unknown>) => void,
+  onDone?: () => void,
+): AbortController {
+  const controller = new AbortController();
+  const token = getToken();
+
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  fetch(`${BASE_URL}${path}`, { headers, signal: controller.signal })
+    .then(async (res) => {
+      if (!res.ok || !res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              onMessage(data);
+            } catch {
+              // ignore parse errors
+            }
+          }
+        }
+      }
+    })
+    .catch(() => {
+      // aborted or network error
+    })
+    .finally(() => {
+      onDone?.();
+    });
+
+  return controller;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
@@ -53,6 +137,8 @@ export const api = {
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  upload: <T>(path: string, file: File | Blob, filename?: string) => upload<T>(path, file, filename),
+  streamSSE,
 };
 
 export { ApiError };

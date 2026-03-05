@@ -1,0 +1,175 @@
+import { useState } from "react";
+import { Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useTemplates, useGenerateDocument } from "@/api/hooks/useAIDocuments";
+import { useDossiers } from "@/api/hooks/usePreparatoryPhases";
+import type { AIDocument } from "@/api/types";
+
+// Hook pour les sessions de transcription
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/api/client";
+
+function useTranscriptionSessions() {
+  return useQuery({
+    queryKey: ["transcription-sessions-list"],
+    queryFn: () =>
+      api.get<Array<{ id: string; original_filename: string; created_at: string; mode: string }>>(
+        "/transcription"
+      ),
+  });
+}
+
+interface Props {
+  onGenerated: (doc: AIDocument) => void;
+}
+
+export function GenerateDialog({ onGenerated }: Props) {
+  const [open, setOpen] = useState(false);
+  const [templateId, setTemplateId] = useState("");
+  const [title, setTitle] = useState("");
+  const [dossierId, setDossierId] = useState("");
+  const [sessionId, setSessionId] = useState("");
+
+  const { data: templates = [] } = useTemplates();
+  const { data: dossiers = [] } = useDossiers();
+  const { data: sessions = [] } = useTranscriptionSessions();
+  const generate = useGenerateDocument();
+
+  const selectedTemplate = templates.find((t) => t.id === templateId);
+
+  async function handleGenerate() {
+    if (!templateId || !title) return;
+    const result = await generate.mutateAsync({
+      template_id: templateId,
+      title,
+      source_dossier_id: dossierId || null,
+      source_session_id: sessionId || null,
+    });
+    onGenerated(result);
+    setOpen(false);
+    // reset
+    setTemplateId("");
+    setTitle("");
+    setDossierId("");
+    setSessionId("");
+  }
+
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>
+        <Sparkles className="w-4 h-4 mr-2" />
+        Générer un document
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Générer un document IA</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>Template *</Label>
+              <Select value={templateId} onValueChange={setTemplateId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisir un template…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.filter((t) => t.is_active).map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedTemplate?.description && (
+                <p className="text-xs text-muted-foreground">{selectedTemplate.description}</p>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <Label>Titre du document *</Label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex : PV du Conseil Municipal du 15/03/2026"
+              />
+            </div>
+
+            <div className="border-t border-border pt-4 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Sources (optionnelles)
+              </p>
+
+              <div className="space-y-1">
+                <Label>Dossier préparatoire</Label>
+                <Select value={dossierId} onValueChange={setDossierId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Aucun dossier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Aucun</SelectItem>
+                    {dossiers.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.title}
+                        {d.meeting_date && (
+                          <span className="text-muted-foreground ml-2 text-xs">
+                            {new Date(d.meeting_date).toLocaleDateString("fr-FR")}
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label>Session de transcription</Label>
+                <Select value={sessionId} onValueChange={setSessionId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Aucune transcription" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Aucune</SelectItem>
+                    {sessions.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.original_filename}
+                        <span className="text-muted-foreground ml-2 text-xs">
+                          {new Date(s.created_at).toLocaleDateString("fr-FR")}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
+            <Button
+              onClick={handleGenerate}
+              disabled={!templateId || !title || generate.isPending}
+            >
+              {generate.isPending ? "Lancement…" : "Générer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

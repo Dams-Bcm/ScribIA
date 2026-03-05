@@ -3,8 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { useAuth } from "../stores/auth";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Shield, Download, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Download, Trash2, CheckCircle, XCircle } from "lucide-react";
 
 interface ConsentStatus {
   consent_type: string;

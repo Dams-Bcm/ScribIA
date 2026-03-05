@@ -10,9 +10,24 @@ alembic==1.14.1
 # Auth
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 
 # Settings
 pydantic-settings==2.7.1
+
+# Transcription
+faster-whisper==1.1.0
+requests
+
+# Diarisation
+pyannote.audio==4.0.4
+soundfile
+scipy
+scikit-learn
+
+# AI Documents
+python-docx==1.1.2
+pdfminer.six==20231228
 
 # Utilities
 python-multipart==0.0.20

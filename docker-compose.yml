@@ -2,10 +2,10 @@
 #  ScribIA v2 — Docker Compose
 #
 #  Profils disponibles :
-#    docker-compose up                         → front + back + db (tout local)
-#    docker-compose up backend frontend        → front + back (db externe)
-#    docker-compose up frontend                → front seul (back + db ailleurs)
-#    docker-compose --profile db up            → explicitement avec db
+#    docker-compose up                         → front + back + ollama (tout local)
+#    docker-compose --profile db up            → + base de données SQL Server locale
+#    docker-compose up backend frontend        → front + back (db + ollama externes)
+#    docker-compose up frontend                → front seul (back + db + ollama ailleurs)
 # ============================================================================
 
 services:
@@ -17,7 +17,7 @@ services:
       MSSQL_SA_PASSWORD: "${DB_PASSWORD:-ScribIA_Dev_2026!}"
       MSSQL_PID: "Developer"
     ports:
-      - "${DB_EXPOSED_PORT:-1433}:1433"
+      - "${DB_EXPOSED_PORT:-1434}:1433"
     volumes:
       - mssql_data:/var/opt/mssql
     healthcheck:
@@ -26,6 +26,20 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "${OLLAMA_PORT:-11435}:11434"     # 11435 pour ne pas conflicte avec un ollama local
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   backend:
     build: ./backend
@@ -37,18 +51,32 @@ services:
       SCRIBIA_DB_USER: "${SCRIBIA_DB_USER:-sa}"
       SCRIBIA_DB_PASSWORD: "${DB_PASSWORD:-ScribIA_Dev_2026!}"
       SCRIBIA_JWT_SECRET: "${JWT_SECRET:-CHANGE-ME-IN-PRODUCTION}"
-      SCRIBIA_CORS_ORIGINS: "${SCRIBIA_CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}"
+      SCRIBIA_CORS_ORIGINS: "${SCRIBIA_CORS_ORIGINS:-http://localhost:3001,http://localhost:5173}"
+      SCRIBIA_OLLAMA_URL: "${SCRIBIA_OLLAMA_URL:-http://ollama:11434}"
+      # SCRIBIA_HF_TOKEN passé directement via env_file: .env
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8001}:8000"
     volumes:
       - ./backend:/app
+      - audio_data:/data/audio
+      - prep_docs:/data/prep_docs
+      - ai_docs:/data/ai_docs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   frontend:
     build: ./frontend
     ports:
-      - "3000:80"
-    depends_on:
-      - backend
+      - "${FRONTEND_PORT:-3001}:80"
 
 volumes:
   mssql_data:
+  audio_data:
+  prep_docs:
+  ai_docs:
+  ollama_data:

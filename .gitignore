@@ -30,5 +30,11 @@ docker-compose.override.yml
 backend/alembic/versions/*.py
 !backend/alembic/versions/.gitkeep
 
+# ── Data (audio files, database, models) ──
+data/
+*.db
+*.sqlite
+*.sqlite3
+
 # ── Logs ──
 *.log
