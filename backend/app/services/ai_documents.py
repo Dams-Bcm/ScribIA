@@ -199,6 +199,7 @@ def _call_ollama(model: str, system_prompt: str, user_prompt: str, temperature: 
         "system": system_prompt,
         "prompt": user_prompt,
         "stream": True,
+        "keep_alive": 0,  # décharge le modèle de la VRAM immédiatement après génération
         "options": {"temperature": temperature},
     }
     url = f"{settings.ollama_url}/api/generate"
