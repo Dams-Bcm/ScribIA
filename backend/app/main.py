@@ -43,17 +43,17 @@ async def lifespan(app: FastAPI):
     except Exception as _e:
         print(f"[LIFESPAN] create_all FAILED: {_e}", flush=True)
         raise
-    _log.info("[STARTUP] add_missing_columns...")
+    print("[LIFESPAN] add_missing_columns...", flush=True)
     _add_missing_columns()
-    _log.info("[STARTUP] seed_super_admin...")
+    print("[LIFESPAN] seed_super_admin...", flush=True)
     _seed_super_admin()
-    _log.info("[STARTUP] seed_sectors...")
+    print("[LIFESPAN] seed_sectors...", flush=True)
     _seed_sectors()
-    _log.info("[STARTUP] sync_tenant_modules...")
+    print("[LIFESPAN] sync_tenant_modules...", flush=True)
     _sync_tenant_modules()
-    _log.info("[STARTUP] load_dedicated_db_cache...")
+    print("[LIFESPAN] load_dedicated_db_cache...", flush=True)
     _load_dedicated_db_cache()
-    _log.info("[STARTUP] done!")
+    print("[LIFESPAN] done! App ready.", flush=True)
     yield
 
 
