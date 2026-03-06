@@ -93,9 +93,6 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
       }
     }
 
-    // Clear browser selection so the blue highlight doesn't cover our UI
-    sel.removeAllRanges();
-
     if (e.shiftKey) {
       setEnrollSegIds((prev) => {
         const merged = new Set([...prev, ...newIds]);
@@ -352,15 +349,15 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
         </div>
       )}
 
-      {/* Hide Chrome blue selection highlight in enroll mode, show purple underline instead */}
+      {/* Purple selection highlight in enroll mode */}
       {mode === "enroll" && (
         <style>{`
           .enroll-segments *::selection {
-            background: transparent !important;
+            background: rgba(147, 51, 234, 0.25) !important;
             color: inherit !important;
           }
           .enroll-segments *::-moz-selection {
-            background: transparent !important;
+            background: rgba(147, 51, 234, 0.25) !important;
             color: inherit !important;
           }
         `}</style>
@@ -399,7 +396,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
                 data-seg-id={seg.id}
                 className={`flex gap-2 py-2 pl-3 rounded-r-lg transition-colors ${
                   isEnrollHighlighted
-                    ? "bg-purple-100/60 border-l-4 border-purple-500 ring-1 ring-purple-300/50 shadow-[inset_0_0_0_1px_rgba(147,51,234,0.08),0_0_12px_rgba(147,51,234,0.15)]"
+                    ? "bg-purple-50/80 border-l-4 border-purple-500 ring-1 ring-purple-200/60"
                     : isSelected
                       ? "bg-primary/10 ring-1 ring-primary/30 border-l-4 " + color.border
                       : isPlaying

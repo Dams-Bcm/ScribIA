@@ -20,8 +20,10 @@ import {
   Search,
   BookOpen,
   Megaphone,
+  Moon,
+  Sun,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "../lib/utils";
 import { AnnouncementPopup } from "./AnnouncementPopup";
 
@@ -36,6 +38,30 @@ interface NavItem {
 export function Layout() {
   const { user, isSuperAdmin, hasModule, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const THEMES = [
+    { key: "light", label: "Clair", icon: Sun },
+    { key: "blur", label: "Sombre", icon: Moon },
+  ] as const;
+  type ThemeKey = (typeof THEMES)[number]["key"];
+
+  const [theme, setTheme] = useState<ThemeKey>(() => (localStorage.getItem("theme") as ThemeKey) || "light");
+
+  useEffect(() => {
+    // Remove all theme classes, then apply current
+    THEMES.forEach((t) => document.documentElement.classList.remove(`theme-${t.key}`));
+    if (theme !== "light") {
+      document.documentElement.classList.add(`theme-${theme}`);
+    }
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  function cycleTheme() {
+    const idx = THEMES.findIndex((t) => t.key === theme);
+    setTheme(THEMES[(idx + 1) % THEMES.length].key);
+  }
+
+  const currentTheme = THEMES.find((t) => t.key === theme)!;
 
   const navItems: NavItem[] = [
     // ── Général ──
@@ -130,6 +156,13 @@ export function Layout() {
               <p className="text-sm font-medium truncate">{user?.display_name ?? user?.username}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.role}</p>
             </div>
+            <button
+              onClick={cycleTheme}
+              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+            >
+              <currentTheme.icon className="w-4 h-4" />
+              {currentTheme.label}
+            </button>
             <button
               onClick={logout}
               className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
