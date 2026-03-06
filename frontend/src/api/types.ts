@@ -480,6 +480,7 @@ export const AVAILABLE_MODULES: ModuleDefinition[] = [
   { key: "procedures", label: "Procédures collaboratives" },
   { key: "contacts", label: "Carnet de contacts" },
   { key: "search", label: "Recherche intelligente" },
+  { key: "dictionary", label: "Dictionnaire de substitution" },
 ];
 
 // ── Procédures ────────────────────────────────────────────────────────────────
@@ -693,6 +694,46 @@ export interface ContactUpdate {
   phone?: string | null;
   role?: string | null;
   custom_fields?: Record<string, unknown> | null;
+}
+
+// ── Dictionary / Substitutions ────────────────────────────────────────────────
+
+export interface SubstitutionRule {
+  id: string;
+  tenant_id: string;
+  original: string;
+  replacement: string;
+  is_case_sensitive: boolean;
+  is_whole_word: boolean;
+  is_enabled: boolean;
+  category: string | null;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubstitutionRuleCreate {
+  original: string;
+  replacement: string;
+  is_case_sensitive?: boolean;
+  is_whole_word?: boolean;
+  is_enabled?: boolean;
+  category?: string | null;
+}
+
+export interface SubstitutionRuleUpdate {
+  original?: string;
+  replacement?: string;
+  is_case_sensitive?: boolean;
+  is_whole_word?: boolean;
+  is_enabled?: boolean;
+  category?: string | null;
+}
+
+export interface SubstitutionPreview {
+  original_text: string;
+  substituted_text: string;
+  rules_applied: number;
 }
 
 // ── Search / RAG ──────────────────────────────────────────────────────────────

@@ -26,6 +26,7 @@ from app.schemas.ai_documents import (
     TemplateResponse,
     TemplateUpdate,
 )
+from app.models.transcription import TranscriptionJob
 from app.services.ai_documents import enqueue_generation, seed_default_templates
 from app.services.event_bus import event_bus
 
@@ -184,6 +185,35 @@ async def pull_ollama_model(
             yield f"data: {json.dumps({'error': str(exc)})}\n\n"
 
     return StreamingResponse(_stream(), media_type="text/event-stream")
+
+
+# ── Sources disponibles ───────────────────────────────────────────────────────
+
+@router.get("/sources/sessions")
+def list_available_sessions(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Liste toutes les sessions de transcription (simple + diarisation) completees."""
+    jobs = (
+        db.query(TranscriptionJob)
+        .filter(
+            TranscriptionJob.tenant_id == user.tenant_id,
+            TranscriptionJob.status == "completed",
+        )
+        .order_by(TranscriptionJob.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": j.id,
+            "title": j.title,
+            "original_filename": j.original_filename,
+            "created_at": j.created_at.isoformat() if j.created_at else None,
+            "mode": j.mode,
+        }
+        for j in jobs
+    ]
 
 
 # ── Génération ────────────────────────────────────────────────────────────────

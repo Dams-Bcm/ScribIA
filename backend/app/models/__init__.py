@@ -14,6 +14,7 @@ from app.models.procedures import (
 from app.models.contacts import ContactGroup, Contact
 from app.models.ai_settings import AISetting, AI_USAGES
 from app.models.sector import Sector
+from app.models.substitution import SubstitutionRule
 
 __all__ = [
     "Base", "Tenant", "TenantModule", "User", "AVAILABLE_MODULES",
@@ -29,4 +30,5 @@ __all__ = [
     "ContactGroup", "Contact",
     "AISetting", "AI_USAGES",
     "Sector",
+    "SubstitutionRule",
 ]

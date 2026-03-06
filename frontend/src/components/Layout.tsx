@@ -19,6 +19,7 @@ import {
   Settings2,
   FolderCog,
   Search,
+  BookOpen,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../lib/utils";
@@ -49,6 +50,7 @@ export function Layout() {
     { to: "/procedures", label: "Procédures", icon: ClipboardList, visible: hasModule("procedures"), section: "Modules" },
     { to: "/contacts", label: "Contacts", icon: BookUser, visible: hasModule("contacts"), section: "Modules" },
     { to: "/recherche", label: "Recherche", icon: Search, visible: hasModule("search"), section: "Modules" },
+    { to: "/dictionnaire", label: "Dictionnaire", icon: BookOpen, visible: hasModule("dictionary"), section: "Modules" },
 
     // ── Administration ──
     { to: "/admin/tenants", label: "Tenants", icon: Building2, visible: isSuperAdmin, section: "Administration" },

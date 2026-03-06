@@ -15,6 +15,7 @@ AVAILABLE_MODULES = {
     "procedures":                 "Procédures collaboratives",
     "contacts":                   "Carnet de contacts",
     "search":                     "Recherche intelligente",
+    "dictionary":                 "Dictionnaire de substitution",
 }
 
 

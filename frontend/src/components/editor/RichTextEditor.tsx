@@ -27,8 +27,11 @@ import {
   Minus,
   Save,
   Download,
+  BookOpen,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCreateRule } from "@/api/hooks/useDictionary";
 
 interface Props {
   /** Contenu initial en Markdown */
@@ -54,6 +57,8 @@ const slashCommands = [
 export function RichTextEditor({ initialContent, onSave, onExport, readOnly = false }: Props) {
   const [dirty, setDirty] = useState(false);
   const editorRef = useRef<EditorInstance | null>(null);
+  const [dictPopover, setDictPopover] = useState<{ original: string; replacement: string } | null>(null);
+  const createRule = useCreateRule();
 
   function handleSave() {
     if (!editorRef.current || !onSave) return;
@@ -137,6 +142,19 @@ export function RichTextEditor({ initialContent, onSave, onExport, readOnly = fa
                   <Strikethrough className="w-3.5 h-3.5" />
                 </Button>
               </EditorBubbleItem>
+              {/* Separator + Dictionary quick-add */}
+              <div className="w-px h-5 bg-border mx-0.5" />
+              <EditorBubbleItem onSelect={(editor) => {
+                const sel = editor.state.selection;
+                const text = editor.state.doc.textBetween(sel.from, sel.to, " ");
+                if (text.trim()) {
+                  setDictPopover({ original: text.trim(), replacement: "" });
+                }
+              }}>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Ajouter au dictionnaire">
+                  <BookOpen className="w-3.5 h-3.5" />
+                </Button>
+              </EditorBubbleItem>
             </EditorBubble>
           )}
 
@@ -166,6 +184,62 @@ export function RichTextEditor({ initialContent, onSave, onExport, readOnly = fa
           )}
         </EditorContent>
       </EditorRoot>
+
+      {/* Dictionary quick-add popover */}
+      {dictPopover && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20" onClick={() => setDictPopover(null)}>
+          <div className="bg-background rounded-xl border border-border shadow-lg p-4 w-80" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-semibold text-sm flex items-center gap-1.5">
+                <BookOpen className="w-4 h-4" /> Ajouter au dictionnaire
+              </h4>
+              <button onClick={() => setDictPopover(null)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!dictPopover.replacement.trim()) return;
+              await createRule.mutateAsync({
+                original: dictPopover.original,
+                replacement: dictPopover.replacement,
+              });
+              setDictPopover(null);
+            }}>
+              <div className="space-y-2">
+                <div>
+                  <label className="text-xs text-muted-foreground">Mot original</label>
+                  <input
+                    type="text"
+                    className="w-full border border-border rounded-lg px-2.5 py-1.5 text-sm bg-muted/30 mt-0.5"
+                    value={dictPopover.original}
+                    onChange={(e) => setDictPopover({ ...dictPopover, original: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Remplacement</label>
+                  <input
+                    type="text"
+                    className="w-full border border-border rounded-lg px-2.5 py-1.5 text-sm bg-background mt-0.5"
+                    value={dictPopover.replacement}
+                    onChange={(e) => setDictPopover({ ...dictPopover, replacement: e.target.value })}
+                    autoFocus
+                    placeholder="Saisir le remplacement..."
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <Button type="submit" size="sm" disabled={createRule.isPending || !dictPopover.replacement.trim()}>
+                  Ajouter
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setDictPopover(null)}>
+                  Annuler
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

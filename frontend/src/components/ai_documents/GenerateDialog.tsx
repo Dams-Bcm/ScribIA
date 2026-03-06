@@ -26,10 +26,10 @@ import { api } from "@/api/client";
 
 function useTranscriptionSessions() {
   return useQuery({
-    queryKey: ["transcription-sessions-list"],
+    queryKey: ["ai-documents-source-sessions"],
     queryFn: () =>
-      api.get<Array<{ id: string; original_filename: string; created_at: string; mode: string }>>(
-        "/transcription"
+      api.get<Array<{ id: string; title: string; original_filename: string; created_at: string; mode: string }>>(
+        "/ai-documents/sources/sessions"
       ),
   });
 }
@@ -150,8 +150,9 @@ export function GenerateDialog({ onGenerated }: Props) {
                     <SelectItem value="__none__">Aucune</SelectItem>
                     {sessions.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.original_filename}
+                        {s.title || s.original_filename}
                         <span className="text-muted-foreground ml-2 text-xs">
+                          {s.mode === "diarisation" ? "[T+D] " : "[T] "}
                           {new Date(s.created_at).toLocaleDateString("fr-FR")}
                         </span>
                       </SelectItem>
