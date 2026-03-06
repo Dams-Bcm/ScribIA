@@ -1,19 +1,31 @@
 from contextlib import asynccontextmanager
+import sys
+
+print("[BOOT] main.py loading...", flush=True)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+print("[BOOT] importing config...", flush=True)
 from app.config import settings
+print("[BOOT] importing database...", flush=True)
 from app.database import engine
+print("[BOOT] importing models...", flush=True)
 from app.models import Base, Tenant, TenantModule, User, AVAILABLE_MODULES
+print("[BOOT] importing auth...", flush=True)
 from app.services.auth import hash_password
+print("[BOOT] importing routers...", flush=True)
 from app.routers import health, auth, admin, privacy, transcription, diarisation, compliance, preparatory_phases, ai_documents, speakers, contacts, search, dictionary
+print("[BOOT] importing procedures...", flush=True)
 from app.routers.procedures import router as procedures_router, public_router as procedures_public_router
+print("[BOOT] importing middleware...", flush=True)
 from app.middleware.tenant_db import TenantDBMiddleware
+print("[BOOT] all imports done!", flush=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("[LIFESPAN] entering lifespan...", flush=True)
     import asyncio
     import logging as _logging
     _log = _logging.getLogger("scribia.startup")
@@ -22,7 +34,7 @@ async def lifespan(app: FastAPI):
     event_bus.set_loop(asyncio.get_running_loop())
 
     # Create tables on startup (Alembic will replace this in production)
-    _log.info("[STARTUP] create_all...")
+    print("[LIFESPAN] create_all...", flush=True)
     Base.metadata.create_all(bind=engine)
     _log.info("[STARTUP] add_missing_columns...")
     _add_missing_columns()
