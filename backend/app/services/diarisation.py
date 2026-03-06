@@ -596,6 +596,10 @@ def process_diarisation_job(job_id: str):
 
             # Pre-extract per-speaker embeddings while pyannote is still in memory.
             # Used later for automatic profile matching — non-critical.
+            logger.info(
+                f"[MATCHING] Starting speaker embedding pre-extraction "
+                f"({len(diarization_segments)} diarisation segments)..."
+            )
             try:
                 from app.services.speaker_enrollment import (
                     extract_speaker_embeddings_from_diarisation,
@@ -603,9 +607,14 @@ def process_diarisation_job(job_id: str):
                 speaker_embeddings = extract_speaker_embeddings_from_diarisation(
                     wav_path, diarization_segments
                 )
+                logger.info(
+                    f"[MATCHING] Pre-extraction done: "
+                    f"{len(speaker_embeddings)} speaker embedding(s) extracted"
+                )
             except Exception as e_emb:
                 logger.warning(
-                    f"[MATCHING] Pre-extraction failed (non-critical): {e_emb}"
+                    f"[MATCHING] Pre-extraction failed (non-critical): {e_emb}",
+                    exc_info=True,
                 )
         except Exception as e:
             _update_job(db, job,
@@ -690,6 +699,10 @@ def process_diarisation_job(job_id: str):
         db.commit()
 
         # ── Step 5.5: Auto-match detected speakers to known profiles ──────
+        logger.info(
+            f"[MATCHING] speaker_embeddings has {len(speaker_embeddings)} entries: "
+            f"{list(speaker_embeddings.keys()) if speaker_embeddings else '(empty)'}"
+        )
         if speaker_embeddings:
             try:
                 from app.services.speaker_enrollment import match_speakers_to_profiles
@@ -702,8 +715,13 @@ def process_diarisation_job(job_id: str):
                 )
             except Exception as e_match:
                 logger.warning(
-                    f"[MATCHING] Auto-match failed (non-critical): {e_match}"
+                    f"[MATCHING] Auto-match failed (non-critical): {e_match}",
+                    exc_info=True,
                 )
+        else:
+            logger.warning(
+                "[MATCHING] No speaker embeddings available — auto-match skipped"
+            )
 
         # ── Done ─────────────────────────────────────────────────────────
         _update_job(db, job,
