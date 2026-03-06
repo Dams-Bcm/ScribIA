@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Copy, Download, Check, Play, Pause, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ApplyDictionaryButton } from "@/components/dictionary/ApplyDictionaryButton";
 import type { DiarisationSegment, DiarisationSpeaker } from "@/api/types";
 import { getSpeakerColor } from "./speakerColors";
 import { SpeakerPanel } from "./SpeakerPanel";
@@ -132,6 +133,11 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
           <Download className="w-4 h-4" />
           VTT
         </Button>
+        <ApplyDictionaryButton
+          targetType="transcription"
+          targetId={jobId}
+          previewText={segments.map((s) => s.text).join("\n")}
+        />
       </div>
 
       {/* Lecteur audio (masqué, contrôlé par les boutons segments) */}

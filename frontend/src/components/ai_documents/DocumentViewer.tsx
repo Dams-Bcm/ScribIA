@@ -1,6 +1,7 @@
 import { Loader2, XCircle } from "lucide-react";
 import { useAIDocument, useUpdateAIDocument } from "@/api/hooks/useAIDocuments";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
+import { ApplyDictionaryButton } from "@/components/dictionary/ApplyDictionaryButton";
 
 interface Props {
   docId: string;
@@ -86,11 +87,20 @@ export function DocumentViewer({ docId }: Props) {
       )}
 
       {doc.status === "completed" && doc.result_text && (
-        <RichTextEditor
-          initialContent={doc.result_text}
-          onSave={handleSave}
-          onExport={handleExport}
-        />
+        <>
+          <div className="flex justify-end">
+            <ApplyDictionaryButton
+              targetType="ai_document"
+              targetId={docId}
+              previewText={doc.result_text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()}
+            />
+          </div>
+          <RichTextEditor
+            initialContent={doc.result_text}
+            onSave={handleSave}
+            onExport={handleExport}
+          />
+        </>
       )}
     </div>
   );

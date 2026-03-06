@@ -68,3 +68,19 @@ export function useImportRules() {
     },
   });
 }
+
+export function useApplyDictionary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { target_type: "transcription" | "ai_document"; target_id: string }) =>
+      api.post<{ rules_applied: number; target_type: string; target_id: string }>("/dictionary/apply", body),
+    onSuccess: (_data, variables) => {
+      if (variables.target_type === "transcription") {
+        qc.invalidateQueries({ queryKey: ["transcription"] });
+      } else {
+        qc.invalidateQueries({ queryKey: ["ai-documents"] });
+      }
+      qc.invalidateQueries({ queryKey: KEYS.rules });
+    },
+  });
+}

@@ -42,16 +42,16 @@ export function UploadArea({ onFile, disabled }: UploadAreaProps) {
       className={`
         flex flex-col items-center justify-center gap-3 p-8 rounded-xl border-2 border-dashed
         cursor-pointer transition-colors
-        ${dragOver ? "border-blue-500 bg-blue-50" : "border-border hover:border-blue-400 hover:bg-blue-50/50"}
+        ${dragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}
         ${disabled ? "opacity-50 pointer-events-none" : ""}
       `}
     >
-      <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+      <div className="w-12 h-12 rounded-xl bg-muted text-muted-foreground flex items-center justify-center">
         {dragOver ? <FileAudio className="w-6 h-6" /> : <Upload className="w-6 h-6" />}
       </div>
       <div className="text-center">
         <p className="text-sm font-medium">
-          Glissez un fichier audio ici ou <span className="text-blue-600 underline">parcourir</span>
+          Glissez un fichier audio ici ou <span className="underline">parcourir</span>
         </p>
         <p className="text-xs text-muted-foreground mt-1">
           MP3, WAV, M4A, OGG, FLAC, WebM, AAC (max 500 Mo)

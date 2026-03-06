@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Copy, Download, Check, Play, Pause, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ApplyDictionaryButton } from "@/components/dictionary/ApplyDictionaryButton";
 import type { TranscriptionSegment } from "@/api/types";
 
 interface TranscriptionResultProps {
@@ -114,6 +115,11 @@ export function TranscriptionResult({ segments, jobId, title }: TranscriptionRes
           <Download className="w-4 h-4" />
           VTT
         </Button>
+        <ApplyDictionaryButton
+          targetType="transcription"
+          targetId={jobId}
+          previewText={fullText}
+        />
       </div>
 
       {/* Lecteur audio (masqué, contrôlé par les boutons segments) */}

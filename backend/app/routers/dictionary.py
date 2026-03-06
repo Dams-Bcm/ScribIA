@@ -7,9 +7,13 @@ Module requis : dictionary
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from pydantic import BaseModel
+
 from app.database import get_db
 from app.deps import get_current_user, require_module
 from app.models.substitution import SubstitutionRule
+from app.models.transcription import TranscriptionJob, TranscriptionSegment
+from app.models.ai_documents import AIDocument
 from app.models.user import User
 from app.schemas.substitution import (
     SubstitutionRuleCreate,
@@ -162,3 +166,61 @@ def import_rules(
         created += 1
     db.commit()
     return {"imported": created}
+
+
+# ── Apply substitutions to content ─────────────────────────────────────────
+
+class ApplyRequest(BaseModel):
+    target_type: str  # "transcription" | "ai_document"
+    target_id: str
+
+
+@router.post("/apply")
+def apply_to_content(
+    body: ApplyRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Apply all enabled substitution rules to a transcription or AI document."""
+    rules = (
+        db.query(SubstitutionRule)
+        .filter(SubstitutionRule.tenant_id == user.tenant_id, SubstitutionRule.is_enabled == True)
+        .all()
+    )
+    if not rules:
+        raise HTTPException(status_code=400, detail="Aucune regle active dans le dictionnaire")
+
+    total_applied = 0
+
+    if body.target_type == "transcription":
+        job = db.query(TranscriptionJob).filter_by(id=body.target_id, tenant_id=user.tenant_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Transcription introuvable")
+        segments = db.query(TranscriptionSegment).filter_by(job_id=job.id).all()
+        for seg in segments:
+            new_text, count = apply_substitutions(seg.text, rules)
+            if count > 0:
+                seg.text = new_text
+                total_applied += count
+
+    elif body.target_type == "ai_document":
+        doc = db.query(AIDocument).filter_by(id=body.target_id, tenant_id=user.tenant_id).first()
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document introuvable")
+        if not doc.result_text:
+            raise HTTPException(status_code=400, detail="Le document n'a pas encore de contenu")
+        new_text, count = apply_substitutions(doc.result_text, rules)
+        if count > 0:
+            doc.result_text = new_text
+            total_applied += count
+
+    else:
+        raise HTTPException(status_code=400, detail="target_type doit etre 'transcription' ou 'ai_document'")
+
+    # Update usage counters
+    if total_applied > 0:
+        for rule in rules:
+            rule.usage_count += 1
+        db.commit()
+
+    return {"rules_applied": total_applied, "target_type": body.target_type, "target_id": body.target_id}
