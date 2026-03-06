@@ -128,6 +128,53 @@ function streamSSE(
   return controller;
 }
 
+function uploadWithProgress<T>(
+  path: string,
+  file: File | Blob,
+  filename?: string,
+  onProgress?: (pct: number) => void,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const token = getToken();
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status === 401) {
+        localStorage.removeItem("token");
+        if (window.location.pathname !== "/login") window.location.href = "/login";
+        reject(new ApiError(401, "Session expirée"));
+        return;
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        try {
+          const body = JSON.parse(xhr.responseText);
+          reject(new ApiError(xhr.status, body.detail ?? xhr.statusText));
+        } catch {
+          reject(new ApiError(xhr.status, xhr.statusText));
+        }
+        return;
+      }
+      resolve(JSON.parse(xhr.responseText));
+    });
+
+    xhr.addEventListener("error", () => reject(new ApiError(0, "Erreur réseau")));
+    xhr.addEventListener("abort", () => reject(new ApiError(0, "Upload annulé")));
+
+    const formData = new FormData();
+    formData.append("file", file, filename ?? (file instanceof File ? file.name : "recording.webm"));
+
+    xhr.open("POST", `${BASE_URL}${path}`);
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.send(formData);
+  });
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
@@ -138,6 +185,8 @@ export const api = {
     request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
   upload: <T>(path: string, file: File | Blob, filename?: string) => upload<T>(path, file, filename),
+  uploadWithProgress: <T>(path: string, file: File | Blob, filename?: string, onProgress?: (pct: number) => void) =>
+    uploadWithProgress<T>(path, file, filename, onProgress),
   streamSSE,
 };
 

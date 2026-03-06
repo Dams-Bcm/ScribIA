@@ -118,13 +118,33 @@ def get_diarization_pipeline():
                 "Vérifiez votre HF_TOKEN et les conditions des modèles pyannote."
             )
 
+        # Log pipeline parameter structure for debugging
+        try:
+            params = _diarization_pipeline.parameters(instantiated=True)
+            logger.info(f"[PYANNOTE] Pipeline parameter keys: {list(params.keys())}")
+            for key, val in params.items():
+                if isinstance(val, dict):
+                    logger.info(f"[PYANNOTE]   {key}: {val}")
+                else:
+                    logger.info(f"[PYANNOTE]   {key}: {val}")
+        except Exception as e:
+            logger.warning(f"[PYANNOTE] Could not read pipeline params: {e}")
+
         # Apply clustering threshold
         if settings.clustering_threshold:
             try:
                 params = _diarization_pipeline.parameters(instantiated=True)
-                params["clustering"]["threshold"] = settings.clustering_threshold
-                _diarization_pipeline.instantiate(params)
-                logger.info(f"Clustering threshold set to {settings.clustering_threshold}")
+                if "clustering" in params and isinstance(params["clustering"], dict):
+                    params["clustering"]["threshold"] = settings.clustering_threshold
+                    _diarization_pipeline.instantiate(params)
+                    logger.info(f"Clustering threshold set to {settings.clustering_threshold}")
+                else:
+                    # Try alternative parameter paths for 3.1
+                    logger.warning(f"[PYANNOTE] No 'clustering' dict in params. Keys: {list(params.keys())}")
+                    # Try setting threshold directly if it exists at top level
+                    for key in params:
+                        if "threshold" in str(key).lower() or "cluster" in str(key).lower():
+                            logger.info(f"[PYANNOTE] Found potential key: {key} = {params[key]}")
             except Exception as e:
                 logger.warning(f"Could not set clustering threshold: {e}")
 
@@ -313,6 +333,14 @@ def run_diarization(
                 f"sample_rate={sample_rate}, duration={duration_s:.1f}s, "
                 f"rms={rms:.4f}, abs_max={abs_max:.4f}")
 
+    # Log effective pipeline parameters before running
+    try:
+        effective_params = pipeline.parameters(instantiated=True)
+        if "clustering" in effective_params:
+            logger.info(f"[DIARIZATION] Effective clustering params: {effective_params['clustering']}")
+    except Exception:
+        pass
+
     diarization_params = {"waveform": waveform, "sample_rate": sample_rate}
     if num_speakers and num_speakers >= 2:
         logger.info(f"[DIARIZATION] Using user-specified num_speakers={num_speakers}")
@@ -325,6 +353,7 @@ def run_diarization(
             max_speakers=2,
         )
     else:
+        logger.info(f"[DIARIZATION] Using min_speakers={settings.min_speakers}, max_speakers={settings.max_speakers}")
         result = pipeline(
             diarization_params,
             min_speakers=settings.min_speakers,

@@ -1,36 +1,49 @@
 import { useState, useCallback } from "react";
-import { Mic } from "lucide-react";
+import { Mic, Loader2, Upload } from "lucide-react";
 import {
   useTranscriptionJobs,
-  useUploadAudio,
   useStartProcessing,
   useDeleteJob,
 } from "@/api/hooks/useTranscription";
+import { api } from "@/api/client";
+import { useQueryClient } from "@tanstack/react-query";
+import type { TranscriptionUploadResponse } from "@/api/types";
 import { UploadArea } from "@/components/transcription/UploadArea";
 import { AudioRecorder } from "@/components/transcription/AudioRecorder";
 import { JobList } from "@/components/transcription/JobList";
 import { TranscriptionJobView } from "@/components/transcription/TranscriptionJobView";
 
 export function TranscriptionPage() {
+  const qc = useQueryClient();
   const { data: jobs = [], isLoading } = useTranscriptionJobs();
-  const uploadAudio = useUploadAudio();
   const startProcessing = useStartProcessing();
   const deleteJob = useDeleteJob();
 
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const handleFile = useCallback(
     async (file: File | Blob, filename?: string) => {
       try {
-        const result = await uploadAudio.mutateAsync({ file, filename });
-        // Auto-start processing after upload
+        setUploadError(null);
+        setUploadProgress(0);
+        const result = await api.uploadWithProgress<TranscriptionUploadResponse>(
+          "/transcription/upload",
+          file,
+          filename,
+          (pct) => setUploadProgress(pct),
+        );
+        setUploadProgress(null);
+        qc.invalidateQueries({ queryKey: ["transcription"] });
         await startProcessing.mutateAsync(result.id);
         setSelectedJobId(result.id);
-      } catch {
-        // errors handled by mutation state
+      } catch (err) {
+        setUploadProgress(null);
+        setUploadError(err instanceof Error ? err.message : "Une erreur est survenue");
       }
     },
-    [uploadAudio, startProcessing],
+    [qc, startProcessing],
   );
 
   const handleProcess = useCallback(
@@ -69,7 +82,7 @@ export function TranscriptionPage() {
   }
 
   // ── List view ───────────────────────────────────────────────────────
-  const busy = uploadAudio.isPending || startProcessing.isPending;
+  const busy = uploadProgress !== null || startProcessing.isPending;
 
   return (
     <div>
@@ -103,9 +116,33 @@ export function TranscriptionPage() {
             />
           </div>
 
-          {(uploadAudio.isError || startProcessing.isError) && (
+          {/* Upload progress */}
+          {uploadProgress !== null && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Upload className="w-4 h-4 animate-pulse" />
+                <span>Upload en cours… {uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Processing indicator */}
+          {uploadProgress === null && startProcessing.isPending && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Lancement du traitement…</span>
+            </div>
+          )}
+
+          {(uploadError || startProcessing.isError) && (
             <p className="text-sm text-red-600 text-center">
-              {(uploadAudio.error ?? startProcessing.error)?.message ?? "Une erreur est survenue"}
+              {uploadError ?? startProcessing.error?.message ?? "Une erreur est survenue"}
             </p>
           )}
         </div>
