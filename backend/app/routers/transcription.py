@@ -179,6 +179,12 @@ def delete_job(
         if audio_path.exists():
             audio_path.unlink()
 
+    # Delete enrollment segments referencing this job's transcription segments
+    from app.models.speaker import SpeakerEnrollmentSegment
+    db.query(SpeakerEnrollmentSegment).filter(
+        SpeakerEnrollmentSegment.job_id == job_id
+    ).delete(synchronize_session=False)
+
     db.delete(job)
     db.commit()
 
