@@ -466,6 +466,7 @@ export const AVAILABLE_MODULES: ModuleDefinition[] = [
   { key: "convocations", label: "Convocations" },
   { key: "procedures", label: "Procédures collaboratives" },
   { key: "contacts", label: "Carnet de contacts" },
+  { key: "search", label: "Recherche intelligente" },
 ];
 
 // ── Procédures ────────────────────────────────────────────────────────────────
