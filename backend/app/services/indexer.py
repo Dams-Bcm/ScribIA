@@ -158,19 +158,22 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
             stats["ai_documents"] += 1
             stats["chunks_total"] += n
 
-    # 2. Transcriptions
-    from app.models import TranscriptionJob
+    # 2. Transcriptions (segments are stored in transcription_segments table)
+    from app.models.transcription import TranscriptionJob, TranscriptionSegment
     jobs = db.query(TranscriptionJob).filter(
         TranscriptionJob.tenant_id == tenant_id,
         TranscriptionJob.status == "completed",
     ).all()
     for job in jobs:
-        if job.result_text:
-            try:
-                segments = json.loads(job.result_text) if isinstance(job.result_text, str) else []
-            except (json.JSONDecodeError, TypeError):
-                segments = [{"text": job.result_text}]
-            n = index_transcription(tenant_id, job.id, job.original_filename or "Transcription", segments)
+        segs = (
+            db.query(TranscriptionSegment)
+            .filter_by(job_id=job.id)
+            .order_by(TranscriptionSegment.order_index)
+            .all()
+        )
+        if segs:
+            segments = [{"speaker": s.speaker_label or "", "text": s.text} for s in segs]
+            n = index_transcription(tenant_id, job.id, job.title or job.original_filename or "Transcription", segments)
             stats["transcriptions"] += 1
             stats["chunks_total"] += n
 
