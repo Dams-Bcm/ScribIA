@@ -60,9 +60,9 @@ async def lifespan(app: FastAPI):
 def _add_missing_columns():
     """Add columns introduced by diarisation module to existing tables (MSSQL)."""
     from sqlalchemy import text, inspect
-    insp = inspect(engine)
 
     with engine.connect() as conn:
+        insp = inspect(conn)
         # transcription_jobs: mode, num_speakers, detected_speakers
         job_cols = {c["name"] for c in insp.get_columns("transcription_jobs")}
         if "mode" not in job_cols:
