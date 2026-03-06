@@ -358,12 +358,14 @@ function SectorTemplateManager({ sector }: { sector: string }) {
                           <div key={field.id} className="flex gap-2 items-center bg-muted rounded p-1.5">
                             <Input className="flex-1 h-7 text-xs" value={field.label} onChange={(e) => {
                               const fields = [...(((step.config as Record<string, unknown>)?.fields as unknown[]) || [])] as { id: string; label: string; type: string; required: boolean }[];
-                              fields[fi] = { id: fields[fi].id, label: e.target.value, type: fields[fi].type, required: fields[fi].required };
+                              const cur = fields[fi]!;
+                              fields[fi] = { id: cur.id, label: e.target.value, type: cur.type, required: cur.required };
                               updateStep(si, "config", { ...step.config, fields });
                             }} placeholder="Libellé du champ" />
                             <Select value={field.type} onValueChange={(v) => {
                               const fields = [...(((step.config as Record<string, unknown>)?.fields as unknown[]) || [])] as { id: string; label: string; type: string; required: boolean }[];
-                              fields[fi] = { id: fields[fi].id, label: fields[fi].label, type: v, required: fields[fi].required };
+                              const cur = fields[fi]!;
+                              fields[fi] = { id: cur.id, label: cur.label, type: v, required: cur.required };
                               updateStep(si, "config", { ...step.config, fields });
                             }}>
                               <SelectTrigger className="w-28 h-7 text-xs"><SelectValue /></SelectTrigger>
