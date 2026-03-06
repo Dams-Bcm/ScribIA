@@ -10,6 +10,7 @@ AI_USAGES = {
     "ai_documents": "Génération de documents IA",
     "workflow_generation": "Génération de workflows",
     "convocations": "Génération de convocations",
+    "sector_suggestions": "Suggestions sectorielles",
 }
 
 
