@@ -83,7 +83,9 @@ def reindex(
     if user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Réservé aux administrateurs.")
 
+    logger.warning("[SEARCH] Starting reindex for tenant %s", user.tenant_id)
     stats = indexer.reindex_tenant(user.tenant_id, db)
+    logger.warning("[SEARCH] Reindex result: %s", stats)
 
     log_action(db, "search_reindex", user_id=user.id, tenant_id=user.tenant_id,
                resource="search", details=stats)

@@ -147,11 +147,19 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
 
     stats = {"ai_documents": 0, "transcriptions": 0, "procedures": 0, "chunks_total": 0}
 
+    # Purge existing data for this tenant before reindex
+    try:
+        collection = vectorstore.get_collection(tenant_id)
+        collection.delete(where={})
+    except Exception:
+        pass  # collection may not exist yet
+
     # 1. Documents IA
     docs = db.query(AIDocument).filter(
         AIDocument.tenant_id == tenant_id,
         AIDocument.status == "completed",
     ).all()
+    logger.warning("[RAG] Found %d completed AI documents for tenant %s", len(docs), tenant_id)
     for doc in docs:
         if doc.result_text:
             n = index_ai_document(tenant_id, doc.id, doc.title, doc.result_text)
@@ -164,6 +172,7 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
         TranscriptionJob.tenant_id == tenant_id,
         TranscriptionJob.status == "completed",
     ).all()
+    logger.warning("[RAG] Found %d completed transcriptions for tenant %s", len(jobs), tenant_id)
     for job in jobs:
         segs = (
             db.query(TranscriptionSegment)
