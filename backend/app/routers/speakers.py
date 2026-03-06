@@ -5,9 +5,10 @@ from app.database import get_db
 from app.deps import require_admin, get_current_user
 from app.models import User
 from app.models.speaker import SpeakerProfile
+from app.models.contacts import Contact
 from app.schemas.speaker import (
     SpeakerProfileCreate, SpeakerProfileUpdate, SpeakerProfileResponse,
-    EnrollFromDiarisationRequest,
+    EnrollFromDiarisationRequest, EnrollContactFromDiarisationRequest,
 )
 
 router = APIRouter(prefix="/speakers", tags=["speakers"])
@@ -192,6 +193,188 @@ def enroll_from_diarisation(
                 start_time=seg.start_time,
                 end_time=seg.end_time,
             ))
+
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+@router.get("/contacts-for-enrollment")
+def contacts_for_enrollment(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    """List all contacts in the tenant with their enrollment status."""
+    contacts = (
+        db.query(Contact)
+        .filter(Contact.tenant_id == user.tenant_id)
+        .order_by(Contact.name)
+        .all()
+    )
+
+    # Find existing speaker profiles linked to these contacts
+    contact_ids = [c.id for c in contacts]
+    linked_profiles = {}
+    if contact_ids:
+        profiles = (
+            db.query(SpeakerProfile)
+            .filter(
+                SpeakerProfile.contact_id.in_(contact_ids),
+                SpeakerProfile.tenant_id == user.tenant_id,
+            )
+            .all()
+        )
+        for p in profiles:
+            linked_profiles[p.contact_id] = {
+                "profile_id": p.id,
+                "enrollment_status": p.enrollment_status,
+                "consent_status": p.consent_status,
+            }
+
+    return [
+        {
+            "id": c.id,
+            "name": c.name,
+            "email": c.email,
+            "phone": c.phone,
+            "role": c.role,
+            "group_id": c.group_id,
+            "speaker_profile": linked_profiles.get(c.id),
+        }
+        for c in contacts
+    ]
+
+
+@router.post("/enroll-contact", response_model=SpeakerProfileResponse)
+def enroll_contact_from_diarisation(
+    body: EnrollContactFromDiarisationRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    """
+    Enroll a Contact as a speaker from a diarisation.
+    Auto-creates or reuses the SpeakerProfile linked to this contact.
+    """
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from app.config import settings
+    from app.models.speaker import SpeakerEnrollmentSegment
+    from app.models.transcription import DiarisationSpeaker, TranscriptionJob, TranscriptionSegment
+    from app.services.transcription import convert_to_wav
+
+    # Load the contact
+    contact = (
+        db.query(Contact)
+        .filter(Contact.id == body.contact_id, Contact.tenant_id == user.tenant_id)
+        .first()
+    )
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact introuvable")
+
+    # Find or create a SpeakerProfile linked to this contact
+    profile = (
+        db.query(SpeakerProfile)
+        .filter(
+            SpeakerProfile.contact_id == contact.id,
+            SpeakerProfile.tenant_id == user.tenant_id,
+        )
+        .first()
+    )
+    if not profile:
+        # Split contact name into first/last
+        parts = contact.name.strip().split(" ", 1)
+        first_name = parts[0]
+        last_name = parts[1].upper() if len(parts) > 1 else ""
+        profile = SpeakerProfile(
+            tenant_id=user.tenant_id,
+            first_name=first_name,
+            last_name=last_name,
+            display_name=contact.name,
+            email=contact.email,
+            phone_number=contact.phone,
+            fonction=contact.role,
+            contact_id=contact.id,
+        )
+        db.add(profile)
+        db.flush()
+
+    # Load the DiarisationSpeaker
+    diar_speaker = (
+        db.query(DiarisationSpeaker)
+        .filter(DiarisationSpeaker.id == body.diarisation_speaker_id)
+        .first()
+    )
+    if not diar_speaker:
+        raise HTTPException(status_code=404, detail="Locuteur introuvable dans la diarisation")
+
+    # Load & authorise the job
+    job_q = db.query(TranscriptionJob).filter(TranscriptionJob.id == diar_speaker.job_id)
+    if not user.is_super_admin:
+        job_q = job_q.filter(TranscriptionJob.tenant_id == user.tenant_id)
+    job = job_q.first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job introuvable")
+
+    # Link DiarisationSpeaker → SpeakerProfile
+    diar_speaker.profile_id = profile.id
+
+    if body.compute_embedding:
+        segments = (
+            db.query(TranscriptionSegment)
+            .filter(
+                TranscriptionSegment.job_id == job.id,
+                TranscriptionSegment.speaker_id == diar_speaker.speaker_id,
+            )
+            .all()
+        )
+        if not segments:
+            raise HTTPException(status_code=400, detail="Aucun segment trouvé pour ce locuteur")
+
+        audio_path = Path(settings.audio_path) / job.tenant_id / job.audio_filename
+        if not audio_path.exists():
+            raise HTTPException(status_code=400, detail="Fichier audio introuvable pour l'enrollment")
+
+        wav_path = audio_path
+        temp_wav: Path | None = None
+        if audio_path.suffix.lower() != ".wav":
+            temp_wav = Path(tempfile.mktemp(suffix="_enroll.wav"))
+            convert_to_wav(audio_path, temp_wav)
+            wav_path = temp_wav
+
+        try:
+            from app.services.speaker_enrollment import extract_embedding_from_audio_segments
+            seg_times = [(s.start_time, s.end_time) for s in segments]
+            embedding = extract_embedding_from_audio_segments(wav_path, seg_times)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        finally:
+            if temp_wav and temp_wav.exists():
+                temp_wav.unlink()
+
+        profile.embedding = json.dumps(embedding)
+        profile.enrollment_status = "enrolled"
+        profile.enrollment_method = "operator"
+        profile.enrolled_at = datetime.now(timezone.utc)
+
+        # Replace previous enrollment segments
+        db.query(SpeakerEnrollmentSegment).filter(
+            SpeakerEnrollmentSegment.speaker_profile_id == profile.id
+        ).delete()
+
+        for seg in segments:
+            db.add(SpeakerEnrollmentSegment(
+                speaker_profile_id=profile.id,
+                job_id=job.id,
+                segment_id=seg.id,
+                start_time=seg.start_time,
+                end_time=seg.end_time,
+            ))
+
+    # Update contact enrollment status
+    contact.enrollment_status = profile.enrollment_status
 
     db.commit()
     db.refresh(profile)

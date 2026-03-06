@@ -100,15 +100,28 @@ def run_transcription(audio_path: Path, language: str = "fr", word_timestamps: b
     """
     model = get_whisper_model()
 
-    segments_gen, info = model.transcribe(
-        str(audio_path),
+    # Parse temperature cascade
+    temperature = [float(t.strip()) for t in settings.whisper_temperature.split(",") if t.strip()]
+    if len(temperature) == 1:
+        temperature = temperature[0]
+
+    kwargs = dict(
         language=language,
         beam_size=settings.whisper_beam_size,
         vad_filter=True,
-        vad_parameters=dict(min_silence_duration_ms=500, speech_pad_ms=200),
+        vad_parameters=dict(
+            min_silence_duration_ms=settings.whisper_vad_min_silence_ms,
+            speech_pad_ms=settings.whisper_vad_speech_pad_ms,
+        ),
         no_speech_threshold=settings.whisper_no_speech_threshold,
         word_timestamps=word_timestamps,
+        temperature=temperature,
+        condition_on_previous_text=settings.whisper_condition_on_previous_text,
     )
+    if settings.whisper_initial_prompt:
+        kwargs["initial_prompt"] = settings.whisper_initial_prompt
+
+    segments_gen, info = model.transcribe(str(audio_path), **kwargs)
 
     segments = []
     words = []

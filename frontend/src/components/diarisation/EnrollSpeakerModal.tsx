@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X, UserCheck, Loader2, Mic } from "lucide-react";
-import { useSpeakers, useEnrollFromDiarisation } from "@/api/hooks/useSpeakers";
+import { useContactsForEnrollment, useEnrollContactFromDiarisation } from "@/api/hooks/useSpeakers";
 import { ApiError } from "@/api/client";
 import type { DiarisationSpeaker } from "@/api/types";
 
@@ -17,28 +17,23 @@ export function EnrollSpeakerModal({
   onClose,
   onSuccess,
 }: EnrollSpeakerModalProps) {
-  const { data: profiles = [], isLoading: loadingProfiles } = useSpeakers();
-  const enroll = useEnrollFromDiarisation();
+  const { data: contacts = [], isLoading: loadingContacts } = useContactsForEnrollment();
+  const enroll = useEnrollContactFromDiarisation();
 
-  const [selectedProfileId, setSelectedProfileId] = useState<string>(
-    speaker.profile_id ?? "",
-  );
+  const [selectedContactId, setSelectedContactId] = useState<string>("");
   const [computeEmbedding, setComputeEmbedding] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const speakerLabel = speaker.display_name || speaker.speaker_id;
 
   async function handleSubmit() {
-    if (!selectedProfileId) return;
+    if (!selectedContactId) return;
     setError(null);
     try {
       await enroll.mutateAsync({
-        profileId: selectedProfileId,
-        body: {
-          job_id: jobId,
-          diarisation_speaker_id: speaker.id,
-          compute_embedding: computeEmbedding,
-        },
+        contact_id: selectedContactId,
+        diarisation_speaker_id: speaker.id,
+        compute_embedding: computeEmbedding,
       });
       onSuccess();
       onClose();
@@ -54,7 +49,7 @@ export function EnrollSpeakerModal({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <UserCheck className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-bold">Lier / Enroller un intervenant</h2>
+            <h2 className="text-lg font-bold">Lier / Enroller un contact</h2>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
@@ -69,32 +64,32 @@ export function EnrollSpeakerModal({
           </span>
         </p>
 
-        {/* Profile selector */}
+        {/* Contact selector */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1.5">
-            Profil intervenant *
+            Contact *
           </label>
-          {loadingProfiles ? (
+          {loadingContacts ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
               <Loader2 className="w-4 h-4 animate-spin" />
               Chargement…
             </div>
-          ) : profiles.length === 0 ? (
+          ) : contacts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Aucun intervenant créé — créez d&apos;abord un contact dans le module Contacts.
+              Aucun contact — créez d&apos;abord des contacts dans le module Contacts.
             </p>
           ) : (
             <select
-              value={selectedProfileId}
-              onChange={(e) => setSelectedProfileId(e.target.value)}
+              value={selectedContactId}
+              onChange={(e) => setSelectedContactId(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="">— Choisir un intervenant —</option>
-              {profiles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.display_name ?? `${p.first_name} ${p.last_name}`}
-                  {p.fonction ? ` — ${p.fonction}` : ""}
-                  {p.enrollment_status === "enrolled" ? " ✓" : ""}
+              <option value="">— Choisir un contact —</option>
+              {contacts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.role ? ` — ${c.role}` : ""}
+                  {c.speaker_profile?.enrollment_status === "enrolled" ? " ✓" : ""}
                 </option>
               ))}
             </select>
@@ -138,7 +133,7 @@ export function EnrollSpeakerModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!selectedProfileId || enroll.isPending}
+            disabled={!selectedContactId || enroll.isPending}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             {enroll.isPending && <Loader2 className="w-4 h-4 animate-spin" />}

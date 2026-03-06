@@ -48,3 +48,9 @@ class EnrollFromDiarisationRequest(BaseModel):
     job_id: str
     diarisation_speaker_id: str  # DiarisationSpeaker.id (UUID)
     compute_embedding: bool = True
+
+
+class EnrollContactFromDiarisationRequest(BaseModel):
+    contact_id: str
+    diarisation_speaker_id: str
+    compute_embedding: bool = True

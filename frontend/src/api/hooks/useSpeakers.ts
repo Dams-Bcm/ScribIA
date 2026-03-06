@@ -9,6 +9,27 @@ export function useSpeakers() {
   });
 }
 
+export interface ContactForEnrollment {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: string | null;
+  group_id: string;
+  speaker_profile: {
+    profile_id: string;
+    enrollment_status: string | null;
+    consent_status: string | null;
+  } | null;
+}
+
+export function useContactsForEnrollment() {
+  return useQuery<ContactForEnrollment[]>({
+    queryKey: ["speakers", "contacts-for-enrollment"],
+    queryFn: () => api.get("/speakers/contacts-for-enrollment"),
+  });
+}
+
 interface EnrollFromDiarisationBody {
   job_id: string;
   diarisation_speaker_id: string;
@@ -27,7 +48,31 @@ export function useEnrollFromDiarisation() {
     }) => api.post(`/speakers/${profileId}/enroll-from-diarisation`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "speakers"] });
+      qc.invalidateQueries({ queryKey: ["speakers", "contacts-for-enrollment"] });
       qc.invalidateQueries({ queryKey: ["diarisation"] });
+    },
+    onError: (err) => {
+      console.error("Enrollment failed", err instanceof ApiError ? err.message : err);
+    },
+  });
+}
+
+interface EnrollContactBody {
+  contact_id: string;
+  diarisation_speaker_id: string;
+  compute_embedding?: boolean;
+}
+
+export function useEnrollContactFromDiarisation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: EnrollContactBody) =>
+      api.post<SpeakerProfile>("/speakers/enroll-contact", body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "speakers"] });
+      qc.invalidateQueries({ queryKey: ["speakers", "contacts-for-enrollment"] });
+      qc.invalidateQueries({ queryKey: ["diarisation"] });
+      qc.invalidateQueries({ queryKey: ["contacts"] });
     },
     onError: (err) => {
       console.error("Enrollment failed", err instanceof ApiError ? err.message : err);

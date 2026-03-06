@@ -1073,6 +1073,77 @@ def update_ai_settings(
     return {"message": "Configuration IA mise à jour"}
 
 
+# ── Whisper / Transcription Settings ──────────────────────────────────────────
+
+WHISPER_SETTINGS_KEYS = {
+    "whisper_model": ("Modèle Whisper", "medium"),
+    "whisper_language": ("Langue", "fr"),
+    "whisper_beam_size": ("Beam size", "5"),
+    "whisper_no_speech_threshold": ("Seuil no-speech", "0.45"),
+    "whisper_temperature": ("Température (cascade)", "0.0,0.2,0.4,0.6,0.8,1.0"),
+    "whisper_initial_prompt": ("Prompt initial (vocabulaire)", ""),
+    "whisper_condition_on_previous_text": ("Conditionner sur texte précédent", "true"),
+    "whisper_vad_min_silence_ms": ("VAD : silence min (ms)", "500"),
+    "whisper_vad_speech_pad_ms": ("VAD : padding parole (ms)", "200"),
+    "compute_type": ("Précision calcul", "float16"),
+}
+
+
+@router.get("/whisper-settings")
+def get_whisper_settings(
+    _: User = Depends(require_super_admin),
+):
+    """Retourne la configuration Whisper actuelle."""
+    return {
+        "settings": [
+            {
+                "key": key,
+                "label": label,
+                "value": str(getattr(settings, key, default)),
+                "default": default,
+            }
+            for key, (label, default) in WHISPER_SETTINGS_KEYS.items()
+        ],
+        "device": settings.device,
+    }
+
+
+class WhisperSettingUpdate(BaseModel):
+    key: str
+    value: str
+
+
+@router.put("/whisper-settings")
+def update_whisper_settings(
+    body: list[WhisperSettingUpdate],
+    _: User = Depends(require_super_admin),
+):
+    """Met à jour les paramètres Whisper (appliqués au runtime)."""
+    for item in body:
+        if item.key not in WHISPER_SETTINGS_KEYS:
+            continue
+        if item.key in ("whisper_beam_size", "whisper_vad_min_silence_ms", "whisper_vad_speech_pad_ms"):
+            try:
+                setattr(settings, item.key, int(item.value))
+            except ValueError:
+                pass
+        elif item.key == "whisper_no_speech_threshold":
+            try:
+                setattr(settings, item.key, float(item.value))
+            except ValueError:
+                pass
+        elif item.key == "whisper_condition_on_previous_text":
+            settings.whisper_condition_on_previous_text = item.value.lower() in ("true", "1", "yes")
+        else:
+            setattr(settings, item.key, item.value)
+
+    # Force whisper model reload on next transcription
+    from app.services.transcription import unload_whisper
+    unload_whisper()
+
+    return {"message": "Paramètres Whisper mis à jour"}
+
+
 # ── RAG / Search Settings ────────────────────────────────────────────────────
 
 RAG_SETTINGS_KEYS = {

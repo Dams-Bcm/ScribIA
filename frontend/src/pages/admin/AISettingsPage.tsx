@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search } from "lucide-react";
+import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search, Mic } from "lucide-react";
 
 interface AIUsage {
   usage_key: string;
@@ -34,6 +34,18 @@ interface RAGSettingsResponse {
   chroma_url: string;
 }
 
+interface WhisperSetting {
+  key: string;
+  label: string;
+  value: string;
+  default: string;
+}
+
+interface WhisperSettingsResponse {
+  settings: WhisperSetting[];
+  device: string;
+}
+
 function useAISettings() {
   return useQuery({
     queryKey: ["ai-settings"],
@@ -45,6 +57,13 @@ function useRAGSettings() {
   return useQuery({
     queryKey: ["rag-settings"],
     queryFn: () => api.get<RAGSettingsResponse>("/admin/rag-settings"),
+  });
+}
+
+function useWhisperSettings() {
+  return useQuery({
+    queryKey: ["whisper-settings"],
+    queryFn: () => api.get<WhisperSettingsResponse>("/admin/whisper-settings"),
   });
 }
 
@@ -63,6 +82,15 @@ function useUpdateRAGSettings() {
     mutationFn: (body: { key: string; value: string }[]) =>
       api.put("/admin/rag-settings", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rag-settings"] }),
+  });
+}
+
+function useUpdateWhisperSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { key: string; value: string }[]) =>
+      api.put("/admin/whisper-settings", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["whisper-settings"] }),
   });
 }
 
@@ -106,16 +134,20 @@ function useDeleteModel() {
 export function AISettingsPage() {
   const { data, isLoading } = useAISettings();
   const { data: ragData } = useRAGSettings();
+  const { data: whisperData } = useWhisperSettings();
   const updateSettings = useUpdateAISettings();
   const updateRAG = useUpdateRAGSettings();
+  const updateWhisper = useUpdateWhisperSettings();
   const pullModel = usePullModel();
   const deleteModel = useDeleteModel();
 
   const [overrides, setOverrides] = useState<Record<string, string | null>>({});
   const [ragOverrides, setRAGOverrides] = useState<Record<string, string>>({});
+  const [whisperOverrides, setWhisperOverrides] = useState<Record<string, string>>({});
   const [pullName, setPullName] = useState("");
   const [saved, setSaved] = useState(false);
   const [ragSaved, setRAGSaved] = useState(false);
+  const [whisperSaved, setWhisperSaved] = useState(false);
 
   if (isLoading || !data) {
     return (
@@ -160,8 +192,17 @@ export function AISettingsPage() {
     setPullName("");
   }
 
+  async function handleWhisperSave() {
+    const body = Object.entries(whisperOverrides).map(([key, value]) => ({ key, value }));
+    await updateWhisper.mutateAsync(body);
+    setWhisperOverrides({});
+    setWhisperSaved(true);
+    setTimeout(() => setWhisperSaved(false), 2000);
+  }
+
   const hasChanges = Object.keys(overrides).length > 0;
   const hasRAGChanges = Object.keys(ragOverrides).length > 0;
+  const hasWhisperChanges = Object.keys(whisperOverrides).length > 0;
 
   return (
     <div>
@@ -270,6 +311,109 @@ export function AISettingsPage() {
 
               <p className="text-xs text-muted-foreground mt-4">
                 Les modifications sont appliquées immédiatement. Une réindexation est nécessaire après changement de la taille des chunks.
+              </p>
+            </div>
+          )}
+          {/* Whisper Settings */}
+          {whisperData && (
+            <div className="bg-background rounded-xl border border-border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Mic className="w-4 h-4" />
+                  <h2 className="text-lg font-semibold">Transcription (Whisper)</h2>
+                </div>
+                <Button size="sm" onClick={handleWhisperSave} disabled={!hasWhisperChanges && !whisperSaved || updateWhisper.isPending}>
+                  {whisperSaved ? (
+                    <><Check className="w-4 h-4 mr-1" /> Sauvegardé</>
+                  ) : updateWhisper.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Sauvegarde…</>
+                  ) : (
+                    <><Save className="w-4 h-4 mr-1" /> Sauvegarder</>
+                  )}
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground mb-4">
+                Device : <span className="font-mono font-medium text-foreground">{whisperData.device}</span>
+              </p>
+
+              <div className="space-y-4">
+                {whisperData.settings.map((s) => (
+                  <div key={s.key} className="flex items-center gap-4">
+                    <div className="w-60 shrink-0">
+                      <Label className="text-sm font-medium">{s.label}</Label>
+                      <p className="text-xs text-muted-foreground">défaut : {s.default || "(vide)"}</p>
+                    </div>
+                    {s.key === "whisper_condition_on_previous_text" ? (
+                      <Select
+                        value={whisperOverrides[s.key] ?? s.value}
+                        onValueChange={(v) => {
+                          setWhisperOverrides({ ...whisperOverrides, [s.key]: v });
+                          setWhisperSaved(false);
+                        }}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="true">Oui</SelectItem>
+                          <SelectItem value="false">Non (anti-hallucination)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : s.key === "whisper_model" ? (
+                      <Select
+                        value={whisperOverrides[s.key] ?? s.value}
+                        onValueChange={(v) => {
+                          setWhisperOverrides({ ...whisperOverrides, [s.key]: v });
+                          setWhisperSaved(false);
+                        }}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="tiny">tiny (rapide, moins précis)</SelectItem>
+                          <SelectItem value="base">base</SelectItem>
+                          <SelectItem value="small">small</SelectItem>
+                          <SelectItem value="medium">medium (recommandé)</SelectItem>
+                          <SelectItem value="large-v3">large-v3 (meilleur, plus lent)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : s.key === "compute_type" ? (
+                      <Select
+                        value={whisperOverrides[s.key] ?? s.value}
+                        onValueChange={(v) => {
+                          setWhisperOverrides({ ...whisperOverrides, [s.key]: v });
+                          setWhisperSaved(false);
+                        }}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="float16">float16 (GPU, recommandé)</SelectItem>
+                          <SelectItem value="float32">float32 (CPU)</SelectItem>
+                          <SelectItem value="int8">int8 (économe en mémoire)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        className="flex-1 font-mono text-sm"
+                        value={whisperOverrides[s.key] ?? s.value}
+                        onChange={(e) => {
+                          setWhisperOverrides({ ...whisperOverrides, [s.key]: e.target.value });
+                          setWhisperSaved(false);
+                        }}
+                        placeholder={s.default || "(vide)"}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-muted-foreground mt-4">
+                Le modèle Whisper sera rechargé automatiquement lors de la prochaine transcription après modification.
+                Le <strong>prompt initial</strong> permet d'injecter du vocabulaire métier (noms propres, termes techniques).
               </p>
             </div>
           )}

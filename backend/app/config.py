@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     whisper_language: str = "fr"
     whisper_beam_size: int = 5
     whisper_no_speech_threshold: float = 0.45
+    whisper_temperature: str = "0.0,0.2,0.4,0.6,0.8,1.0"
+    whisper_initial_prompt: str = ""
+    whisper_condition_on_previous_text: bool = True
+    whisper_vad_min_silence_ms: int = 500
+    whisper_vad_speech_pad_ms: int = 200
 
     # ── Diarisation ────────────────────────────────────────────────────────────
     hf_token: str = ""
