@@ -74,12 +74,10 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
     if (mode !== "enroll") return;
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) {
-      // Don't clear if Shift is held (user is building a multi-selection)
       if (!e.shiftKey) setEnrollSegIds([]);
       return;
     }
 
-    // Find all segment elements that intersect the selection
     const container = segmentsContainerRef.current;
     if (!container) return;
 
@@ -94,8 +92,10 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
       }
     }
 
+    // Clear browser selection so the blue highlight doesn't cover our UI
+    sel.removeAllRanges();
+
     if (e.shiftKey) {
-      // Accumulate: merge with existing selection
       setEnrollSegIds((prev) => {
         const merged = new Set([...prev, ...newIds]);
         return Array.from(merged);
@@ -367,7 +367,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
           )}
           {mode === "enroll" && (
             <p className="text-xs text-muted-foreground mb-2">
-              Surlignez du texte pour selectionner la plage audio a enroller.
+              Surlignez du texte pour selectionner la plage audio a enroller. Maintenez <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] font-mono">Shift</kbd> pour ajouter d&apos;autres plages.
             </p>
           )}
           {segments.map((seg, index) => {
@@ -382,14 +382,14 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
               <div
                 key={seg.id}
                 data-seg-id={seg.id}
-                className={`flex gap-2 py-2 border-l-4 ${color.border} pl-3 rounded-r-lg transition-colors ${
-                  isSelected
-                    ? "bg-primary/10 ring-1 ring-primary/30"
-                    : isEnrollHighlighted
-                      ? "bg-purple-50 ring-1 ring-purple-200"
+                className={`flex gap-2 py-2 pl-3 rounded-r-lg transition-colors ${
+                  isEnrollHighlighted
+                    ? "bg-purple-100 border-l-4 border-purple-500 ring-2 ring-purple-300"
+                    : isSelected
+                      ? "bg-primary/10 ring-1 ring-primary/30 border-l-4 " + color.border
                       : isPlaying
-                        ? "bg-primary/5"
-                        : "hover:bg-muted/40"
+                        ? "bg-primary/5 border-l-4 " + color.border
+                        : "hover:bg-muted/40 border-l-4 " + color.border
                 } ${mode === "normal" && isAdmin ? "cursor-pointer" : ""} ${mode === "enroll" ? "select-text" : ""}`}
                 onClick={(e) => {
                   if (mode !== "normal" || !isAdmin) return;
