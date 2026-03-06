@@ -182,9 +182,11 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
             .order_by(TranscriptionSegment.order_index)
             .all()
         )
+        title = job.title or job.original_filename or "Transcription"
+        logger.warning("[RAG]   Transcription '%s' (id=%s, segs=%d, status=%s)", title, job.id, len(segs), job.status)
         if segs:
             segments = [{"speaker": s.speaker_label or "", "text": s.text} for s in segs]
-            n = index_transcription(tenant_id, job.id, job.title or job.original_filename or "Transcription", segments)
+            n = index_transcription(tenant_id, job.id, title, segments)
             stats["transcriptions"] += 1
             stats["chunks_total"] += n
 
