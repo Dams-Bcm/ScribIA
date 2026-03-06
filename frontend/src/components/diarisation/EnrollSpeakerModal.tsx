@@ -13,7 +13,6 @@ interface EnrollSpeakerModalProps {
 
 export function EnrollSpeakerModal({
   speaker,
-  jobId,
   onClose,
   onSuccess,
 }: EnrollSpeakerModalProps) {
