@@ -50,7 +50,7 @@ def index_ai_document(tenant_id: str, doc_id: str, title: str, content: str) -> 
     if not content or not content.strip():
         return 0
 
-    chunks = _chunk_text(content)
+    chunks = _chunk_text(f"[Document : {title}]\n{content}")
     doc_ids = [f"aidoc_{doc_id}_{i}" for i in range(len(chunks))]
     metadatas = [
         {"source_type": "ai_document", "source_id": doc_id, "title": title, "chunk_index": i}
@@ -76,8 +76,8 @@ def index_transcription(tenant_id: str, job_id: str, title: str, segments: list[
             prefix = f"[{speaker}] " if speaker else ""
             full_text_parts.append(f"{prefix}{text}")
 
-    full_text = "\n".join(full_text_parts)
-    if not full_text.strip():
+    full_text = f"[Transcription : {title}]\n" + "\n".join(full_text_parts)
+    if len(full_text.strip()) < 20:
         return 0
 
     chunks = _chunk_text(full_text)
@@ -149,8 +149,10 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
 
     # Purge existing data for this tenant before reindex
     try:
-        collection = vectorstore.get_collection(tenant_id)
-        collection.delete(where={})
+        client = vectorstore._get_client()
+        col_name = vectorstore._collection_name(tenant_id)
+        client.delete_collection(col_name)
+        logger.warning("[RAG] Purged collection %s", col_name)
     except Exception:
         pass  # collection may not exist yet
 

@@ -53,9 +53,9 @@ class Settings(BaseSettings):
     # ── RAG / ChromaDB ──────────────────────────────────────────────────────────
     chroma_url: str = "http://chroma:8000"
     embedding_model: str = "nomic-embed-text"
-    rag_chunk_size: int = 500          # chars per chunk
-    rag_chunk_overlap: int = 50        # overlap between chunks
-    rag_top_k: int = 8                 # number of chunks to retrieve
+    rag_chunk_size: int = 1500         # chars per chunk
+    rag_chunk_overlap: int = 200       # overlap between chunks
+    rag_top_k: int = 10               # number of chunks to retrieve
 
     # ── App ────────────────────────────────────────────────────────────────────
     app_name: str = "ScribIA"
