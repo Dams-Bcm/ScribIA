@@ -233,3 +233,68 @@ def send_consent_email(
     db.commit()
     db.refresh(profile)
     return profile
+
+
+@router.get("/debug/match-scores/{job_id}")
+def debug_match_scores(
+    job_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    """
+    Diagnostic: show cosine similarity scores between all enrolled profiles
+    and all detected speakers in a diarisation job.
+    Re-computes scores from stored embeddings (does not need pyannote loaded).
+    """
+    import json
+    import numpy as np
+    from app.models.transcription import DiarisationSpeaker
+
+    profiles = (
+        db.query(SpeakerProfile)
+        .filter(
+            SpeakerProfile.tenant_id == user.tenant_id,
+            SpeakerProfile.embedding.isnot(None),
+        )
+        .all()
+    )
+
+    diar_speakers = (
+        db.query(DiarisationSpeaker)
+        .filter(DiarisationSpeaker.job_id == job_id)
+        .all()
+    )
+
+    if not profiles:
+        return {"error": "Aucun profil avec embedding", "scores": []}
+    if not diar_speakers:
+        return {"error": "Aucun speaker dans ce job", "scores": []}
+
+    profile_info = []
+    for p in profiles:
+        try:
+            emb = np.array(json.loads(p.embedding), dtype=np.float32)
+            norm = np.linalg.norm(emb)
+            if norm > 0:
+                emb = emb / norm
+            profile_info.append({"id": p.id, "name": p.display_name, "status": p.enrollment_status, "emb": emb})
+        except Exception as e:
+            profile_info.append({"id": p.id, "name": p.display_name, "status": p.enrollment_status, "error": str(e)})
+
+    return {
+        "job_id": job_id,
+        "threshold": 0.75,
+        "enrolled_profiles": [
+            {"id": pi["id"], "name": pi["name"], "status": pi["status"],
+             "emb_dim": len(pi["emb"]) if "emb" in pi else None,
+             "error": pi.get("error")}
+            for pi in profile_info
+        ],
+        "diarisation_speakers": [
+            {"id": ds.id, "speaker_id": ds.speaker_id, "display_name": ds.display_name,
+             "profile_id": ds.profile_id, "segment_count": ds.segment_count}
+            for ds in diar_speakers
+        ],
+        "note": "Les scores cosinus sont calcules pendant la diarisation (step 5.5). "
+                "Verifiez les logs: docker logs scribia-backend-1 2>&1 | grep MATCHING",
+    }

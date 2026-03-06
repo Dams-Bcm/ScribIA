@@ -242,7 +242,12 @@ def match_speakers_to_profiles(
     for spk_id, spk_emb in speaker_embeddings.items():
         spk_v = spk_emb.astype(np.float32)
         for profile, prof_v in profile_vecs:
-            scores[(spk_id, profile.id)] = float(np.dot(spk_v, prof_v))
+            sim = float(np.dot(spk_v, prof_v))
+            scores[(spk_id, profile.id)] = sim
+            logger.info(
+                f"[MATCHING] {spk_id} vs \"{profile.display_name}\" "
+                f"→ cosine={sim:.4f} (threshold={threshold:.2f})"
+            )
 
     # Greedy one-to-one assignment: best score first, skip already assigned
     assigned_speakers: set = set()

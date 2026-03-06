@@ -51,7 +51,7 @@ export function UploadArea({ onFile, disabled }: UploadAreaProps) {
       </div>
       <div className="text-center">
         <p className="text-sm font-medium">
-          Glissez un fichier audio ici ou <span className="underline">parcourir</span>
+          Glissez un fichier audio ici ou parcourir
         </p>
         <p className="text-xs text-muted-foreground mt-1">
           MP3, WAV, M4A, OGG, FLAC, WebM, AAC (max 500 Mo)
