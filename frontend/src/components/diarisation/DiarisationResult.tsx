@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Copy, Download, Check, Play, Pause, Loader2, UserPlus, X } from "lucide-react";
+import { Copy, Download, Check, Play, Pause, Loader2, UserPlus, X, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApplyDictionaryButton } from "@/components/dictionary/ApplyDictionaryButton";
 import { useAuth } from "@/stores/auth";
@@ -26,12 +26,15 @@ function formatTime(seconds: number): string {
 }
 
 export function DiarisationResult({ segments, speakers, jobId, title, onRenameSpeaker }: DiarisationResultProps) {
-  const { isSuperAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const [copied, setCopied] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [playingSegId, setPlayingSegId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const stopAtRef = useRef<number | null>(null);
+
+  // Enrollment mode toggle
+  const [enrollMode, setEnrollMode] = useState(false);
 
   // Segment selection for enrollment
   const [selectedSegIds, setSelectedSegIds] = useState<Set<string>>(new Set());
@@ -178,6 +181,21 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
           targetId={jobId}
           previewText={segments.map((s) => s.text).join("\n")}
         />
+        {isAdmin && (
+          <Button
+            variant={enrollMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setEnrollMode((prev) => {
+                if (prev) clearSelection();
+                return !prev;
+              });
+            }}
+          >
+            <Mic className="w-4 h-4" />
+            {enrollMode ? "Quitter le mode enrollment" : "Mode Enrollment"}
+          </Button>
+        )}
       </div>
 
       {/* Consent panel */}
@@ -200,7 +218,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
       )}
 
       {/* Selection floating bar */}
-      {isSuperAdmin && selectedSegIds.size > 0 && (
+      {enrollMode && selectedSegIds.size > 0 && (
         <div className="sticky top-0 z-20 flex items-center gap-3 bg-primary/10 border border-primary/30 rounded-lg px-4 py-2">
           <span className="text-sm font-medium">
             {selectedSegIds.size} segment{selectedSegIds.size > 1 ? "s" : ""} selectionne{selectedSegIds.size > 1 ? "s" : ""}
@@ -229,7 +247,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
 
         {/* Segments */}
         <div className="flex-1 space-y-1 max-h-[60vh] overflow-y-auto">
-          {isSuperAdmin && (
+          {enrollMode && (
             <p className="text-xs text-muted-foreground mb-2">
               Cliquez sur les segments pour les selectionner (Shift+clic pour une plage), puis &quot;Enroller&quot;.
             </p>
@@ -250,9 +268,9 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
                     : isPlaying
                       ? "bg-primary/5"
                       : "hover:bg-muted/40"
-                } ${isSuperAdmin ? "cursor-pointer" : ""}`}
+                } ${enrollMode ? "cursor-pointer" : ""}`}
                 onClick={(e) => {
-                  if (!isSuperAdmin) return;
+                  if (!enrollMode) return;
                   // Don't select when clicking play button
                   if ((e.target as HTMLElement).closest("button")) return;
                   toggleSegment(seg.id, index, e.shiftKey);
