@@ -67,3 +67,31 @@ export function useRenameSpeaker() {
     },
   });
 }
+
+export function useDeleteSegments() {
+  const qc = useQueryClient();
+  return useMutation<{ deleted: number }, Error, { jobId: string; segmentIds: string[] }>({
+    mutationFn: ({ jobId, segmentIds }) =>
+      api.post<{ deleted: number }>(`/diarisation/${jobId}/delete-segments`, { segment_ids: segmentIds }),
+    onSuccess: (_, { jobId }) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(jobId) });
+      qc.invalidateQueries({ queryKey: KEYS.list });
+    },
+  });
+}
+
+export function useMergeSegments() {
+  const qc = useQueryClient();
+  return useMutation<
+    { merged_segment_id: string; text: string; merged_count: number },
+    Error,
+    { jobId: string; segmentIds: string[] }
+  >({
+    mutationFn: ({ jobId, segmentIds }) =>
+      api.post(`/diarisation/${jobId}/merge-segments`, { segment_ids: segmentIds }),
+    onSuccess: (_, { jobId }) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(jobId) });
+      qc.invalidateQueries({ queryKey: KEYS.list });
+    },
+  });
+}

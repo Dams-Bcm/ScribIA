@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { Copy, Download, Check, Play, Pause, Loader2, UserPlus, X, Mic } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Copy, Download, Check, Play, Pause, Loader2, UserPlus, X, Mic, Trash2, Merge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApplyDictionaryButton } from "@/components/dictionary/ApplyDictionaryButton";
 import { useAuth } from "@/stores/auth";
 import type { DiarisationSegment, DiarisationSpeaker } from "@/api/types";
+import { useDeleteSegments, useMergeSegments } from "@/api/hooks/useDiarisation";
 import { getSpeakerColor } from "./speakerColors";
 import { SpeakerPanel } from "./SpeakerPanel";
 import { EnrollFromSelectionModal } from "./EnrollFromSelectionModal";
@@ -27,21 +28,27 @@ function formatTime(seconds: number): string {
 
 export function DiarisationResult({ segments, speakers, jobId, title, onRenameSpeaker }: DiarisationResultProps) {
   const { isAdmin } = useAuth();
+  const deleteSegments = useDeleteSegments();
+  const mergeSegments = useMergeSegments();
   const [copied, setCopied] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [playingSegId, setPlayingSegId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const stopAtRef = useRef<number | null>(null);
+  const segmentsContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Enrollment mode toggle
-  const [enrollMode, setEnrollMode] = useState(false);
+  // Mode: "normal" (segment click selection) or "enroll" (text highlight)
+  const [mode, setMode] = useState<"normal" | "enroll">("normal");
 
-  // Segment selection for enrollment
+  // Segment selection (normal mode)
   const [selectedSegIds, setSelectedSegIds] = useState<Set<string>>(new Set());
-  const [showEnrollModal, setShowEnrollModal] = useState(false);
   const lastClickedRef = useRef<number | null>(null);
 
-  // Charger l'audio comme blob URL (pour passer le token d'auth)
+  // Enrollment text highlight state
+  const [enrollSegIds, setEnrollSegIds] = useState<string[]>([]);
+  const [showEnrollModal, setShowEnrollModal] = useState(false);
+
+  // Audio loading
   useEffect(() => {
     const token = localStorage.getItem("token") ?? "";
     fetch(`/api/diarisation/${jobId}/audio`, {
@@ -61,6 +68,46 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
+
+  // Detect text selection in enroll mode
+  const handleMouseUp = useCallback(() => {
+    if (mode !== "enroll") return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) {
+      setEnrollSegIds([]);
+      return;
+    }
+
+    // Find all segment elements that intersect the selection
+    const container = segmentsContainerRef.current;
+    if (!container) return;
+
+    const range = sel.getRangeAt(0);
+    const segElements = container.querySelectorAll("[data-seg-id]");
+    const ids: string[] = [];
+
+    for (const el of segElements) {
+      if (range.intersectsNode(el)) {
+        const segId = (el as HTMLElement).dataset.segId;
+        if (segId) ids.push(segId);
+      }
+    }
+
+    setEnrollSegIds(ids);
+  }, [mode]);
+
+  useEffect(() => {
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => document.removeEventListener("mouseup", handleMouseUp);
+  }, [handleMouseUp]);
+
+  // Clear states when switching mode
+  function switchMode(newMode: "normal" | "enroll") {
+    setSelectedSegIds(new Set());
+    setEnrollSegIds([]);
+    lastClickedRef.current = null;
+    setMode(newMode);
+  }
 
   function playSeg(seg: DiarisationSegment) {
     const audio = audioRef.current;
@@ -93,7 +140,6 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
       const next = new Set(prev);
 
       if (shiftKey && lastClickedRef.current !== null) {
-        // Range select
         const start = Math.min(lastClickedRef.current, index);
         const end = Math.max(lastClickedRef.current, index);
         for (let i = start; i <= end && i < segments.length; i++) {
@@ -117,7 +163,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
     lastClickedRef.current = null;
   }
 
-  const selectedSegments = segments.filter((s) => selectedSegIds.has(s.id));
+  const enrollSelectedSegments = segments.filter((s) => enrollSegIds.includes(s.id));
 
   // Build speaker maps
   const speakerColorMap = new Map<string, number>();
@@ -156,6 +202,8 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
       });
   };
 
+  const isBusy = deleteSegments.isPending || mergeSegments.isPending;
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -183,17 +231,12 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
         />
         {isAdmin && (
           <Button
-            variant={enrollMode ? "default" : "outline"}
+            variant={mode === "enroll" ? "default" : "outline"}
             size="sm"
-            onClick={() => {
-              setEnrollMode((prev) => {
-                if (prev) clearSelection();
-                return !prev;
-              });
-            }}
+            onClick={() => switchMode(mode === "enroll" ? "normal" : "enroll")}
           >
             <Mic className="w-4 h-4" />
-            {enrollMode ? "Quitter le mode enrollment" : "Mode Enrollment"}
+            {mode === "enroll" ? "Quitter le mode enrollment" : "Mode Enrollment"}
           </Button>
         )}
       </div>
@@ -201,7 +244,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
       {/* Consent panel */}
       <ConsentPanel jobId={jobId} />
 
-      {/* Lecteur audio (masque, controle par les boutons segments) */}
+      {/* Audio player (hidden) */}
       {audioUrl ? (
         <audio
           ref={audioRef}
@@ -217,11 +260,65 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
         </div>
       )}
 
-      {/* Selection floating bar */}
-      {enrollMode && selectedSegIds.size > 0 && (
+      {/* Normal mode: segment selection floating bar */}
+      {mode === "normal" && isAdmin && selectedSegIds.size > 0 && (
         <div className="sticky top-0 z-20 flex items-center gap-3 bg-primary/10 border border-primary/30 rounded-lg px-4 py-2">
           <span className="text-sm font-medium">
             {selectedSegIds.size} segment{selectedSegIds.size > 1 ? "s" : ""} selectionne{selectedSegIds.size > 1 ? "s" : ""}
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            {selectedSegIds.size >= 2 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  mergeSegments.mutate(
+                    { jobId, segmentIds: Array.from(selectedSegIds) },
+                    { onSuccess: () => clearSelection() },
+                  );
+                }}
+                disabled={isBusy}
+              >
+                {mergeSegments.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                ) : (
+                  <Merge className="w-4 h-4 mr-1" />
+                )}
+                Fusionner
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                if (!confirm(`Supprimer ${selectedSegIds.size} segment(s) ? Cette action est irreversible.`)) return;
+                deleteSegments.mutate(
+                  { jobId, segmentIds: Array.from(selectedSegIds) },
+                  { onSuccess: () => clearSelection() },
+                );
+              }}
+              disabled={isBusy}
+            >
+              {deleteSegments.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-1" />
+              )}
+              Supprimer
+            </Button>
+          </div>
+          <Button size="sm" variant="ghost" onClick={clearSelection}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
+
+      {/* Enroll mode: text highlight floating bar */}
+      {mode === "enroll" && enrollSegIds.length > 0 && (
+        <div className="sticky top-0 z-20 flex items-center gap-3 bg-purple-100 border border-purple-300 rounded-lg px-4 py-2">
+          <span className="text-sm font-medium text-purple-800">
+            {enrollSegIds.length} segment{enrollSegIds.length > 1 ? "s" : ""} surligne{enrollSegIds.length > 1 ? "s" : ""}
+            {" "}({formatTime(Math.min(...enrollSelectedSegments.map((s) => s.start_time)))} - {formatTime(Math.max(...enrollSelectedSegments.map((s) => s.end_time)))})
           </span>
           <Button
             size="sm"
@@ -232,7 +329,14 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
             <UserPlus className="w-4 h-4 mr-1" />
             Enroller
           </Button>
-          <Button size="sm" variant="ghost" onClick={clearSelection}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              window.getSelection()?.removeAllRanges();
+              setEnrollSegIds([]);
+            }}
+          >
             <X className="w-4 h-4" />
           </Button>
         </div>
@@ -246,10 +350,15 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
         </div>
 
         {/* Segments */}
-        <div className="flex-1 space-y-1 max-h-[60vh] overflow-y-auto">
-          {enrollMode && (
+        <div ref={segmentsContainerRef} className="flex-1 space-y-1 max-h-[60vh] overflow-y-auto">
+          {isAdmin && mode === "normal" && (
             <p className="text-xs text-muted-foreground mb-2">
-              Cliquez sur les segments pour les selectionner (Shift+clic pour une plage), puis &quot;Enroller&quot;.
+              Cliquez sur les segments pour les selectionner (Shift+clic pour une plage).
+            </p>
+          )}
+          {mode === "enroll" && (
+            <p className="text-xs text-muted-foreground mb-2">
+              Surlignez du texte pour selectionner la plage audio a enroller.
             </p>
           )}
           {segments.map((seg, index) => {
@@ -257,21 +366,24 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
             const color = getSpeakerColor(colorIndex);
             const label = speakerLabelMap.get(seg.speaker_id ?? "") || seg.speaker_label || seg.speaker_id || "";
             const isPlaying = playingSegId === seg.id;
-            const isSelected = selectedSegIds.has(seg.id);
+            const isSelected = mode === "normal" && selectedSegIds.has(seg.id);
+            const isEnrollHighlighted = mode === "enroll" && enrollSegIds.includes(seg.id);
 
             return (
               <div
                 key={seg.id}
+                data-seg-id={seg.id}
                 className={`flex gap-2 py-2 border-l-4 ${color.border} pl-3 rounded-r-lg transition-colors ${
                   isSelected
                     ? "bg-primary/10 ring-1 ring-primary/30"
-                    : isPlaying
-                      ? "bg-primary/5"
-                      : "hover:bg-muted/40"
-                } ${enrollMode ? "cursor-pointer" : ""}`}
+                    : isEnrollHighlighted
+                      ? "bg-purple-50 ring-1 ring-purple-200"
+                      : isPlaying
+                        ? "bg-primary/5"
+                        : "hover:bg-muted/40"
+                } ${mode === "normal" && isAdmin ? "cursor-pointer" : ""} ${mode === "enroll" ? "select-text" : ""}`}
                 onClick={(e) => {
-                  if (!enrollMode) return;
-                  // Don't select when clicking play button
+                  if (mode !== "normal" || !isAdmin) return;
                   if ((e.target as HTMLElement).closest("button")) return;
                   toggleSegment(seg.id, index, e.shiftKey);
                 }}
@@ -307,13 +419,14 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
       </div>
 
       {/* Enrollment modal */}
-      {showEnrollModal && selectedSegments.length > 0 && (
+      {showEnrollModal && enrollSelectedSegments.length > 0 && (
         <EnrollFromSelectionModal
-          segments={selectedSegments}
+          segments={enrollSelectedSegments}
           jobId={jobId}
           onClose={() => setShowEnrollModal(false)}
           onSuccess={() => {
-            clearSelection();
+            window.getSelection()?.removeAllRanges();
+            setEnrollSegIds([]);
           }}
         />
       )}

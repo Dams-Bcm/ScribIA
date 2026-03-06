@@ -292,6 +292,150 @@ def rename_speaker(
     return {"ok": True}
 
 
+# ── Delete segments ─────────────────────────────────────────────────────────
+
+@router.post("/{job_id}/delete-segments")
+def delete_segments(
+    job_id: str,
+    body: dict,
+    user: User = Depends(get_current_user),
+    _mod: bool = Depends(require_module("transcription_diarisation")),
+    db: Session = Depends(get_db),
+):
+    """Delete selected segments from a completed diarisation job."""
+    segment_ids: list[str] = body.get("segment_ids", [])
+    if not segment_ids:
+        raise HTTPException(400, "Aucun segment selectionne")
+
+    job = (
+        db.query(TranscriptionJob)
+        .filter(
+            TranscriptionJob.id == job_id,
+            TranscriptionJob.tenant_id == user.tenant_id,
+            TranscriptionJob.mode == "diarisation",
+        )
+        .first()
+    )
+    if not job:
+        raise HTTPException(404, "Job introuvable")
+
+    deleted = (
+        db.query(TranscriptionSegment)
+        .filter(
+            TranscriptionSegment.job_id == job_id,
+            TranscriptionSegment.id.in_(segment_ids),
+        )
+        .delete(synchronize_session="fetch")
+    )
+
+    # Re-index remaining segments to keep timeline order_index contiguous
+    remaining = (
+        db.query(TranscriptionSegment)
+        .filter(TranscriptionSegment.job_id == job_id)
+        .order_by(TranscriptionSegment.start_time)
+        .all()
+    )
+    for idx, seg in enumerate(remaining):
+        seg.order_index = idx
+
+    # Update speaker stats (segment_count, total_duration)
+    speakers = (
+        db.query(DiarisationSpeaker)
+        .filter(DiarisationSpeaker.job_id == job_id)
+        .all()
+    )
+    for sp in speakers:
+        sp_segs = [s for s in remaining if s.speaker_id == sp.speaker_id]
+        sp.segment_count = len(sp_segs)
+        sp.total_duration = sum(s.end_time - s.start_time for s in sp_segs)
+
+    db.commit()
+    return {"deleted": deleted}
+
+
+# ── Merge segments ──────────────────────────────────────────────────────────
+
+@router.post("/{job_id}/merge-segments")
+def merge_segments(
+    job_id: str,
+    body: dict,
+    user: User = Depends(get_current_user),
+    _mod: bool = Depends(require_module("transcription_diarisation")),
+    db: Session = Depends(get_db),
+):
+    """Merge selected segments into a single segment (keep earliest start, latest end)."""
+    segment_ids: list[str] = body.get("segment_ids", [])
+    if len(segment_ids) < 2:
+        raise HTTPException(400, "Selectionnez au moins 2 segments a fusionner")
+
+    job = (
+        db.query(TranscriptionJob)
+        .filter(
+            TranscriptionJob.id == job_id,
+            TranscriptionJob.tenant_id == user.tenant_id,
+            TranscriptionJob.mode == "diarisation",
+        )
+        .first()
+    )
+    if not job:
+        raise HTTPException(404, "Job introuvable")
+
+    to_merge = (
+        db.query(TranscriptionSegment)
+        .filter(
+            TranscriptionSegment.job_id == job_id,
+            TranscriptionSegment.id.in_(segment_ids),
+        )
+        .order_by(TranscriptionSegment.start_time)
+        .all()
+    )
+    if len(to_merge) < 2:
+        raise HTTPException(400, "Segments introuvables")
+
+    # Keep the first segment, merge text and times into it
+    keeper = to_merge[0]
+    keeper.text = " ".join(s.text for s in to_merge)
+    keeper.start_time = min(s.start_time for s in to_merge)
+    keeper.end_time = max(s.end_time for s in to_merge)
+
+    # Delete the others
+    ids_to_delete = [s.id for s in to_merge[1:]]
+    db.query(TranscriptionSegment).filter(
+        TranscriptionSegment.id.in_(ids_to_delete)
+    ).delete(synchronize_session="fetch")
+
+    # Re-index
+    remaining = (
+        db.query(TranscriptionSegment)
+        .filter(TranscriptionSegment.job_id == job_id)
+        .order_by(TranscriptionSegment.start_time)
+        .all()
+    )
+    for idx, seg in enumerate(remaining):
+        seg.order_index = idx
+
+    # Update speaker stats
+    speakers = (
+        db.query(DiarisationSpeaker)
+        .filter(DiarisationSpeaker.job_id == job_id)
+        .all()
+    )
+    for sp in speakers:
+        sp_segs = [s for s in remaining if s.speaker_id == sp.speaker_id]
+        sp.segment_count = len(sp_segs)
+        sp.total_duration = sum(s.end_time - s.start_time for s in sp_segs)
+
+    db.commit()
+    db.refresh(keeper)
+    return {
+        "merged_segment_id": keeper.id,
+        "text": keeper.text,
+        "start_time": keeper.start_time,
+        "end_time": keeper.end_time,
+        "merged_count": len(to_merge),
+    }
+
+
 # ── Serve audio ──────────────────────────────────────────────────────────────
 
 AUDIO_MIME = {
