@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search, Mic } from "lucide-react";
+import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search, Mic, ChevronDown, CheckCircle2, XCircle } from "lucide-react";
 
 interface AIUsage {
   usage_key: string;
@@ -94,33 +94,22 @@ function useUpdateWhisperSettings() {
   });
 }
 
-function usePullModel() {
-  return useMutation({
-    mutationFn: async (modelName: string) => {
-      const response = await fetch(`/api/ai-documents/ollama-models/pull?model=${encodeURIComponent(modelName)}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      if (!response.ok) throw new Error("Pull failed");
-      const reader = response.body?.getReader();
-      if (!reader) return;
-      const decoder = new TextDecoder();
-      let lastStatus = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value, { stream: true });
-        for (const line of text.split("\n")) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              lastStatus = data.status || lastStatus;
-            } catch { /* skip */ }
-          }
-        }
-      }
-      return lastStatus;
-    },
-  });
+const SUGGESTED_MODELS = [
+  { name: "llama3.1:8b",   desc: "Llama 3.1 8B — polyvalent, rapide (~5 Go)" },
+  { name: "llama3.1:70b",  desc: "Llama 3.1 70B — haute qualité (~40 Go)" },
+  { name: "mistral:7b",    desc: "Mistral 7B — bon en français (~4 Go)" },
+  { name: "mistral-nemo",  desc: "Mistral Nemo 12B — excellent en français (~7 Go)" },
+  { name: "gemma2:9b",     desc: "Gemma 2 9B — Google, efficace (~6 Go)" },
+  { name: "qwen2.5:7b",    desc: "Qwen 2.5 7B — multilingue (~5 Go)" },
+];
+
+type PullStatus = "idle" | "pulling" | "done" | "error";
+
+interface PullState {
+  status: PullStatus;
+  message: string;
+  total?: number;
+  completed?: number;
 }
 
 function useDeleteModel() {
@@ -132,19 +121,21 @@ function useDeleteModel() {
 }
 
 export function AISettingsPage() {
+  const qc = useQueryClient();
   const { data, isLoading } = useAISettings();
   const { data: ragData } = useRAGSettings();
   const { data: whisperData } = useWhisperSettings();
   const updateSettings = useUpdateAISettings();
   const updateRAG = useUpdateRAGSettings();
   const updateWhisper = useUpdateWhisperSettings();
-  const pullModel = usePullModel();
   const deleteModel = useDeleteModel();
 
   const [overrides, setOverrides] = useState<Record<string, string | null>>({});
   const [ragOverrides, setRAGOverrides] = useState<Record<string, string>>({});
   const [whisperOverrides, setWhisperOverrides] = useState<Record<string, string>>({});
   const [pullName, setPullName] = useState("");
+  const [pullState, setPullState] = useState<PullState>({ status: "idle", message: "" });
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [saved, setSaved] = useState(false);
   const [ragSaved, setRAGSaved] = useState(false);
   const [whisperSaved, setWhisperSaved] = useState(false);
@@ -186,10 +177,50 @@ export function AISettingsPage() {
     setTimeout(() => setRAGSaved(false), 2000);
   }
 
-  async function handlePull() {
-    if (!pullName.trim()) return;
-    await pullModel.mutateAsync(pullName.trim());
-    setPullName("");
+  function handlePull(modelName?: string) {
+    const name = (modelName ?? pullName).trim();
+    if (!name || pullState.status === "pulling") return;
+    setPullState({ status: "pulling", message: "Connexion à Ollama…" });
+
+    fetch(`/api/ai-documents/ollama-models/pull?model=${encodeURIComponent(name)}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    }).then(async (resp) => {
+      if (!resp.body) throw new Error("Pas de body");
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          const raw = line.slice(5).trim();
+          if (!raw) continue;
+          try {
+            const chunk = JSON.parse(raw);
+            if (chunk.error) {
+              setPullState({ status: "error", message: chunk.error });
+              return;
+            }
+            if (chunk.status === "success") {
+              setPullState({ status: "done", message: "Modèle installé avec succès !" });
+              qc.invalidateQueries({ queryKey: ["ai-settings"] });
+              setPullName("");
+              return;
+            }
+            setPullState({ status: "pulling", message: chunk.status ?? "Téléchargement…", total: chunk.total, completed: chunk.completed });
+          } catch { /* skip */ }
+        }
+      }
+      setPullState({ status: "done", message: "Terminé" });
+      qc.invalidateQueries({ queryKey: ["ai-settings"] });
+      setPullName("");
+    }).catch((err) => {
+      setPullState({ status: "error", message: String(err) });
+    });
   }
 
   async function handleWhisperSave() {
@@ -424,36 +455,94 @@ export function AISettingsPage() {
           {/* Pull model */}
           <div className="bg-background rounded-xl border border-border p-5">
             <h3 className="text-sm font-semibold mb-3">Télécharger un modèle</h3>
+
+            {/* Suggestions */}
+            <div className="mb-3">
+              <button
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-2"
+                onClick={() => setShowSuggestions((v) => !v)}
+              >
+                <ChevronDown className={`w-3 h-3 transition-transform ${showSuggestions ? "rotate-180" : ""}`} />
+                Modèles suggérés
+              </button>
+              {showSuggestions && (
+                <div className="space-y-1 mb-3">
+                  {SUGGESTED_MODELS.map((s) => {
+                    const installed = data.ollama_models.includes(s.name);
+                    return (
+                      <button
+                        key={s.name}
+                        className={`w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left ${
+                          installed ? "opacity-50 cursor-default" : "hover:bg-muted/50"
+                        }`}
+                        onClick={() => !installed && setPullName(s.name)}
+                        disabled={installed}
+                      >
+                        {installed ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-500" />
+                        ) : (
+                          <Download className="w-3.5 h-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                        )}
+                        <div>
+                          <p className="text-sm font-mono font-medium">{s.name}</p>
+                          <p className="text-xs text-muted-foreground">{s.desc}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <Input
                 value={pullName}
                 onChange={(e) => setPullName(e.target.value)}
                 placeholder="ex: llama3.1:70b"
-                className="text-sm"
+                className="text-sm font-mono"
                 onKeyDown={(e) => e.key === "Enter" && handlePull()}
               />
-              <Button size="sm" onClick={handlePull} disabled={!pullName.trim() || pullModel.isPending}>
-                {pullModel.isPending ? (
+              <Button size="sm" onClick={() => handlePull()} disabled={!pullName.trim() || pullState.status === "pulling"}>
+                {pullState.status === "pulling" ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Download className="w-4 h-4" />
                 )}
               </Button>
             </div>
-            {pullModel.isPending && (
-              <p className="text-xs text-muted-foreground mt-2">Téléchargement en cours… (peut prendre plusieurs minutes)</p>
-            )}
-            {pullModel.isSuccess && (
-              <p className="text-xs text-green-600 mt-2">Modèle téléchargé avec succès</p>
-            )}
-            {pullModel.isError && (
-              <p className="text-xs text-destructive mt-2">Erreur lors du téléchargement</p>
+
+            {/* Pull progress */}
+            {pullState.status !== "idle" && (
+              <div className="mt-3 rounded-lg border border-border p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  {pullState.status === "pulling" && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />}
+                  {pullState.status === "done" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
+                  {pullState.status === "error" && <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />}
+                  <span className="text-xs text-muted-foreground truncate">{pullState.message}</span>
+                </div>
+                {pullState.total && pullState.completed && pullState.status === "pulling" && (
+                  <div className="w-full bg-muted rounded-full h-1.5">
+                    <div
+                      className="bg-primary h-1.5 rounded-full transition-all"
+                      style={{ width: `${Math.round((pullState.completed / pullState.total) * 100)}%` }}
+                    />
+                  </div>
+                )}
+                {(pullState.status === "done" || pullState.status === "error") && (
+                  <button
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setPullState({ status: "idle", message: "" })}
+                  >
+                    Fermer
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
           {/* Installed models */}
           <div className="bg-background rounded-xl border border-border p-5">
-            <h3 className="text-sm font-semibold mb-3">Modèles installés</h3>
+            <h3 className="text-sm font-semibold mb-3">Modèles installés ({data.ollama_models.length})</h3>
             {data.ollama_models.length === 0 ? (
               <div className="text-center py-4">
                 <AlertCircle className="w-6 h-6 mx-auto mb-1 text-muted-foreground opacity-40" />

@@ -4,8 +4,6 @@ import { GenerateDialog } from "@/components/ai_documents/GenerateDialog";
 import { DocumentList } from "@/components/ai_documents/DocumentList";
 import { DocumentViewer } from "@/components/ai_documents/DocumentViewer";
 import { TemplateManager } from "@/components/ai_documents/TemplateManager";
-import { ModelManager } from "@/components/ai_documents/ModelManager";
-import { useAuth } from "@/stores/auth";
 import type { AIDocument } from "@/api/types";
 
 type Tab = "generate" | "documents" | "templates";
@@ -17,7 +15,6 @@ const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function AIDocumentsPage() {
-  const { isSuperAdmin } = useAuth();
   const [tab, setTab] = useState<Tab>("generate");
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
 
@@ -122,7 +119,6 @@ export function AIDocumentsPage() {
                 Les templates par défaut sont créés automatiquement.
               </p>
             </div>
-            {isSuperAdmin && <ModelManager />}
           </div>
           <TemplateManager />
         </div>
