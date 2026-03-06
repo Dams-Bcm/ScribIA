@@ -432,7 +432,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
                     {formatTime(seg.start_time)}
                   </span>
                 </div>
-                <p className={`text-sm leading-relaxed flex-1 ${isEnrollHighlighted ? "underline decoration-purple-500 decoration-2 underline-offset-4" : ""}`}>{seg.text}</p>
+                <p className="text-sm leading-relaxed flex-1">{seg.text}</p>
               </div>
             );
           })}

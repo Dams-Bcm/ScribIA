@@ -100,14 +100,15 @@ def get_diarization_pipeline():
 
         try:
             _diarization_pipeline = Pipeline.from_pretrained(
-                "pyannote/speaker-diarization-community-1",
+                "pyannote/speaker-diarization-3.1",
                 token=token,
             )
         except Exception as e:
             raise RuntimeError(
                 f"Impossible de charger le pipeline pyannote: {e}. "
-                "Vérifiez que vous avez accepté les conditions du modèle:\n"
-                "  https://huggingface.co/pyannote/speaker-diarization-community-1\n"
+                "Vérifiez que vous avez accepté les conditions des modèles:\n"
+                "  https://huggingface.co/pyannote/speaker-diarization-3.1\n"
+                "  https://huggingface.co/pyannote/segmentation-3.0\n"
                 "et que votre HF_TOKEN est valide."
             ) from e
 
