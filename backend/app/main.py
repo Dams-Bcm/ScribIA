@@ -1,5 +1,14 @@
 from contextlib import asynccontextmanager
+import logging
 import sys
+
+# Configure root logger so that all logger.info / logger.warning calls
+# from app modules are visible in docker logs (stdout).
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:%(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 print("[BOOT] main.py loading...", flush=True)
 
