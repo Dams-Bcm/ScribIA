@@ -8,6 +8,8 @@ import {
   EditorCommandItem,
   EditorCommandEmpty,
   EditorCommandList,
+  StarterKit,
+  TiptapUnderline,
   type EditorInstance,
 } from "novel";
 import { marked } from "marked";
@@ -63,6 +65,11 @@ export function RichTextEditor({ initialContent, onSave, onExport, readOnly = fa
   // Convert markdown to HTML for initial load
   const initialHtml = marked.parse(initialContent, { async: false }) as string;
 
+  const extensions = [
+    StarterKit,
+    TiptapUnderline,
+  ];
+
   return (
     <div className="space-y-2">
       {/* Toolbar */}
@@ -90,6 +97,7 @@ export function RichTextEditor({ initialContent, onSave, onExport, readOnly = fa
       {/* Editor */}
       <EditorRoot>
         <EditorContent
+          extensions={extensions}
           editable={!readOnly}
           onCreate={({ editor }) => {
             editorRef.current = editor;
