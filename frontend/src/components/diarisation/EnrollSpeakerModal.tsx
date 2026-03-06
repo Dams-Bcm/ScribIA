@@ -81,7 +81,7 @@ export function EnrollSpeakerModal({
             </div>
           ) : profiles.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Aucun intervenant créé — créez d&apos;abord un profil dans Administration &gt; Intervenants.
+              Aucun intervenant créé — créez d&apos;abord un contact dans le module Contacts.
             </p>
           ) : (
             <select

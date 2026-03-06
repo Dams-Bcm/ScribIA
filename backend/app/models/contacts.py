@@ -13,7 +13,6 @@ class ContactGroup(UUIDMixin, TimestampMixin, Base):
     tenant_id   = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     name        = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    address     = Column(String(500), nullable=True)
     metadata_   = Column("metadata", Text, nullable=True)  # JSON — sector-specific (total_tantiemes, etc.)
 
     contacts = relationship("Contact", back_populates="group", cascade="all, delete-orphan", order_by="Contact.name")

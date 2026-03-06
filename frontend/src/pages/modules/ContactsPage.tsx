@@ -28,11 +28,11 @@ import type { ContactGroupCreate, ContactCreate } from "@/api/types";
 function CreateGroupForm({ onDone }: { onDone: () => void }) {
   const create = useCreateContactGroup();
   const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
+  const [description, setDescription] = useState("");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const body: ContactGroupCreate = { name, address: address || null };
+    const body: ContactGroupCreate = { name, description: description || null };
     create.mutate(body, { onSuccess: () => onDone() });
   }
 
@@ -45,17 +45,17 @@ function CreateGroupForm({ onDone }: { onDone: () => void }) {
           className="w-full mt-1 px-3 py-2 border border-input rounded-lg text-sm"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Ex : Résidence Les Tilleuls"
+          placeholder="Ex : Commission urbanisme"
           required
         />
       </div>
       <div>
-        <label className="text-sm font-medium">Adresse</label>
+        <label className="text-sm font-medium">Description</label>
         <input
           className="w-full mt-1 px-3 py-2 border border-input rounded-lg text-sm"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder="12 rue des Lilas, 75001 Paris"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Description du groupe (optionnel)"
         />
       </div>
       <div className="flex gap-2">
@@ -169,7 +169,7 @@ function GroupDetail({ groupId, onBack }: { groupId: string; onBack: () => void 
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-xl font-bold">{group.name}</h2>
-          {group.address && <p className="text-sm text-muted-foreground">{group.address}</p>}
+          {group.description && <p className="text-sm text-muted-foreground">{group.description}</p>}
           <p className="text-xs text-muted-foreground mt-1">{group.contacts.length} contact(s)</p>
         </div>
         <Button size="sm" onClick={() => setShowAdd(true)}>
@@ -289,8 +289,8 @@ export function ContactsPage() {
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold truncate">{g.name}</h3>
-                  {g.address && (
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{g.address}</p>
+                  {g.description && (
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{g.description}</p>
                   )}
                   <p className="text-sm text-muted-foreground mt-2">
                     {g.contact_count} contact{g.contact_count !== 1 ? "s" : ""}

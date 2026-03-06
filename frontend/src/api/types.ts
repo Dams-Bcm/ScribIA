@@ -492,7 +492,6 @@ export const AVAILABLE_MODULES: ModuleDefinition[] = [
   { key: "preparatory_phases", label: "Phase(s) préparatoire(s)" },
   { key: "rgpd", label: "RGPD" },
   { key: "ai_documents", label: "Génération de documents IA" },
-  { key: "convocations", label: "Convocations" },
   { key: "procedures", label: "Procédures collaboratives" },
   { key: "contacts", label: "Carnet de contacts" },
   { key: "search", label: "Recherche intelligente" },
@@ -660,7 +659,6 @@ export interface ContactGroup {
   id: string;
   name: string;
   description: string | null;
-  address: string | null;
   metadata: Record<string, unknown> | null;
   contact_count: number;
   created_at: string;
@@ -688,14 +686,12 @@ export interface ContactGroupDetail extends ContactGroup {
 export interface ContactGroupCreate {
   name: string;
   description?: string | null;
-  address?: string | null;
   metadata?: Record<string, unknown> | null;
 }
 
 export interface ContactGroupUpdate {
   name?: string;
   description?: string | null;
-  address?: string | null;
   metadata?: Record<string, unknown> | null;
 }
 

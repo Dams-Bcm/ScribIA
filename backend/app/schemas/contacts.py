@@ -7,14 +7,12 @@ from pydantic import BaseModel, Field
 class ContactGroupCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
-    address: str | None = None
     metadata: dict | None = None
 
 
 class ContactGroupUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
     description: str | None = None
-    address: str | None = None
     metadata: dict | None = None
 
 
@@ -38,7 +36,6 @@ class ContactGroupResponse(BaseModel):
     id: str
     name: str
     description: str | None
-    address: str | None
     metadata: dict | None
     contact_count: int = 0
     created_at: datetime

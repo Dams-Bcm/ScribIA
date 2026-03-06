@@ -47,7 +47,6 @@ def _to_group_response(g: ContactGroup) -> ContactGroupResponse:
         id=g.id,
         name=g.name,
         description=g.description,
-        address=g.address,
         metadata=_parse_json(g.metadata_),
         contact_count=len(g.contacts) if g.contacts else 0,
         created_at=g.created_at,
@@ -110,7 +109,6 @@ def create_group(
         tenant_id=user.tenant_id,
         name=body.name,
         description=body.description,
-        address=body.address,
         metadata_=json.dumps(body.metadata) if body.metadata else None,
     )
     db.add(g)

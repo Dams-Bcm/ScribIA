@@ -16,7 +16,6 @@ import { TranscriptionPage } from "./pages/modules/TranscriptionPage";
 import { TranscriptionDiarisationPage } from "./pages/modules/TranscriptionDiarisationPage";
 import { RGPDPage } from "./pages/modules/RGPDPage";
 import { AIDocumentsPage } from "./pages/modules/AIDocumentsPage";
-import { ConvocationsPage } from "./pages/modules/ConvocationsPage";
 import { PreparatoryPhasesPage } from "./pages/modules/PreparatoryPhasesPage";
 import { ProceduresPage } from "./pages/modules/ProceduresPage";
 import { ContactsPage } from "./pages/modules/ContactsPage";
@@ -27,7 +26,6 @@ import { FormPage } from "./pages/public/FormPage";
 // Admin pages
 import { TenantsPage } from "./pages/admin/TenantsPage";
 import { UsersPage } from "./pages/admin/UsersPage";
-import { SpeakersPage } from "./pages/admin/SpeakersPage";
 import { AuditLogsPage } from "./pages/admin/AuditLogsPage";
 import { WorkflowsPage } from "./pages/admin/WorkflowsPage";
 import { AISettingsPage } from "./pages/admin/AISettingsPage";
@@ -80,7 +78,6 @@ function AppRoutes() {
           <Route path="phases-preparatoires" element={<PreparatoryPhasesPage />} />
           <Route path="rgpd" element={<RGPDPage />} />
           <Route path="documents-ia" element={<AIDocumentsPage />} />
-          <Route path="convocations" element={<ConvocationsPage />} />
           <Route path="procedures" element={<ProceduresPage />} />
           <Route path="contacts" element={<ContactsPage />} />
           <Route path="recherche" element={<SearchPage />} />
@@ -92,7 +89,6 @@ function AppRoutes() {
           {/* Administration */}
           <Route path="admin/tenants" element={<TenantsPage />} />
           <Route path="admin/users" element={<UsersPage />} />
-          <Route path="admin/speakers" element={<SpeakersPage />} />
           <Route path="admin/workflows" element={<WorkflowsPage />} />
           <Route path="admin/sectors" element={<SectorsPage />} />
           <Route path="admin/ai-settings" element={<AISettingsPage />} />

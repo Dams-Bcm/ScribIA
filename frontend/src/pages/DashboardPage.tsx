@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { useAuth } from "../stores/auth";
 import { ModuleGuard } from "../components/ModuleGuard";
-import { Mic, FileText, FolderOpen, Scale, Sparkles, Mail } from "lucide-react";
+import { Mic, FileText, FolderOpen, Scale, Sparkles } from "lucide-react";
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -46,14 +46,6 @@ export function DashboardPage() {
       icon: Sparkles,
       color: "bg-emerald-50 text-emerald-600",
       to: "/documents-ia",
-    },
-    {
-      key: "convocations",
-      label: "Convocations",
-      description: "Création et envoi de convocations",
-      icon: Mail,
-      color: "bg-rose-50 text-rose-600",
-      to: "/convocations",
     },
   ];
 
