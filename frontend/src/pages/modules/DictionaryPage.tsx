@@ -112,8 +112,8 @@ export function DictionaryPage() {
         const parts = line.split(";");
         if (parts.length >= 2) {
           parsed.push({
-            original: parts[0].trim(),
-            replacement: parts[1].trim(),
+            original: parts[0]!.trim(),
+            replacement: parts[1]!.trim(),
             is_case_sensitive: parts[2]?.trim().toLowerCase() !== "false",
             is_whole_word: parts[3]?.trim().toLowerCase() !== "false",
             category: parts[4]?.trim() || null,
