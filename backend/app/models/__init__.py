@@ -7,8 +7,9 @@ from app.models.speaker import SpeakerProfile, SpeakerEnrollmentSegment
 from app.models.preparatory import PreparatoryDossier, AgendaPoint, DossierDocument, DossierStatus
 from app.models.ai_documents import AIDocumentTemplate, AIDocument
 from app.models.procedures import (
-    ProcedureTemplate, ProcedureTemplateRole,
-    Procedure, ProcedureParticipant, ProcedureStatus,
+    ProcedureTemplate, ProcedureTemplateRole, ProcedureTemplateStep,
+    Procedure, ProcedureParticipant, ProcedureStepInstance,
+    ProcedureStatus, StepType, StepStatus,
 )
 from app.models.contacts import ContactGroup, Contact
 from app.models.ai_settings import AISetting, AI_USAGES
@@ -22,8 +23,9 @@ __all__ = [
     "SpeakerProfile", "SpeakerEnrollmentSegment",
     "PreparatoryDossier", "AgendaPoint", "DossierDocument", "DossierStatus",
     "AIDocumentTemplate", "AIDocument",
-    "ProcedureTemplate", "ProcedureTemplateRole",
-    "Procedure", "ProcedureParticipant", "ProcedureStatus",
+    "ProcedureTemplate", "ProcedureTemplateRole", "ProcedureTemplateStep",
+    "Procedure", "ProcedureParticipant", "ProcedureStepInstance",
+    "ProcedureStatus", "StepType", "StepStatus",
     "ContactGroup", "Contact",
     "AISetting", "AI_USAGES",
     "Sector",

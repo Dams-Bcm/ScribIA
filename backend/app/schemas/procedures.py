@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Optional
 
@@ -47,6 +49,7 @@ class ProcedureTemplateCreate(BaseModel):
     description: Optional[str] = None
     document_template_id: Optional[str] = None
     roles: list[TemplateRoleCreate] = []
+    steps: list[TemplateStepCreate] = []
 
 
 class ProcedureTemplateUpdate(BaseModel):
@@ -65,6 +68,7 @@ class ProcedureTemplateResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     roles: list[TemplateRoleResponse] = []
+    steps: list[TemplateStepResponse] = []
 
     model_config = {"from_attributes": True}
 
@@ -137,9 +141,11 @@ class ProcedureDetailResponse(BaseModel):
     document_template_id: Optional[str] = None
     source_session_id: Optional[str] = None
     ai_document_id: Optional[str] = None
+    current_step_index: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     participants: list[ParticipantResponse] = []
+    steps: list[StepInstanceResponse] = []
 
     model_config = {"from_attributes": True}
 
@@ -157,3 +163,53 @@ class PublicFormResponse(BaseModel):
 
 class FormSubmit(BaseModel):
     responses: dict  # {question_id: valeur}
+
+
+# ── Steps de template ────────────────────────────────────────────────────────
+
+class TemplateStepCreate(BaseModel):
+    step_type: str  # StepType enum value
+    label: str
+    description: Optional[str] = None
+    config: Optional[dict] = None
+    is_required: bool = True
+
+
+class TemplateStepUpdate(BaseModel):
+    label: Optional[str] = None
+    description: Optional[str] = None
+    config: Optional[dict] = None
+    is_required: Optional[bool] = None
+
+
+class TemplateStepResponse(BaseModel):
+    id: str
+    order_index: int
+    step_type: str
+    label: str
+    description: Optional[str] = None
+    config: Optional[dict] = None
+    is_required: bool = True
+
+    model_config = {"from_attributes": True}
+
+
+# ── Step instances (procédure en cours) ───────────────────────────────────────
+
+class StepInstanceResponse(BaseModel):
+    id: str
+    order_index: int
+    step_type: str
+    label: str
+    description: Optional[str] = None
+    config: Optional[dict] = None
+    status: str  # StepStatus value
+    data: Optional[dict] = None
+    completed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class StepActionRequest(BaseModel):
+    """Données envoyées pour compléter une étape."""
+    data: dict = {}  # Données spécifiques au type d'étape

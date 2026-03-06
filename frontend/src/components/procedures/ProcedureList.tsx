@@ -1,16 +1,17 @@
-import { ClipboardList, Trash2, Users, CheckCircle2, Clock, Loader2, CalendarCheck, Mic, Sparkles } from "lucide-react";
+import { ClipboardList, Trash2, Users, CheckCircle2, Clock, Loader2, CalendarCheck, Mic, Sparkles, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useProcedures, useDeleteProcedure } from "@/api/hooks/useProcedures";
 import type { ProcedureListItem, ProcedureStatus } from "@/api/types";
 
 const STATUS_CONFIG: Record<ProcedureStatus, { label: string; icon: React.ReactNode; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-  draft:      { label: "Brouillon",   icon: <Clock className="w-3 h-3" />,                        variant: "secondary" },
-  collecting: { label: "Collecte",    icon: <Loader2 className="w-3 h-3 animate-spin" />,         variant: "default" },
-  scheduled:  { label: "Planifiée",   icon: <CalendarCheck className="w-3 h-3" />,                variant: "outline" },
-  meeting:    { label: "Réunion",     icon: <Mic className="w-3 h-3" />,                          variant: "outline" },
-  generating: { label: "Génération",  icon: <Sparkles className="w-3 h-3 animate-pulse" />,       variant: "default" },
-  done:       { label: "Terminée",    icon: <CheckCircle2 className="w-3 h-3" />,                 variant: "outline" },
+  draft:       { label: "Brouillon",   icon: <Clock className="w-3 h-3" />,                        variant: "secondary" },
+  in_progress: { label: "En cours",    icon: <ArrowRight className="w-3 h-3" />,                   variant: "default" },
+  collecting:  { label: "Collecte",    icon: <Loader2 className="w-3 h-3 animate-spin" />,         variant: "default" },
+  scheduled:   { label: "Planifiée",   icon: <CalendarCheck className="w-3 h-3" />,                variant: "outline" },
+  meeting:     { label: "Réunion",     icon: <Mic className="w-3 h-3" />,                          variant: "outline" },
+  generating:  { label: "Génération",  icon: <Sparkles className="w-3 h-3 animate-pulse" />,       variant: "default" },
+  done:        { label: "Terminée",    icon: <CheckCircle2 className="w-3 h-3" />,                 variant: "outline" },
 };
 
 interface Props {

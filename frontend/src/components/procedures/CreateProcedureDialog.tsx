@@ -95,11 +95,15 @@ export function CreateProcedureDialog({ onCreated }: Props) {
                         {tpl.description && (
                           <p className="text-xs text-muted-foreground mt-0.5">{tpl.description}</p>
                         )}
-                        {tpl.roles.length > 0 && (
+                        {tpl.steps && tpl.steps.length > 0 ? (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {tpl.steps.length} étape(s) : {tpl.steps.map((s) => s.label).join(" → ")}
+                          </p>
+                        ) : tpl.roles.length > 0 ? (
                           <p className="text-xs text-muted-foreground mt-1">
                             {tpl.roles.map((r) => r.role_name).join(", ")}
                           </p>
-                        )}
+                        ) : null}
                       </div>
                     </button>
                   ))}

@@ -96,6 +96,13 @@ def _add_missing_columns():
                 "ALTER TABLE ai_documents ADD extra_context NVARCHAR(MAX) NULL"
             ))
 
+        # procedures: current_step_index
+        proc_cols = {c["name"] for c in insp.get_columns("procedures")}
+        if "current_step_index" not in proc_cols:
+            conn.execute(text(
+                "ALTER TABLE procedures ADD current_step_index INT NULL"
+            ))
+
         conn.commit()
 
 

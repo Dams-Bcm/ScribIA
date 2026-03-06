@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
 from app.database import get_db
-from app.models import Tenant, TenantModule, User, AVAILABLE_MODULES, AuditLog, AIDocumentTemplate, ProcedureTemplate, ProcedureTemplateRole, AISetting, AI_USAGES, Sector
+from app.models import Tenant, TenantModule, User, AVAILABLE_MODULES, AuditLog, AIDocumentTemplate, ProcedureTemplate, ProcedureTemplateRole, ProcedureTemplateStep, AISetting, AI_USAGES, Sector
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantModuleUpdate
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.services.auth import hash_password
@@ -277,7 +277,7 @@ def list_sector_templates(
     """Liste les templates de procédure sectoriels (master)."""
     templates = (
         db.query(ProcedureTemplate)
-        .options(joinedload(ProcedureTemplate.roles))
+        .options(joinedload(ProcedureTemplate.roles), joinedload(ProcedureTemplate.steps))
         .filter(ProcedureTemplate.sector == sector, ProcedureTemplate.tenant_id.is_(None))
         .order_by(ProcedureTemplate.created_at.desc())
         .all()
@@ -308,6 +308,16 @@ def create_sector_template(
             order_index=i,
             invitation_delay_days=role.get("invitation_delay_days", 15),
             form_questions=json.dumps(role.get("form_questions", []), ensure_ascii=False),
+        ))
+    for i, step in enumerate(body.get("steps", [])):
+        db.add(ProcedureTemplateStep(
+            template_id=tpl.id,
+            order_index=i,
+            step_type=step["step_type"],
+            label=step["label"],
+            description=step.get("description"),
+            config=json.dumps(step.get("config", {}), ensure_ascii=False) if step.get("config") else None,
+            is_required=step.get("is_required", True),
         ))
     db.commit()
     db.refresh(tpl)
@@ -350,6 +360,18 @@ def _sector_template_response(tpl: ProcedureTemplate) -> dict:
             }
             for r in (tpl.roles or [])
         ],
+        "steps": [
+            {
+                "id": s.id,
+                "order_index": s.order_index,
+                "step_type": s.step_type,
+                "label": s.label,
+                "description": s.description,
+                "config": json.loads(s.config) if s.config else None,
+                "is_required": s.is_required,
+            }
+            for s in (tpl.steps or [])
+        ],
     }
 
 
@@ -357,30 +379,34 @@ def _sector_template_response(tpl: ProcedureTemplate) -> dict:
 
 _GENERATE_SYSTEM_PROMPT = """Tu es un expert en modélisation de workflows et procédures métier.
 On te donne une description textuelle d'un processus / workflow.
-Tu dois produire UN SEUL template de procédure qui représente l'ensemble du workflow décrit.
+Tu dois produire UN SEUL template de procédure avec des ÉTAPES SÉQUENTIELLES.
 
-RÈGLE FONDAMENTALE : Un workflow = UN SEUL template. Ne découpe JAMAIS un workflow en plusieurs templates.
-Les différentes étapes/phases du workflow doivent être résumées dans la description du template,
-pas transformées en templates séparés.
+RÈGLE FONDAMENTALE : Un workflow = UN SEUL template avec des étapes ordonnées (steps).
 
-Les "roles" représentent les PARTICIPANTS / ACTEURS du workflow (ex: "Syndic", "Copropriétaire",
-"Conseil syndical"), PAS les étapes du processus.
+Chaque étape a un TYPE parmi :
+- "form" : formulaire à remplir par l'utilisateur (config.fields = [{id, label, type, required}])
+  type de champ : "text", "textarea", "date", "file"
+- "select_contacts" : sélection de contacts destinataires (config = {})
+- "send_email" : envoi d'email aux contacts sélectionnés (config.subject_template, config.body_template)
+- "collect_responses" : envoi de formulaires aux participants et attente des réponses
+  (config.roles = [{role_name, invitation_delay_days, form_questions: [{id, label, type, required}]}])
+- "generate_document" : génération d'un document IA (config = {})
+- "upload_document" : upload d'un fichier (config.accepted_types = ["pdf","docx"])
+- "manual" : étape manuelle / validation humaine (config.instructions = "...")
 
 Le template contient :
-- name : nom court du template (ex: "AG Copropriété")
-- description : description complète du workflow, incluant les grandes étapes/phases
-- roles : liste des ACTEURS participants (personnes ou groupes), chacun avec :
-  - role_name : nom du rôle/acteur
-  - invitation_delay_days : délai d'invitation en jours avant la réunion
-  - form_questions : liste de questions du formulaire de collecte pour CE rôle, chacune avec :
-    - id : identifiant unique (ex: "q1", "q2"...)
-    - label : texte de la question
-    - type : "textarea" ou "text"
-    - required : true ou false
-    - options : [] (vide)
+- name : nom court du template
+- description : description du workflow
+- steps : liste ordonnée des étapes, chacune avec :
+  - step_type : un des types ci-dessus
+  - label : nom affiché de l'étape (ex: "Création de l'ODJ")
+  - description : description optionnelle
+  - config : configuration spécifique au type (voir ci-dessus)
+  - is_required : true ou false
 
-IMPORTANT : Retourne UNIQUEMENT du JSON valide, sans commentaire, sans markdown, sans texte avant ou après.
-Le JSON doit être un tableau contenant UN SEUL template : [{"name": ..., "description": ..., "roles": [...]}]"""
+IMPORTANT : Retourne UNIQUEMENT du JSON valide, sans commentaire, sans markdown.
+Le JSON doit être un tableau contenant UN SEUL template :
+[{"name": "...", "description": "...", "steps": [...]}]"""
 
 
 class WorkflowGenerateRequest(BaseModel):
@@ -437,8 +463,21 @@ def generate_workflow(
     if isinstance(templates, dict):
         templates = [templates]
 
-    # Assign unique IDs to questions if missing
+    # Assign unique IDs to form fields/questions if missing
     for tpl in templates:
+        # New steps format
+        for step in tpl.get("steps", []):
+            config = step.get("config", {}) or {}
+            # Form fields
+            for i, f in enumerate(config.get("fields", [])):
+                if not f.get("id"):
+                    f["id"] = f"f{i+1}_{uuid.uuid4().hex[:6]}"
+            # Collect_responses roles
+            for role in config.get("roles", []):
+                for i, q in enumerate(role.get("form_questions", [])):
+                    if not q.get("id"):
+                        q["id"] = f"q{i+1}_{uuid.uuid4().hex[:6]}"
+        # Legacy roles format (backward compat)
         for role in tpl.get("roles", []):
             for i, q in enumerate(role.get("form_questions", [])):
                 if not q.get("id"):
@@ -723,6 +762,16 @@ def provision_tenant(
                     order_index=role.order_index,
                     invitation_delay_days=role.invitation_delay_days,
                     form_questions=role.form_questions,
+                ))
+            for step in (st.steps or []):
+                db.add(ProcedureTemplateStep(
+                    template_id=proc_tmpl.id,
+                    order_index=step.order_index,
+                    step_type=step.step_type,
+                    label=step.label,
+                    description=step.description,
+                    config=step.config,
+                    is_required=step.is_required,
                 ))
             created_proc_templates.append({"id": proc_tmpl.id, "name": proc_tmpl.name})
     else:

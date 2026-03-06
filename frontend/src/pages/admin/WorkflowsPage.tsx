@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { useSectors } from "../../api/hooks/useSectors";
-import type { FormQuestion, ProcedureTemplateRole } from "../../api/types";
-import { Settings2, Plus, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2 } from "lucide-react";
+import type { FormQuestion, ProcedureTemplateRole, StepType } from "../../api/types";
+import { Settings2, Plus, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2, FileText, Users, Mail, ClipboardList, Upload, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,16 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
+interface TemplateStep {
+  id?: string;
+  order_index: number;
+  step_type: StepType;
+  label: string;
+  description?: string | null;
+  config?: Record<string, unknown> | null;
+  is_required?: boolean;
+}
+
 interface SectorTemplate {
   id: string;
   name: string;
@@ -25,11 +35,33 @@ interface SectorTemplate {
   created_at: string;
   updated_at: string;
   roles: ProcedureTemplateRole[];
+  steps: TemplateStep[];
+}
+
+const STEP_TYPES: { value: StepType; label: string; icon: typeof FileText }[] = [
+  { value: "form", label: "Formulaire", icon: FileText },
+  { value: "select_contacts", label: "Sélection contacts", icon: Users },
+  { value: "send_email", label: "Envoi email", icon: Mail },
+  { value: "collect_responses", label: "Collecte réponses", icon: ClipboardList },
+  { value: "upload_document", label: "Upload document", icon: Upload },
+  { value: "generate_document", label: "Génération IA", icon: Sparkles },
+  { value: "manual", label: "Validation manuelle", icon: CheckSquare },
+];
+
+function stepIcon(type: StepType) {
+  const found = STEP_TYPES.find((s) => s.value === type);
+  return found ? found.icon : FileText;
+}
+
+function stepLabel(type: StepType) {
+  return STEP_TYPES.find((s) => s.value === type)?.label ?? type;
 }
 
 const QUESTION_TYPES = [
   { value: "textarea", label: "Texte long" },
   { value: "text", label: "Texte court" },
+  { value: "date", label: "Date" },
+  { value: "file", label: "Fichier" },
 ];
 
 function useSectorTemplates(sector: string) {
@@ -60,7 +92,8 @@ function useDeleteSectorTemplate(sector: string) {
 interface GeneratedTemplate {
   name: string;
   description?: string | null;
-  roles: { role_name: string; invitation_delay_days: number; form_questions: FormQuestion[] }[];
+  roles?: { role_name: string; invitation_delay_days: number; form_questions: FormQuestion[] }[];
+  steps?: { step_type: StepType; label: string; description?: string; config?: Record<string, unknown>; is_required?: boolean }[];
 }
 
 // ── Template manager for a sector ───────────────────────────────────────────
@@ -100,7 +133,8 @@ function SectorTemplateManager({ sector }: { sector: string }) {
       await createTemplate.mutateAsync({
         name: tpl.name,
         description: tpl.description || null,
-        roles: tpl.roles,
+        roles: tpl.roles || [],
+        steps: tpl.steps || [],
       });
     }
     setGenerateOpen(false);
@@ -111,6 +145,19 @@ function SectorTemplateManager({ sector }: { sector: string }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [roles, setRoles] = useState<Omit<ProcedureTemplateRole, "id">[]>([]);
+  const [steps, setSteps] = useState<Omit<TemplateStep, "id">[]>([]);
+
+  function addStep(type: StepType = "form") {
+    setSteps([...steps, { order_index: steps.length, step_type: type, label: "", config: {} }]);
+  }
+
+  function updateStep(idx: number, field: string, value: unknown) {
+    setSteps(steps.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+  }
+
+  function removeStep(idx: number) {
+    setSteps(steps.filter((_, i) => i !== idx).map((s, i) => ({ ...s, order_index: i })));
+  }
 
   function addRole() {
     setRoles([...roles, { role_name: "", order_index: roles.length, form_questions: [], invitation_delay_days: 15 }]);
@@ -140,9 +187,9 @@ function SectorTemplateManager({ sector }: { sector: string }) {
 
   async function handleCreate() {
     if (!name.trim()) return;
-    await createTemplate.mutateAsync({ name: name.trim(), description: description.trim() || null, roles });
+    await createTemplate.mutateAsync({ name: name.trim(), description: description.trim() || null, roles, steps });
     setCreateOpen(false);
-    setName(""); setDescription(""); setRoles([]);
+    setName(""); setDescription(""); setRoles([]); setSteps([]);
   }
 
   if (isLoading) {
@@ -178,7 +225,7 @@ function SectorTemplateManager({ sector }: { sector: string }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{tpl.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {tpl.roles.length} rôle(s)
+                    {tpl.steps?.length ? `${tpl.steps.length} étape(s)` : `${tpl.roles.length} rôle(s)`}
                     {tpl.description && ` · ${tpl.description}`}
                   </p>
                 </div>
@@ -198,7 +245,29 @@ function SectorTemplateManager({ sector }: { sector: string }) {
               </div>
               {expandedId === tpl.id && (
                 <div className="border-t border-border px-4 py-3 space-y-2">
-                  {tpl.roles.map((role) => (
+                  {/* Steps */}
+                  {tpl.steps?.length > 0 && (
+                    <div className="space-y-1.5">
+                      {tpl.steps.map((step, idx) => {
+                        const Icon = stepIcon(step.step_type as StepType);
+                        return (
+                          <div key={step.id ?? idx} className="flex items-start gap-2">
+                            <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                              <span className="text-xs text-muted-foreground font-mono w-5">{idx + 1}.</span>
+                              <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">{step.label}</p>
+                              <p className="text-xs text-muted-foreground">{stepLabel(step.step_type as StepType)}</p>
+                              {step.description && <p className="text-xs text-muted-foreground">{step.description}</p>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Legacy roles */}
+                  {(!tpl.steps || tpl.steps.length === 0) && tpl.roles.map((role) => (
                     <div key={role.id} className="bg-muted rounded p-3 space-y-1">
                       <p className="text-sm font-medium">{role.role_name}</p>
                       <p className="text-xs text-muted-foreground">
@@ -235,9 +304,108 @@ function SectorTemplateManager({ sector }: { sector: string }) {
               <Textarea value={description} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)} rows={2} />
             </div>
 
+            {/* Steps section */}
             <div className="border-t border-border pt-4 space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold">Rôles participants</p>
+                <p className="text-sm font-semibold">Étapes du workflow</p>
+                <Select onValueChange={(v) => addStep(v as StepType)}>
+                  <SelectTrigger className="w-48 h-8 text-xs">
+                    <SelectValue placeholder="+ Ajouter une étape" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STEP_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        <span className="flex items-center gap-2">
+                          <t.icon className="w-3.5 h-3.5" />
+                          {t.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {steps.map((step, si) => {
+                const Icon = stepIcon(step.step_type);
+                return (
+                  <div key={si} className="border border-border rounded-lg p-3 space-y-2">
+                    <div className="flex gap-2 items-center">
+                      <span className="text-xs text-muted-foreground font-mono w-5">{si + 1}.</span>
+                      <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <Input
+                        className="flex-1 h-8 text-sm"
+                        value={step.label}
+                        onChange={(e) => updateStep(si, "label", e.target.value)}
+                        placeholder={`Nom de l'étape (${stepLabel(step.step_type)})`}
+                      />
+                      <Badge variant="secondary" className="text-[10px] shrink-0">{stepLabel(step.step_type)}</Badge>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeStep(si)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                    {/* Form step: add fields */}
+                    {step.step_type === "form" && (
+                      <div className="pl-7 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs">Champs du formulaire</Label>
+                          <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => {
+                            const fields = ((step.config as Record<string, unknown>)?.fields as unknown[] || []) as { id: string; label: string; type: string; required: boolean }[];
+                            updateStep(si, "config", { ...step.config, fields: [...fields, { id: crypto.randomUUID(), label: "", type: "text", required: false }] });
+                          }}>
+                            <Plus className="w-3 h-3 mr-1" /> Champ
+                          </Button>
+                        </div>
+                        {(((step.config as Record<string, unknown>)?.fields as { id: string; label: string; type: string; required: boolean }[]) || []).map((field, fi) => (
+                          <div key={field.id} className="flex gap-2 items-center bg-muted rounded p-1.5">
+                            <Input className="flex-1 h-7 text-xs" value={field.label} onChange={(e) => {
+                              const fields = [...(((step.config as Record<string, unknown>)?.fields as unknown[]) || [])] as { id: string; label: string; type: string; required: boolean }[];
+                              fields[fi] = { ...fields[fi], label: e.target.value };
+                              updateStep(si, "config", { ...step.config, fields });
+                            }} placeholder="Libellé du champ" />
+                            <Select value={field.type} onValueChange={(v) => {
+                              const fields = [...(((step.config as Record<string, unknown>)?.fields as unknown[]) || [])] as { id: string; label: string; type: string; required: boolean }[];
+                              fields[fi] = { ...fields[fi], type: v };
+                              updateStep(si, "config", { ...step.config, fields });
+                            }}>
+                              <SelectTrigger className="w-28 h-7 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {QUESTION_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => {
+                              const fields = (((step.config as Record<string, unknown>)?.fields as unknown[]) || []).filter((_, i) => i !== fi);
+                              updateStep(si, "config", { ...step.config, fields });
+                            }}>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Send email step: subject/body templates */}
+                    {step.step_type === "send_email" && (
+                      <div className="pl-7 space-y-1.5">
+                        <Input className="h-7 text-xs" value={(step.config as Record<string, string>)?.subject_template ?? ""} onChange={(e) => updateStep(si, "config", { ...step.config, subject_template: e.target.value })} placeholder="Objet de l'email (ex: Convocation - {titre})" />
+                        <Textarea className="text-xs min-h-[60px]" value={(step.config as Record<string, string>)?.body_template ?? ""} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateStep(si, "config", { ...step.config, body_template: e.target.value })} placeholder="Corps de l'email..." />
+                      </div>
+                    )}
+                    {/* Manual step: instructions */}
+                    {step.step_type === "manual" && (
+                      <div className="pl-7">
+                        <Input className="h-7 text-xs" value={(step.config as Record<string, string>)?.instructions ?? ""} onChange={(e) => updateStep(si, "config", { ...step.config, instructions: e.target.value })} placeholder="Instructions pour cette étape" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {steps.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-2">Ajoutez des étapes pour créer un workflow séquentiel</p>
+              )}
+            </div>
+
+            {/* Legacy roles section */}
+            <div className="border-t border-border pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold">Rôles participants <span className="font-normal text-muted-foreground">(optionnel, mode legacy)</span></p>
                 <Button size="sm" variant="outline" onClick={addRole}>
                   <Plus className="w-3.5 h-3.5 mr-1" /> Ajouter un rôle
                 </Button>
@@ -343,7 +511,27 @@ function SectorTemplateManager({ sector }: { sector: string }) {
                     <p className="text-sm font-bold">{tpl.name}</p>
                     {tpl.description && <p className="text-xs text-muted-foreground">{tpl.description}</p>}
                   </div>
-                  {tpl.roles.map((role, ri) => (
+                  {/* Steps */}
+                  {tpl.steps && tpl.steps.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Étapes</p>
+                      {tpl.steps.map((step, si) => {
+                        const Icon = stepIcon(step.step_type);
+                        return (
+                          <div key={si} className="flex items-start gap-2 bg-muted rounded p-2">
+                            <span className="text-xs text-muted-foreground font-mono w-5 mt-0.5">{si + 1}.</span>
+                            <Icon className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">{step.label}</p>
+                              <p className="text-xs text-muted-foreground">{stepLabel(step.step_type)}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Legacy roles */}
+                  {tpl.roles && tpl.roles.map((role, ri) => (
                     <div key={ri} className="bg-muted rounded p-3 space-y-1">
                       <p className="text-sm font-medium">{role.role_name}</p>
                       <p className="text-xs text-muted-foreground">

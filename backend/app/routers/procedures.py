@@ -18,7 +18,8 @@ from app.database import get_db
 from app.deps import get_current_user, require_module, require_super_admin
 from app.models.procedures import (
     Procedure, ProcedureParticipant, ProcedureTemplate,
-    ProcedureTemplateRole, ProcedureStatus,
+    ProcedureTemplateRole, ProcedureTemplateStep,
+    ProcedureStepInstance, ProcedureStatus, StepStatus,
 )
 from app.models.user import User
 from app.schemas.procedures import (
@@ -26,6 +27,7 @@ from app.schemas.procedures import (
     ProcedureCreate, ProcedureDetailResponse, ProcedureListResponse,
     ProcedureTemplateCreate, ProcedureTemplateResponse, ProcedureTemplateUpdate,
     ProcedureUpdate, PublicFormResponse, TemplateRoleCreate, TemplateRoleResponse,
+    TemplateStepResponse, StepInstanceResponse, StepActionRequest,
 )
 from app.models.ai_documents import AIDocument, AIDocumentTemplate
 from app.services.ai_documents import enqueue_generation
@@ -85,22 +87,50 @@ def _to_detail(proc: Procedure) -> ProcedureDetailResponse:
         document_template_id=proc.document_template_id,
         source_session_id=proc.source_session_id,
         ai_document_id=proc.ai_document_id,
+        current_step_index=proc.current_step_index,
         created_at=proc.created_at,
         updated_at=proc.updated_at,
         participants=[_to_participant(p) for p in proc.participants],
+        steps=[_to_step_instance_response(si) for si in (proc.step_instances or [])],
     )
 
 
 def _get_procedure(db: Session, procedure_id: str, tenant_id: str) -> Procedure:
     proc = (
         db.query(Procedure)
-        .options(joinedload(Procedure.participants))
+        .options(joinedload(Procedure.participants), joinedload(Procedure.step_instances))
         .filter(Procedure.id == procedure_id, Procedure.tenant_id == tenant_id)
         .first()
     )
     if not proc:
         raise HTTPException(status_code=404, detail="Procédure introuvable")
     return proc
+
+
+def _to_step_response(step: ProcedureTemplateStep) -> TemplateStepResponse:
+    return TemplateStepResponse(
+        id=step.id,
+        order_index=step.order_index,
+        step_type=step.step_type,
+        label=step.label,
+        description=step.description,
+        config=json.loads(step.config) if step.config else None,
+        is_required=step.is_required,
+    )
+
+
+def _to_step_instance_response(si: ProcedureStepInstance) -> StepInstanceResponse:
+    return StepInstanceResponse(
+        id=si.id,
+        order_index=si.order_index,
+        step_type=si.step_type,
+        label=si.label,
+        description=si.description,
+        config=json.loads(si.config) if si.config else None,
+        status=si.status,
+        data=json.loads(si.data) if si.data else None,
+        completed_at=si.completed_at,
+    )
 
 
 def _to_template_response(tpl: ProcedureTemplate) -> ProcedureTemplateResponse:
@@ -122,6 +152,7 @@ def _to_template_response(tpl: ProcedureTemplate) -> ProcedureTemplateResponse:
             )
             for r in tpl.roles
         ],
+        steps=[_to_step_response(s) for s in (tpl.steps or [])],
     )
 
 
@@ -140,7 +171,7 @@ def list_templates(
     tid = _resolve_tenant_id(user, tenant_id)
     templates = (
         db.query(ProcedureTemplate)
-        .options(joinedload(ProcedureTemplate.roles))
+        .options(joinedload(ProcedureTemplate.roles), joinedload(ProcedureTemplate.steps))
         .filter(ProcedureTemplate.tenant_id == tid)
         .order_by(ProcedureTemplate.created_at.desc())
         .all()
@@ -177,6 +208,16 @@ def create_template(
             form_questions=_dump_questions(role.form_questions),
             invitation_delay_days=role.invitation_delay_days,
         ))
+    for i, step in enumerate(body.steps):
+        db.add(ProcedureTemplateStep(
+            template_id=tpl.id,
+            order_index=i,
+            step_type=step.step_type,
+            label=step.label,
+            description=step.description,
+            config=json.dumps(step.config, ensure_ascii=False) if step.config else None,
+            is_required=step.is_required,
+        ))
     log_action(db, "create_procedure_template", user_id=user.id, tenant_id=tid,
                resource="procedure_template", details={"name": body.name})
     db.commit()
@@ -197,7 +238,7 @@ def update_template(
 ):
     tpl = (
         db.query(ProcedureTemplate)
-        .options(joinedload(ProcedureTemplate.roles))
+        .options(joinedload(ProcedureTemplate.roles), joinedload(ProcedureTemplate.steps))
         .filter(ProcedureTemplate.id == template_id)
         .first()
     )
@@ -346,17 +387,33 @@ def create_procedure(
     db.add(proc)
     db.flush()
 
-    # Si créée depuis un template, pré-peupler les rôles comme participants vides
+    # Si créée depuis un template, copier les steps et/ou les paramètres
     if body.template_id:
         tpl = (
             db.query(ProcedureTemplate)
-            .options(joinedload(ProcedureTemplate.roles))
+            .options(joinedload(ProcedureTemplate.roles), joinedload(ProcedureTemplate.steps))
             .filter(ProcedureTemplate.id == body.template_id, ProcedureTemplate.tenant_id == user.tenant_id)
             .first()
         )
         if tpl:
             if not proc.document_template_id and tpl.document_template_id:
                 proc.document_template_id = tpl.document_template_id
+
+            # Copier les étapes du template → step instances
+            if tpl.steps:
+                for step in tpl.steps:
+                    db.add(ProcedureStepInstance(
+                        procedure_id=proc.id,
+                        template_step_id=step.id,
+                        order_index=step.order_index,
+                        step_type=step.step_type,
+                        label=step.label,
+                        description=step.description,
+                        config=step.config,
+                        status=StepStatus.PENDING,
+                    ))
+                proc.current_step_index = 0
+                proc.status = ProcedureStatus.DRAFT
 
     log_action(db, "create_procedure", user_id=user.id, tenant_id=user.tenant_id,
                resource="procedure", details={"title": body.title})
@@ -487,6 +544,87 @@ def send_invitations(
     proc.status = ProcedureStatus.COLLECTING
     log_action(db, "send_invitations", user_id=user.id, tenant_id=user.tenant_id,
                resource="procedure", resource_id=procedure_id)
+    db.commit()
+    db.refresh(proc)
+    return _to_detail(proc)
+
+
+# ── Step actions ─────────────────────────────────────────────────────────────
+
+@router.post(
+    "/{procedure_id}/steps/{step_id}/complete",
+    response_model=ProcedureDetailResponse,
+    dependencies=[Depends(require_module("procedures"))],
+)
+def complete_step(
+    procedure_id: str,
+    step_id: str,
+    body: StepActionRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Complète une étape de procédure avec les données fournies."""
+    proc = _get_procedure(db, procedure_id, user.tenant_id)
+    step = db.query(ProcedureStepInstance).filter_by(
+        id=step_id, procedure_id=procedure_id,
+    ).first()
+    if not step:
+        raise HTTPException(status_code=404, detail="Étape introuvable")
+    if step.status == StepStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Cette étape est déjà terminée")
+
+    now = datetime.now(timezone.utc)
+
+    # Sauvegarder les données de l'étape
+    step.data = json.dumps(body.data, ensure_ascii=False) if body.data else None
+    step.status = StepStatus.COMPLETED
+    step.completed_at = now
+
+    # Avancer à l'étape suivante
+    next_steps = [
+        s for s in proc.step_instances
+        if s.order_index > step.order_index and s.status == StepStatus.PENDING
+    ]
+    if next_steps:
+        next_step = next_steps[0]
+        next_step.status = StepStatus.ACTIVE
+        proc.current_step_index = next_step.order_index
+        proc.status = ProcedureStatus.IN_PROGRESS
+    else:
+        # Toutes les étapes sont terminées
+        proc.current_step_index = None
+        proc.status = ProcedureStatus.DONE
+
+    log_action(db, "complete_step", user_id=user.id, tenant_id=user.tenant_id,
+               resource="procedure_step", resource_id=step_id,
+               details={"step_type": step.step_type, "label": step.label})
+    db.commit()
+    db.refresh(proc)
+    return _to_detail(proc)
+
+
+@router.post(
+    "/{procedure_id}/steps/start",
+    response_model=ProcedureDetailResponse,
+    dependencies=[Depends(require_module("procedures"))],
+)
+def start_workflow(
+    procedure_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Démarre le workflow : active la première étape."""
+    proc = _get_procedure(db, procedure_id, user.tenant_id)
+    if not proc.step_instances:
+        raise HTTPException(status_code=400, detail="Cette procédure n'a pas d'étapes")
+
+    first_step = sorted(proc.step_instances, key=lambda s: s.order_index)[0]
+    if first_step.status != StepStatus.PENDING:
+        raise HTTPException(status_code=400, detail="Le workflow est déjà démarré")
+
+    first_step.status = StepStatus.ACTIVE
+    proc.current_step_index = 0
+    proc.status = ProcedureStatus.IN_PROGRESS
     db.commit()
     db.refresh(proc)
     return _to_detail(proc)

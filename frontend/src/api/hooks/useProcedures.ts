@@ -64,7 +64,7 @@ export function useProcedures() {
     queryFn: () => api.get<ProcedureListItem[]>("/procedures"),
     refetchInterval: (query) => {
       const items = query.state.data as ProcedureListItem[] | undefined;
-      const hasActive = items?.some((p) => p.status === "collecting" || p.status === "generating");
+      const hasActive = items?.some((p) => p.status === "collecting" || p.status === "generating" || p.status === "in_progress");
       return hasActive ? 5000 : false;
     },
   });
@@ -144,6 +144,32 @@ export function useSendInvitations(procedureId: string) {
   return useMutation({
     mutationFn: () =>
       api.post<Procedure>(`/procedures/${procedureId}/send-invitations`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.procedures });
+      qc.invalidateQueries({ queryKey: KEYS.procedure(procedureId) });
+    },
+  });
+}
+
+// ── Steps ────────────────────────────────────────────────────────────────────
+
+export function useStartWorkflow(procedureId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<Procedure>(`/procedures/${procedureId}/steps/start`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.procedures });
+      qc.invalidateQueries({ queryKey: KEYS.procedure(procedureId) });
+    },
+  });
+}
+
+export function useCompleteStep(procedureId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ stepId, data }: { stepId: string; data: Record<string, unknown> }) =>
+      api.post<Procedure>(`/procedures/${procedureId}/steps/${stepId}/complete`, { data }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.procedures });
       qc.invalidateQueries({ queryKey: KEYS.procedure(procedureId) });

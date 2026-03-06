@@ -470,7 +470,10 @@ export const AVAILABLE_MODULES: ModuleDefinition[] = [
 
 // ── Procédures ────────────────────────────────────────────────────────────────
 
-export type ProcedureStatus = "draft" | "collecting" | "scheduled" | "meeting" | "generating" | "done";
+export type ProcedureStatus = "draft" | "in_progress" | "collecting" | "scheduled" | "meeting" | "generating" | "done";
+
+export type StepType = "form" | "select_contacts" | "send_email" | "collect_responses" | "generate_document" | "upload_document" | "manual";
+export type StepStatus = "pending" | "active" | "completed" | "skipped";
 
 export interface FormQuestion {
   id: string;
@@ -488,6 +491,16 @@ export interface ProcedureTemplateRole {
   invitation_delay_days: number;
 }
 
+export interface ProcedureTemplateStep {
+  id: string;
+  order_index: number;
+  step_type: StepType;
+  label: string;
+  description: string | null;
+  config: Record<string, unknown> | null;
+  is_required: boolean;
+}
+
 export interface ProcedureTemplate {
   id: string;
   name: string;
@@ -497,6 +510,15 @@ export interface ProcedureTemplate {
   created_at: string;
   updated_at: string;
   roles: ProcedureTemplateRole[];
+  steps: ProcedureTemplateStep[];
+}
+
+export interface ProcedureTemplateStepCreate {
+  step_type: StepType;
+  label: string;
+  description?: string | null;
+  config?: Record<string, unknown> | null;
+  is_required?: boolean;
 }
 
 export interface ProcedureTemplateCreate {
@@ -504,6 +526,7 @@ export interface ProcedureTemplateCreate {
   description?: string | null;
   document_template_id?: string | null;
   roles: Omit<ProcedureTemplateRole, "id">[];
+  steps?: ProcedureTemplateStepCreate[];
 }
 
 export interface ProcedureTemplateUpdate {
@@ -538,6 +561,18 @@ export interface ProcedureListItem {
   updated_at: string;
 }
 
+export interface ProcedureStepInstance {
+  id: string;
+  order_index: number;
+  step_type: StepType;
+  label: string;
+  description: string | null;
+  config: Record<string, unknown> | null;
+  status: StepStatus;
+  data: Record<string, unknown> | null;
+  completed_at: string | null;
+}
+
 export interface Procedure {
   id: string;
   title: string;
@@ -548,9 +583,11 @@ export interface Procedure {
   document_template_id: string | null;
   source_session_id: string | null;
   ai_document_id: string | null;
+  current_step_index: number | null;
   created_at: string;
   updated_at: string;
   participants: ProcedureParticipant[];
+  steps: ProcedureStepInstance[];
 }
 
 export interface ProcedureCreate {
