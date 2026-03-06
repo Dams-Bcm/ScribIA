@@ -73,13 +73,14 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
   const handleMouseUp = useCallback((e: MouseEvent) => {
     if (mode !== "enroll") return;
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) {
-      if (!e.shiftKey) setEnrollSegIds([]);
-      return;
-    }
-
     const container = segmentsContainerRef.current;
     if (!container) return;
+
+    // Only clear selection when clicking inside the segments container (not on toolbar buttons)
+    if (!sel || sel.isCollapsed) {
+      if (!e.shiftKey && container.contains(e.target as Node)) setEnrollSegIds([]);
+      return;
+    }
 
     const range = sel.getRangeAt(0);
     const segElements = container.querySelectorAll("[data-seg-id]");
@@ -351,6 +352,20 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
         </div>
       )}
 
+      {/* Hide Chrome blue selection highlight in enroll mode, show purple underline instead */}
+      {mode === "enroll" && (
+        <style>{`
+          .enroll-segments *::selection {
+            background: transparent !important;
+            color: inherit !important;
+          }
+          .enroll-segments *::-moz-selection {
+            background: transparent !important;
+            color: inherit !important;
+          }
+        `}</style>
+      )}
+
       {/* Two-column layout: speakers + segments */}
       <div className="flex gap-4">
         {/* Speaker panel */}
@@ -359,7 +374,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
         </div>
 
         {/* Segments */}
-        <div ref={segmentsContainerRef} className="flex-1 space-y-1 max-h-[60vh] overflow-y-auto">
+        <div ref={segmentsContainerRef} className={`flex-1 space-y-1 max-h-[60vh] overflow-y-auto ${mode === "enroll" ? "enroll-segments" : ""}`}>
           {isAdmin && mode === "normal" && (
             <p className="text-xs text-muted-foreground mb-2">
               Cliquez sur les segments pour les selectionner (Shift+clic pour une plage).
@@ -384,7 +399,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
                 data-seg-id={seg.id}
                 className={`flex gap-2 py-2 pl-3 rounded-r-lg transition-colors ${
                   isEnrollHighlighted
-                    ? "bg-purple-100 border-l-4 border-purple-500 ring-2 ring-purple-300"
+                    ? "bg-purple-50 border-l-4 border-purple-500"
                     : isSelected
                       ? "bg-primary/10 ring-1 ring-primary/30 border-l-4 " + color.border
                       : isPlaying
@@ -420,7 +435,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
                     {formatTime(seg.start_time)}
                   </span>
                 </div>
-                <p className="text-sm leading-relaxed flex-1">{seg.text}</p>
+                <p className={`text-sm leading-relaxed flex-1 ${isEnrollHighlighted ? "underline decoration-purple-500 decoration-2 underline-offset-4" : ""}`}>{seg.text}</p>
               </div>
             );
           })}
