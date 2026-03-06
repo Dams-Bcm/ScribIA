@@ -64,6 +64,7 @@ def _to_contact_response(c: Contact, speaker_profile=None) -> ContactResponse:
         role=c.role,
         custom_fields=_parse_json(c.custom_fields),
         created_at=c.created_at,
+        speaker_profile_id=speaker_profile.id if speaker_profile else None,
         consent_status=speaker_profile.consent_status if speaker_profile else None,
         consent_type=speaker_profile.consent_type if speaker_profile else None,
         enrollment_status=speaker_profile.enrollment_status if speaker_profile else None,

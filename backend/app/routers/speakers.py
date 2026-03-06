@@ -381,6 +381,31 @@ def enroll_contact_from_diarisation(
     return profile
 
 
+@router.delete("/{profile_id}/enrollment", status_code=200)
+def reset_enrollment(
+    profile_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    """Reset enrollment: clear embedding and enrollment status."""
+    from app.models.speaker import SpeakerEnrollmentSegment
+
+    profile = _get_profile_or_404(profile_id, user, db)
+
+    profile.embedding = None
+    profile.enrollment_status = None
+    profile.enrollment_method = None
+    profile.enrolled_at = None
+
+    # Remove enrollment segments
+    db.query(SpeakerEnrollmentSegment).filter(
+        SpeakerEnrollmentSegment.speaker_profile_id == profile.id
+    ).delete()
+
+    db.commit()
+    return {"message": f"Enrollment de '{profile.display_name}' réinitialisé"}
+
+
 @router.post("/{profile_id}/send-consent", response_model=SpeakerProfileResponse)
 def send_consent_email(
     profile_id: str,

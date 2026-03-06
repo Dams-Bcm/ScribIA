@@ -11,6 +11,7 @@ import {
   ShieldX,
   Send,
   Mic,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +21,7 @@ import {
   useDeleteContactGroup,
   useAddContact,
   useDeleteContact,
+  useResetEnrollment,
 } from "@/api/hooks/useContacts";
 import type { ContactGroupCreate, ContactCreate } from "@/api/types";
 
@@ -150,6 +152,7 @@ function EnrollmentBadge({ status }: { status: string | null }) {
 function GroupDetail({ groupId, onBack }: { groupId: string; onBack: () => void }) {
   const { data: group, isLoading } = useContactGroup(groupId);
   const deleteContact = useDeleteContact();
+  const resetEnrollment = useResetEnrollment();
   const [showAdd, setShowAdd] = useState(false);
 
   if (isLoading || !group) {
@@ -205,7 +208,24 @@ function GroupDetail({ groupId, onBack }: { groupId: string; onBack: () => void 
                   <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{c.phone ?? "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{c.role ?? "—"}</td>
                   <td className="px-4 py-3 hidden lg:table-cell"><ConsentBadge status={c.consent_status} type={c.consent_type} /></td>
-                  <td className="px-4 py-3 hidden lg:table-cell"><EnrollmentBadge status={c.enrollment_status} /></td>
+                  <td className="px-4 py-3 hidden lg:table-cell">
+                    <div className="flex items-center gap-1">
+                      <EnrollmentBadge status={c.enrollment_status} />
+                      {c.enrollment_status && c.speaker_profile_id && (
+                        <button
+                          onClick={() => {
+                            if (!confirm(`Réinitialiser l'enrollment de ${c.name} ?`)) return;
+                            resetEnrollment.mutate(c.speaker_profile_id!);
+                          }}
+                          className="text-muted-foreground hover:text-orange-600 transition-colors"
+                          title="Réinitialiser l'enrollment"
+                          disabled={resetEnrollment.isPending}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     <button
                       onClick={() => deleteContact.mutate({ groupId, contactId: c.id })}

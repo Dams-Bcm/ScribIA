@@ -94,6 +94,19 @@ export function useUpdateContact() {
   });
 }
 
+export function useResetEnrollment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (profileId: string) =>
+      api.delete(`/speakers/${profileId}/enrollment`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["contacts"] });
+      qc.invalidateQueries({ queryKey: ["admin", "speakers"] });
+      qc.invalidateQueries({ queryKey: ["speakers", "contacts-for-enrollment"] });
+    },
+  });
+}
+
 export function useDeleteContact() {
   const qc = useQueryClient();
   return useMutation({

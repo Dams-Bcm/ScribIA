@@ -674,6 +674,7 @@ export interface Contact {
   role: string | null;
   custom_fields: Record<string, unknown> | null;
   created_at: string;
+  speaker_profile_id: string | null;
   consent_status: string | null;
   consent_type: string | null;
   enrollment_status: string | null;
