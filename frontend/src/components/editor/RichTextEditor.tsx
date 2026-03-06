@@ -31,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ApplyDictionaryButton } from "@/components/dictionary/ApplyDictionaryButton";
 import { useCreateRule } from "@/api/hooks/useDictionary";
 
 interface Props {
@@ -42,6 +43,8 @@ interface Props {
   onExport?: (format: "pdf" | "docx") => void;
   /** Mode lecture seule */
   readOnly?: boolean;
+  /** Dictionary apply config (shows "Appliquer le dictionnaire" button) */
+  dictionary?: { targetType: "transcription" | "ai_document"; targetId: string };
 }
 
 const slashCommands = [
@@ -54,7 +57,7 @@ const slashCommands = [
   { title: "Separateur", description: "Ligne horizontale", icon: Minus, command: ({ editor }: { editor: EditorInstance }) => editor.chain().focus().setHorizontalRule().run() },
 ];
 
-export function RichTextEditor({ initialContent, onSave, onExport, readOnly = false }: Props) {
+export function RichTextEditor({ initialContent, onSave, onExport, readOnly = false, dictionary }: Props) {
   const [dirty, setDirty] = useState(false);
   const editorRef = useRef<EditorInstance | null>(null);
   const [dictPopover, setDictPopover] = useState<{ original: string; replacement: string } | null>(null);
@@ -95,6 +98,13 @@ export function RichTextEditor({ initialContent, onSave, onExport, readOnly = fa
                 <Download className="w-3.5 h-3.5 mr-1" /> DOCX
               </Button>
             </>
+          )}
+          {dictionary && (
+            <ApplyDictionaryButton
+              targetType={dictionary.targetType}
+              targetId={dictionary.targetId}
+              previewText={() => editorRef.current?.getText() ?? ""}
+            />
           )}
         </div>
       )}

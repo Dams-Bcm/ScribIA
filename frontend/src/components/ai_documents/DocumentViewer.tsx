@@ -1,7 +1,6 @@
 import { Loader2, XCircle } from "lucide-react";
 import { useAIDocument, useUpdateAIDocument } from "@/api/hooks/useAIDocuments";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
-import { ApplyDictionaryButton } from "@/components/dictionary/ApplyDictionaryButton";
 
 interface Props {
   docId: string;
@@ -22,7 +21,7 @@ function downloadBlob(url: string, filename: string) {
 }
 
 export function DocumentViewer({ docId }: Props) {
-  const { data: doc, isLoading } = useAIDocument(docId);
+  const { data: doc, isLoading, dataUpdatedAt } = useAIDocument(docId);
   const updateDoc = useUpdateAIDocument();
 
   if (isLoading || !doc) {
@@ -87,20 +86,13 @@ export function DocumentViewer({ docId }: Props) {
       )}
 
       {doc.status === "completed" && doc.result_text && (
-        <>
-          <div className="flex justify-end">
-            <ApplyDictionaryButton
-              targetType="ai_document"
-              targetId={docId}
-              previewText={doc.result_text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()}
-            />
-          </div>
-          <RichTextEditor
-            initialContent={doc.result_text}
-            onSave={handleSave}
-            onExport={handleExport}
-          />
-        </>
+        <RichTextEditor
+          key={dataUpdatedAt}
+          initialContent={doc.result_text}
+          onSave={handleSave}
+          onExport={handleExport}
+          dictionary={{ targetType: "ai_document", targetId: docId }}
+        />
       )}
     </div>
   );
