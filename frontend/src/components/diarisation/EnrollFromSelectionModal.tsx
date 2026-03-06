@@ -2,7 +2,7 @@ import { useState } from "react";
 import { X, UserPlus, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useSpeakers, useEnrollFromSegment } from "@/api/hooks/useSpeakers";
+import { useContactsForEnrollment, useEnrollFromSegment } from "@/api/hooks/useSpeakers";
 import { ApiError } from "@/api/client";
 import type { DiarisationSegment } from "@/api/types";
 
@@ -20,11 +20,11 @@ function formatTime(seconds: number): string {
 }
 
 export function EnrollFromSelectionModal({ segments, jobId, onClose, onSuccess }: Props) {
-  const { data: profiles = [], isLoading: loadingProfiles } = useSpeakers();
+  const { data: contacts = [], isLoading: loadingContacts } = useContactsForEnrollment();
   const enroll = useEnrollFromSegment();
 
   const [mode, setMode] = useState<"existing" | "create">("existing");
-  const [selectedProfileId, setSelectedProfileId] = useState("");
+  const [selectedContactId, setSelectedContactId] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [fonction, setFonction] = useState("");
@@ -41,7 +41,14 @@ export function EnrollFromSelectionModal({ segments, jobId, onClose, onSuccess }
     try {
       const body =
         mode === "existing"
-          ? { start_time: startTime, end_time: endTime, speaker_profile_id: selectedProfileId }
+          ? (() => {
+              const contact = contacts.find((c) => c.id === selectedContactId);
+              if (contact?.speaker_profile?.profile_id) {
+                return { start_time: startTime, end_time: endTime, speaker_profile_id: contact.speaker_profile.profile_id };
+              }
+              const parts = (contact?.name ?? "").split(" ", 2);
+              return { start_time: startTime, end_time: endTime, first_name: parts[0], last_name: parts[1] ?? parts[0] };
+            })()
           : {
               start_time: startTime,
               end_time: endTime,
@@ -64,7 +71,7 @@ export function EnrollFromSelectionModal({ segments, jobId, onClose, onSuccess }
     !tooShort &&
     !enroll.isPending &&
     !success &&
-    (mode === "existing" ? !!selectedProfileId : firstName.trim() && lastName.trim());
+    (mode === "existing" ? !!selectedContactId : firstName.trim() && lastName.trim());
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -126,27 +133,27 @@ export function EnrollFromSelectionModal({ segments, jobId, onClose, onSuccess }
         {/* Existing profile selector */}
         {mode === "existing" && (
           <div className="mb-4">
-            {loadingProfiles ? (
+            {loadingContacts ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Chargement...
               </div>
-            ) : profiles.length === 0 ? (
+            ) : contacts.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Aucun profil intervenant. Utilisez &quot;Nouveau profil&quot;.
+                Aucun contact. Créez d&apos;abord des contacts dans le module Contacts.
               </p>
             ) : (
               <select
-                value={selectedProfileId}
-                onChange={(e) => setSelectedProfileId(e.target.value)}
+                value={selectedContactId}
+                onChange={(e) => setSelectedContactId(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <option value="">-- Choisir un intervenant --</option>
-                {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.display_name ?? `${p.first_name} ${p.last_name}`}
-                    {p.fonction ? ` - ${p.fonction}` : ""}
-                    {p.enrollment_status === "enrolled" ? " (enrolle)" : ""}
+                <option value="">— Choisir un contact —</option>
+                {contacts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {c.role ? ` — ${c.role}` : ""}
+                    {c.speaker_profile?.enrollment_status === "enrolled" ? " ✓" : ""}
                   </option>
                 ))}
               </select>

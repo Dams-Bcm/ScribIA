@@ -399,7 +399,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
                 data-seg-id={seg.id}
                 className={`flex gap-2 py-2 pl-3 rounded-r-lg transition-colors ${
                   isEnrollHighlighted
-                    ? "bg-purple-50 border-l-4 border-purple-500"
+                    ? "bg-purple-100/60 border-l-4 border-purple-500 ring-1 ring-purple-300/50 shadow-[inset_0_0_0_1px_rgba(147,51,234,0.08),0_0_12px_rgba(147,51,234,0.15)]"
                     : isSelected
                       ? "bg-primary/10 ring-1 ring-primary/30 border-l-4 " + color.border
                       : isPlaying
