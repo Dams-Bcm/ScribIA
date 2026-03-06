@@ -70,7 +70,7 @@ services:
               capabilities: [gpu]
 
   chroma:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.6.3
     ports:
       - "${CHROMA_PORT:-8100}:8000"
     volumes:
