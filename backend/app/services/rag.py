@@ -55,23 +55,26 @@ def ask(tenant_id: str, question: str, source_filter: str | None = None) -> dict
     where = {"source_type": source_filter} if source_filter else None
 
     # 2a. Recherche par mots-clés (via ChromaDB where_document)
+    # ChromaDB $contains is case-sensitive, so try multiple case variants
     keywords = _extract_keywords(question)
     keyword_results = []
     for kw in keywords:
-        try:
-            kw_res = vectorstore.search(
-                tenant_id, query_embedding,
-                where=where,
-                where_document={"$contains": kw},
-                top_k=5,
-            )
-            kw_docs = kw_res.get("documents", [[]])[0]
-            kw_metas = kw_res.get("metadatas", [[]])[0]
-            kw_dists = kw_res.get("distances", [[]])[0]
-            for doc, meta, dist in zip(kw_docs, kw_metas, kw_dists):
-                keyword_results.append((doc, meta, dist, kw))
-        except Exception:
-            pass
+        variants = list({kw, kw.lower(), kw.capitalize(), kw.upper()})
+        for variant in variants:
+            try:
+                kw_res = vectorstore.search(
+                    tenant_id, query_embedding,
+                    where=where,
+                    where_document={"$contains": variant},
+                    top_k=5,
+                )
+                kw_docs = kw_res.get("documents", [[]])[0]
+                kw_metas = kw_res.get("metadatas", [[]])[0]
+                kw_dists = kw_res.get("distances", [[]])[0]
+                for doc, meta, dist in zip(kw_docs, kw_metas, kw_dists):
+                    keyword_results.append((doc, meta, dist, kw))
+            except Exception:
+                pass
 
     # 2b. Recherche sémantique pure
     semantic_results = vectorstore.search(tenant_id, query_embedding, where=where)
