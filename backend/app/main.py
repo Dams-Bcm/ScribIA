@@ -162,6 +162,17 @@ def _add_missing_columns():
                     "ALTER TABLE speaker_profiles ADD contact_id VARCHAR(36) NULL"
                 ))
 
+        # speaker_enrollment_segments: make segment_id nullable
+        if "speaker_enrollment_segments" in insp.get_table_names():
+            ses_col = next(
+                (c for c in insp.get_columns("speaker_enrollment_segments") if c["name"] == "segment_id"),
+                None,
+            )
+            if ses_col and not ses_col.get("nullable", True):
+                conn.execute(text(
+                    "ALTER TABLE speaker_enrollment_segments ALTER COLUMN segment_id VARCHAR(36) NULL"
+                ))
+
         conn.commit()
 
 
