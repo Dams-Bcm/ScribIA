@@ -279,11 +279,12 @@ def generate_sector_suggestions(
         raise HTTPException(status_code=400, detail="Ajoutez une description au secteur avant de générer les suggestions.")
 
     prompt = f"""Tu es un assistant qui configure une application de gestion documentaire pour un secteur professionnel.
+L'application permet de : transcrire des réunions, générer des documents IA (PV, comptes-rendus, synthèses), gérer des procédures collaboratives, et rechercher dans tous ces documents internes.
 
 Secteur : {sector.label}
 Description : {sector.description}
 
-Génère des suggestions contextuelles au format JSON pour les modules suivants. Chaque suggestion doit être pertinente pour ce secteur d'activité.
+Génère des suggestions contextuelles au format JSON. Chaque suggestion doit être pertinente pour ce secteur.
 
 Réponds UNIQUEMENT avec un objet JSON valide (pas de texte avant/après), avec cette structure exacte :
 {{
@@ -295,10 +296,11 @@ Réponds UNIQUEMENT avec un objet JSON valide (pas de texte avant/après), avec 
   "procedures": ["nom de procédure type 1", "nom de procédure type 2"]
 }}
 
-- "search" : 3-5 exemples de questions que les utilisateurs poseraient dans la recherche intelligente
-- "ai_documents" : 3-5 types de documents IA courants dans ce secteur
+Règles IMPORTANTES :
+- "search" : 3-5 exemples de questions que les utilisateurs poseraient pour RECHERCHER DANS LEURS PROPRES DOCUMENTS INTERNES (PV de réunions, transcriptions, comptes-rendus). PAS des questions de culture générale. Exemples du style : "Résume la dernière réunion de...", "Qui était présent lors de...", "Quelles décisions ont été prises sur..."
+- "ai_documents" : 3-5 types de documents que l'IA pourrait générer dans ce secteur (PV, synthèse, compte-rendu, etc.)
 - "transcription.speaker_labels" : 3-5 rôles de locuteurs typiques des réunions de ce secteur
-- "procedures" : 2-4 noms de procédures collaboratives courantes"""
+- "procedures" : 2-4 noms de procédures collaboratives courantes dans ce secteur"""
 
     try:
         model = get_model_for_usage("sector_suggestions") or settings.ollama_default_model

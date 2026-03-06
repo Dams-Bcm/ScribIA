@@ -95,8 +95,13 @@ export function SectorsPage() {
     );
   }
 
-  function handleGenerate() {
+  async function handleGenerate() {
     if (!selected) return;
+    // Save description first if it was modified locally
+    if (descDraft !== null) {
+      await updateSector.mutateAsync({ id: selected.id, description: descDraft });
+      setDescDraft(null);
+    }
     generateSuggestions.mutate(selected.id, {
       onSuccess: () => setSuggestionsDraft(null),
     });
