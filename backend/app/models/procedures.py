@@ -198,7 +198,7 @@ class ProcedureStepInstance(UUIDMixin, Base):
     __tablename__ = "procedure_step_instances"
 
     procedure_id     = Column(String(36), ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False, index=True)
-    template_step_id = Column(String(36), ForeignKey("procedure_template_steps.id", ondelete="SET NULL"), nullable=True)
+    template_step_id = Column(String(36), ForeignKey("procedure_template_steps.id", ondelete="NO ACTION"), nullable=True)
     order_index      = Column(Integer, nullable=False, default=0)
     step_type        = Column(String(30), nullable=False)
     label            = Column(String(200), nullable=False)
