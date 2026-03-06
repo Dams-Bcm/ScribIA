@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session, joinedload
 from app.config import settings
 from app.database import get_db
 from app.models import Tenant, TenantModule, User, AVAILABLE_MODULES, AuditLog, AIDocumentTemplate, ProcedureTemplate, ProcedureTemplateRole, ProcedureTemplateStep, AISetting, AI_USAGES, Sector
+from app.models.announcement import Announcement, announcement_tenants
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantModuleUpdate
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.schemas.announcement import AnnouncementCreate, AnnouncementUpdate, AnnouncementResponse
 from app.services.auth import hash_password
 from app.deps import require_super_admin
 from app.services.ai_config import get_model_for_usage
@@ -1153,3 +1155,81 @@ def list_audit_logs(
         }
         for l in logs
     ]
+
+
+# ── Announcements (Communications) ──────────────────────────────────────────
+
+
+@router.get("/announcements", response_model=list[AnnouncementResponse])
+def list_announcements(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    return db.query(Announcement).order_by(Announcement.created_at.desc()).all()
+
+
+@router.post("/announcements", response_model=AnnouncementResponse, status_code=201)
+def create_announcement(
+    body: AnnouncementCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_super_admin),
+):
+    # Deactivate other announcements
+    db.query(Announcement).filter(Announcement.is_active == True).update({"is_active": False})
+
+    ann = Announcement(
+        title=body.title,
+        message=body.message,
+        target_all=body.target_all,
+    )
+
+    if not body.target_all and body.tenant_ids:
+        tenants = db.query(Tenant).filter(Tenant.id.in_(body.tenant_ids)).all()
+        ann.tenants = tenants
+
+    db.add(ann)
+    db.commit()
+    db.refresh(ann)
+    return ann
+
+
+@router.patch("/announcements/{announcement_id}", response_model=AnnouncementResponse)
+def update_announcement(
+    announcement_id: str,
+    body: AnnouncementUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    ann = db.query(Announcement).filter_by(id=announcement_id).first()
+    if not ann:
+        raise HTTPException(status_code=404, detail="Annonce introuvable")
+
+    if body.is_active is True:
+        # Deactivate others when activating this one
+        db.query(Announcement).filter(Announcement.id != announcement_id, Announcement.is_active == True).update({"is_active": False})
+
+    for field in ("title", "message", "is_active", "target_all"):
+        val = getattr(body, field)
+        if val is not None:
+            setattr(ann, field, val)
+
+    if body.tenant_ids is not None:
+        tenants = db.query(Tenant).filter(Tenant.id.in_(body.tenant_ids)).all() if body.tenant_ids else []
+        ann.tenants = tenants
+
+    db.commit()
+    db.refresh(ann)
+    return ann
+
+
+@router.delete("/announcements/{announcement_id}", status_code=204)
+def delete_announcement(
+    announcement_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    ann = db.query(Announcement).filter_by(id=announcement_id).first()
+    if not ann:
+        raise HTTPException(status_code=404, detail="Annonce introuvable")
+    db.delete(ann)
+    db.commit()

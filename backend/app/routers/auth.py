@@ -3,9 +3,12 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, joinedload
 
+from sqlalchemy import or_
+
 from app.database import get_db
 from app.models import User, Tenant
 from app.models.sector import Sector
+from app.models.announcement import Announcement, announcement_tenants
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.schemas.user import UserResponse
 from app.services.auth import verify_password, create_access_token
@@ -43,3 +46,30 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
         if sector and sector.suggestions:
             response.sector_suggestions = json.loads(sector.suggestions)
     return response
+
+
+@router.get("/announcement")
+def get_active_announcement(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return the currently active announcement visible to this user's tenant."""
+    # Super admins don't see announcements (they manage them)
+    if user.role == "super_admin":
+        return None
+
+    ann = (
+        db.query(Announcement)
+        .filter(Announcement.is_active == True)
+        .outerjoin(announcement_tenants)
+        .filter(
+            or_(
+                Announcement.target_all == True,
+                announcement_tenants.c.tenant_id == user.tenant_id,
+            )
+        )
+        .first()
+    )
+    if not ann:
+        return None
+    return {"id": ann.id, "title": ann.title, "message": ann.message}

@@ -15,6 +15,7 @@ from app.models.contacts import ContactGroup, Contact
 from app.models.ai_settings import AISetting, AI_USAGES
 from app.models.sector import Sector
 from app.models.substitution import SubstitutionRule
+from app.models.announcement import Announcement, announcement_tenants
 
 __all__ = [
     "Base", "Tenant", "TenantModule", "User", "AVAILABLE_MODULES",
@@ -31,4 +32,5 @@ __all__ = [
     "AISetting", "AI_USAGES",
     "Sector",
     "SubstitutionRule",
+    "Announcement", "announcement_tenants",
 ]

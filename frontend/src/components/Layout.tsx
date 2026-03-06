@@ -20,9 +20,11 @@ import {
   FolderCog,
   Search,
   BookOpen,
+  Megaphone,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../lib/utils";
+import { AnnouncementPopup } from "./AnnouncementPopup";
 
 interface NavItem {
   to: string;
@@ -59,6 +61,7 @@ export function Layout() {
     { to: "/admin/workflows", label: "Workflows", icon: Settings2, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/speakers", label: "Intervenants", icon: Mic, visible: isAdmin, section: "Administration" },
     { to: "/admin/ai-settings", label: "Gestion IA", icon: Sparkles, visible: isSuperAdmin, section: "Administration" },
+    { to: "/admin/announcements", label: "Communications", icon: Megaphone, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/audit-logs", label: "Journal d'audit", icon: Shield, visible: isSuperAdmin, section: "Administration" },
 
     // ── Compte ──
@@ -150,6 +153,8 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+
+      <AnnouncementPopup />
     </div>
   );
 }

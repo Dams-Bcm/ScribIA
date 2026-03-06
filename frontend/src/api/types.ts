@@ -736,6 +736,44 @@ export interface SubstitutionPreview {
   rules_applied: number;
 }
 
+// ── Announcements (Communications) ───────────────────────────────────────────
+
+export interface AnnouncementTenant {
+  id: string;
+  name: string;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  message: string;
+  is_active: boolean;
+  target_all: boolean;
+  tenants: AnnouncementTenant[];
+  created_at: string;
+}
+
+export interface AnnouncementCreate {
+  title: string;
+  message: string;
+  target_all?: boolean;
+  tenant_ids?: string[];
+}
+
+export interface AnnouncementUpdate {
+  title?: string;
+  message?: string;
+  is_active?: boolean;
+  target_all?: boolean;
+  tenant_ids?: string[];
+}
+
+export interface ActiveAnnouncement {
+  id: string;
+  title: string;
+  message: string;
+}
+
 // ── Search / RAG ──────────────────────────────────────────────────────────────
 
 export interface SearchSource {
