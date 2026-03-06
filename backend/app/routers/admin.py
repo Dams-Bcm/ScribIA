@@ -1144,6 +1144,71 @@ def update_whisper_settings(
     return {"message": "Paramètres Whisper mis à jour"}
 
 
+# ── Pyannote / Diarisation Settings ──────────────────────────────────────────
+
+PYANNOTE_SETTINGS_KEYS = {
+    "min_speakers": ("Nombre min de locuteurs", "2"),
+    "max_speakers": ("Nombre max de locuteurs", "8"),
+    "clustering_threshold": ("Seuil de clustering", "0.65"),
+    "speaker_matching_threshold": ("Seuil matching enrollment", "0.75"),
+}
+
+
+@router.get("/pyannote-settings")
+def get_pyannote_settings(
+    _: User = Depends(require_super_admin),
+):
+    """Retourne la configuration Pyannote/Diarisation actuelle."""
+    return {
+        "settings": [
+            {
+                "key": key,
+                "label": label,
+                "value": str(getattr(settings, key, default)),
+                "default": default,
+            }
+            for key, (label, default) in PYANNOTE_SETTINGS_KEYS.items()
+        ],
+        "pipeline_model": "pyannote/speaker-diarization-3.1",
+    }
+
+
+class PyannoteSettingUpdate(BaseModel):
+    key: str
+    value: str
+
+
+@router.put("/pyannote-settings")
+def update_pyannote_settings(
+    body: list[PyannoteSettingUpdate],
+    _: User = Depends(require_super_admin),
+):
+    """Met à jour les paramètres Pyannote (appliqués au runtime)."""
+    reload_pipeline = False
+    for item in body:
+        if item.key not in PYANNOTE_SETTINGS_KEYS:
+            continue
+        if item.key in ("min_speakers", "max_speakers"):
+            try:
+                setattr(settings, item.key, int(item.value))
+            except ValueError:
+                pass
+        elif item.key in ("clustering_threshold", "speaker_matching_threshold"):
+            try:
+                val = float(item.value)
+                setattr(settings, item.key, val)
+                if item.key == "clustering_threshold":
+                    reload_pipeline = True
+            except ValueError:
+                pass
+
+    if reload_pipeline:
+        from app.services.diarisation import unload_diarization
+        unload_diarization()
+
+    return {"message": "Paramètres Pyannote mis à jour"}
+
+
 # ── RAG / Search Settings ────────────────────────────────────────────────────
 
 RAG_SETTINGS_KEYS = {

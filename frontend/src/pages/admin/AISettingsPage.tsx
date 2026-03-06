@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search, Mic, ChevronDown, CheckCircle2, XCircle } from "lucide-react";
+import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search, Mic, Users, ChevronDown, CheckCircle2, XCircle } from "lucide-react";
 
 interface AIUsage {
   usage_key: string;
@@ -46,6 +46,18 @@ interface WhisperSettingsResponse {
   device: string;
 }
 
+interface PyannoteSetting {
+  key: string;
+  label: string;
+  value: string;
+  default: string;
+}
+
+interface PyannoteSettingsResponse {
+  settings: PyannoteSetting[];
+  pipeline_model: string;
+}
+
 function useAISettings() {
   return useQuery({
     queryKey: ["ai-settings"],
@@ -64,6 +76,13 @@ function useWhisperSettings() {
   return useQuery({
     queryKey: ["whisper-settings"],
     queryFn: () => api.get<WhisperSettingsResponse>("/admin/whisper-settings"),
+  });
+}
+
+function usePyannoteSettings() {
+  return useQuery({
+    queryKey: ["pyannote-settings"],
+    queryFn: () => api.get<PyannoteSettingsResponse>("/admin/pyannote-settings"),
   });
 }
 
@@ -91,6 +110,15 @@ function useUpdateWhisperSettings() {
     mutationFn: (body: { key: string; value: string }[]) =>
       api.put("/admin/whisper-settings", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["whisper-settings"] }),
+  });
+}
+
+function useUpdatePyannoteSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { key: string; value: string }[]) =>
+      api.put("/admin/pyannote-settings", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["pyannote-settings"] }),
   });
 }
 
@@ -125,20 +153,24 @@ export function AISettingsPage() {
   const { data, isLoading } = useAISettings();
   const { data: ragData } = useRAGSettings();
   const { data: whisperData } = useWhisperSettings();
+  const { data: pyannoteData } = usePyannoteSettings();
   const updateSettings = useUpdateAISettings();
   const updateRAG = useUpdateRAGSettings();
   const updateWhisper = useUpdateWhisperSettings();
+  const updatePyannote = useUpdatePyannoteSettings();
   const deleteModel = useDeleteModel();
 
   const [overrides, setOverrides] = useState<Record<string, string | null>>({});
   const [ragOverrides, setRAGOverrides] = useState<Record<string, string>>({});
   const [whisperOverrides, setWhisperOverrides] = useState<Record<string, string>>({});
+  const [pyannoteOverrides, setPyannoteOverrides] = useState<Record<string, string>>({});
   const [pullName, setPullName] = useState("");
   const [pullState, setPullState] = useState<PullState>({ status: "idle", message: "" });
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [saved, setSaved] = useState(false);
   const [ragSaved, setRAGSaved] = useState(false);
   const [whisperSaved, setWhisperSaved] = useState(false);
+  const [pyannoteSaved, setPyannoteSaved] = useState(false);
 
   if (isLoading || !data) {
     return (
@@ -231,9 +263,18 @@ export function AISettingsPage() {
     setTimeout(() => setWhisperSaved(false), 2000);
   }
 
+  async function handlePyannoteSave() {
+    const body = Object.entries(pyannoteOverrides).map(([key, value]) => ({ key, value }));
+    await updatePyannote.mutateAsync(body);
+    setPyannoteOverrides({});
+    setPyannoteSaved(true);
+    setTimeout(() => setPyannoteSaved(false), 2000);
+  }
+
   const hasChanges = Object.keys(overrides).length > 0;
   const hasRAGChanges = Object.keys(ragOverrides).length > 0;
   const hasWhisperChanges = Object.keys(whisperOverrides).length > 0;
+  const hasPyannoteChanges = Object.keys(pyannoteOverrides).length > 0;
 
   return (
     <div>
@@ -322,8 +363,16 @@ export function AISettingsPage() {
               </p>
 
               <div className="space-y-4">
-                {ragData.settings.map((s) => (
-                  <div key={s.key} className="flex items-center gap-4">
+                {ragData.settings.map((s) => {
+                  const ragDescs: Record<string, string> = {
+                    rag_chunk_size: "Taille des morceaux de texte indexés. Plus grand = plus de contexte, moins précis",
+                    rag_chunk_overlap: "Chevauchement entre chunks pour éviter de couper des phrases importantes",
+                    rag_top_k: "Nombre de résultats retournés par recherche. Plus élevé = plus de contexte pour le LLM",
+                    embedding_model: "Modèle Ollama utilisé pour calculer les vecteurs de recherche sémantique",
+                  };
+                  return (
+                  <div key={s.key}>
+                  <div className="flex items-center gap-4">
                     <div className="w-60 shrink-0">
                       <Label className="text-sm font-medium">{s.label}</Label>
                       <p className="text-xs text-muted-foreground">défaut : {s.default}</p>
@@ -337,7 +386,12 @@ export function AISettingsPage() {
                       }}
                     />
                   </div>
-                ))}
+                  {ragDescs[s.key] && (
+                    <p className="text-[11px] text-muted-foreground/70 mt-0.5">{ragDescs[s.key]}</p>
+                  )}
+                  </div>
+                  );
+                })}
               </div>
 
               <p className="text-xs text-muted-foreground mt-4">
@@ -369,8 +423,22 @@ export function AISettingsPage() {
               </p>
 
               <div className="space-y-4">
-                {whisperData.settings.map((s) => (
-                  <div key={s.key} className="flex items-center gap-4">
+                {whisperData.settings.map((s) => {
+                  const whisperDescs: Record<string, string> = {
+                    whisper_model: "Plus le modèle est gros, plus la transcription est précise mais lente",
+                    whisper_language: "Code ISO de la langue (fr, en, de…). Laisser vide pour détection automatique",
+                    whisper_beam_size: "Nombre de hypothèses explorées. Plus élevé = plus précis mais plus lent",
+                    whisper_no_speech_threshold: "Seuil en dessous duquel un segment est considéré comme du silence",
+                    whisper_temperature: "Cascade de températures pour le décodage. 0 = déterministe",
+                    whisper_initial_prompt: "Vocabulaire métier à injecter (noms propres, acronymes, termes techniques)",
+                    whisper_condition_on_previous_text: "Désactiver réduit les hallucinations mais peut fragmenter les phrases",
+                    whisper_vad_min_silence_ms: "Durée minimale de silence pour couper un segment (en millisecondes)",
+                    whisper_vad_speech_pad_ms: "Marge ajoutée avant/après chaque segment de parole détecté",
+                    compute_type: "Précision de calcul — float16 pour GPU, float32 pour CPU, int8 pour économiser la mémoire",
+                  };
+                  return (
+                  <div key={s.key}>
+                  <div className="flex items-center gap-4">
                     <div className="w-60 shrink-0">
                       <Label className="text-sm font-medium">{s.label}</Label>
                       <p className="text-xs text-muted-foreground">défaut : {s.default || "(vide)"}</p>
@@ -439,12 +507,79 @@ export function AISettingsPage() {
                       />
                     )}
                   </div>
-                ))}
+                  {whisperDescs[s.key] && (
+                    <p className="text-[11px] text-muted-foreground/70 mt-0.5">{whisperDescs[s.key]}</p>
+                  )}
+                  </div>
+                  );
+                })}
               </div>
 
               <p className="text-xs text-muted-foreground mt-4">
                 Le modèle Whisper sera rechargé automatiquement lors de la prochaine transcription après modification.
                 Le <strong>prompt initial</strong> permet d'injecter du vocabulaire métier (noms propres, termes techniques).
+              </p>
+            </div>
+          )}
+
+          {/* Pyannote / Diarisation Settings */}
+          {pyannoteData && (
+            <div className="bg-background rounded-xl border border-border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  <h2 className="text-lg font-semibold">Diarisation (Pyannote)</h2>
+                </div>
+                <Button size="sm" onClick={handlePyannoteSave} disabled={!hasPyannoteChanges && !pyannoteSaved || updatePyannote.isPending}>
+                  {pyannoteSaved ? (
+                    <><Check className="w-4 h-4 mr-1" /> Sauvegardé</>
+                  ) : updatePyannote.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Sauvegarde…</>
+                  ) : (
+                    <><Save className="w-4 h-4 mr-1" /> Sauvegarder</>
+                  )}
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground mb-4">
+                Pipeline : <span className="font-mono font-medium text-foreground">{pyannoteData.pipeline_model}</span>
+              </p>
+
+              <div className="space-y-4">
+                {pyannoteData.settings.map((s) => {
+                  const descriptions: Record<string, string> = {
+                    min_speakers: "Nombre minimum de locuteurs que pyannote tentera de détecter",
+                    max_speakers: "Nombre maximum de locuteurs — augmenter si vos réunions ont beaucoup de participants",
+                    clustering_threshold: "Plus haut = plus de locuteurs distincts, plus bas = fusionne des voix similaires. Recommandé : 0.65–0.80",
+                    speaker_matching_threshold: "Seuil de similarité cosine pour l'auto-identification des intervenants enrollés. Plus bas = plus permissif",
+                  };
+                  return (
+                    <div key={s.key}>
+                      <div className="flex items-center gap-4">
+                        <div className="w-60 shrink-0">
+                          <Label className="text-sm font-medium">{s.label}</Label>
+                          <p className="text-xs text-muted-foreground">défaut : {s.default}</p>
+                        </div>
+                        <Input
+                          className="flex-1 font-mono text-sm"
+                          value={pyannoteOverrides[s.key] ?? s.value}
+                          onChange={(e) => {
+                            setPyannoteOverrides({ ...pyannoteOverrides, [s.key]: e.target.value });
+                            setPyannoteSaved(false);
+                          }}
+                          placeholder={s.default}
+                        />
+                      </div>
+                      {descriptions[s.key] && (
+                        <p className="text-[11px] text-muted-foreground/70 mt-0.5 ml-0">{descriptions[s.key]}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-xs text-muted-foreground mt-4">
+                Le changement du seuil de clustering décharge le pipeline — il sera rechargé à la prochaine diarisation.
               </p>
             </div>
           )}
