@@ -1,8 +1,11 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import User, Tenant
+from app.models.sector import Sector
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.schemas.user import UserResponse
 from app.services.auth import verify_password, create_access_token
@@ -32,5 +35,11 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserResponse)
-def me(user: User = Depends(get_current_user)):
-    return user
+def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    response = UserResponse.model_validate(user)
+    response.tenant_sector = user.tenant_sector
+    if user.tenant and user.tenant.sector:
+        sector = db.query(Sector).filter_by(key=user.tenant.sector).first()
+        if sector and sector.suggestions:
+            response.sector_suggestions = json.loads(sector.suggestions)
+    return response

@@ -51,7 +51,7 @@ export function Layout() {
     { to: "/recherche", label: "Recherche", icon: Search, visible: hasModule("search"), section: "Modules" },
 
     // ── Administration ──
-    { to: "/admin/organizations", label: "Organisations", icon: Building2, visible: isSuperAdmin, section: "Administration" },
+    { to: "/admin/tenants", label: "Tenants", icon: Building2, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/users", label: "Utilisateurs", icon: Users, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/sectors", label: "Secteurs", icon: FolderCog, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/workflows", label: "Workflows", icon: Settings2, visible: isSuperAdmin, section: "Administration" },

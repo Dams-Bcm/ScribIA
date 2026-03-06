@@ -12,7 +12,7 @@ export function useSectors() {
 export function useCreateSector() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { key: string; label: string; default_modules: string[] }) =>
+    mutationFn: (body: { key: string; label: string; description?: string; default_modules: string[] }) =>
       api.post<SectorDefinition>("/admin/sectors", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sectors"] }),
   });
@@ -21,7 +21,7 @@ export function useCreateSector() {
 export function useUpdateSector() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...body }: { id: string; label?: string; default_modules?: string[]; is_active?: boolean }) =>
+    mutationFn: ({ id, ...body }: { id: string; label?: string; description?: string; default_modules?: string[]; suggestions?: Record<string, unknown>; is_active?: boolean }) =>
       api.patch<SectorDefinition>(`/admin/sectors/${id}`, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sectors"] }),
   });
@@ -31,6 +31,15 @@ export function useDeleteSector() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete(`/admin/sectors/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sectors"] }),
+  });
+}
+
+export function useGenerateSuggestions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sectorId: string) =>
+      api.post<SectorDefinition>(`/admin/sectors/${sectorId}/generate-suggestions`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sectors"] }),
   });
 }

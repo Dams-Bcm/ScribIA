@@ -10,7 +10,7 @@ import { AVAILABLE_MODULES, type Tenant, type ProvisionResult } from "../../api/
 import { useSectors } from "../../api/hooks/useSectors";
 import { Building2, Plus, Trash2, X, CheckCircle2, Sparkles } from "lucide-react";
 
-export function OrganizationsPage() {
+export function TenantsPage() {
   const { data: tenants = [], isLoading } = useTenants();
   const createTenant = useCreateTenant();
   const deleteTenant = useDeleteTenant();
@@ -60,7 +60,7 @@ export function OrganizationsPage() {
   }
 
   function handleDelete(id: string) {
-    if (confirm("Supprimer cette organisation et toutes ses données ?")) {
+    if (confirm("Supprimer ce tenant et toutes ses données ?")) {
       deleteTenant.mutate(id);
       if (selectedId === id) setSelectedId(null);
     }
@@ -84,8 +84,8 @@ export function OrganizationsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Organisations</h1>
-          <p className="text-sm text-muted-foreground">{tenants.length} organisation{tenants.length !== 1 ? "s" : ""}</p>
+          <h1 className="text-2xl font-bold">Tenants</h1>
+          <p className="text-sm text-muted-foreground">{tenants.length} tenant{tenants.length !== 1 ? "s" : ""}</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
@@ -115,7 +115,7 @@ export function OrganizationsPage() {
             </>
           )}
 
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-1 mt-4">Organisations</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-1 mt-4">Tenants</p>
           {organizations.filter((o) => !o.parent_id).map((o) => (
             <OrgRow key={o.id} tenant={o} selected={selectedId === o.id} onSelect={(t) => setSelectedId(t.id)} onDelete={handleDelete} />
           ))}
@@ -165,7 +165,7 @@ export function OrganizationsPage() {
           ) : (
             <div className="bg-background rounded-xl border border-border p-12 text-center text-muted-foreground">
               <Building2 className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">Sélectionnez une organisation</p>
+              <p className="text-sm">Sélectionnez un tenant</p>
             </div>
           )}
         </div>

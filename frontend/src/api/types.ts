@@ -12,6 +12,13 @@ export interface TokenResponse {
 
 // ── User ─────────────────────────────────────────────────────────────────────
 
+export interface SectorSuggestions {
+  search?: string[];
+  ai_documents?: string[];
+  transcription?: { speaker_labels?: string[] };
+  procedures?: string[];
+}
+
 export interface User {
   id: string;
   username: string;
@@ -21,6 +28,8 @@ export interface User {
   tenant_id: string;
   is_active: boolean;
   enabled_modules: string[];
+  tenant_sector: string | null;
+  sector_suggestions: SectorSuggestions | null;
 }
 
 // ── Tenant ───────────────────────────────────────────────────────────────────
@@ -34,7 +43,9 @@ export interface SectorDefinition {
   id: string;
   key: string;
   label: string;
+  description: string | null;
   default_modules: string[];
+  suggestions: SectorSuggestions | null;
   is_active: boolean;
 }
 

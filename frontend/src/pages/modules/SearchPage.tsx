@@ -48,8 +48,14 @@ export function SearchPage() {
   );
 }
 
+const DEFAULT_SUGGESTIONS = [
+  "Qui était présent lors de la dernière réunion ?",
+  "Quelles décisions ont été prises récemment ?",
+  "Résume le dernier document généré",
+];
+
 function SearchChat() {
-  const { isAdmin, isSuperAdmin } = useAuth();
+  const { isAdmin, isSuperAdmin, user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
@@ -58,6 +64,8 @@ function SearchChat() {
   const reindex = useReindex();
   const { data: tenants = [] } = useTenants();
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const searchSuggestions = user?.sector_suggestions?.search ?? DEFAULT_SUGGESTIONS;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -162,11 +170,7 @@ function SearchChat() {
               Posez une question pour rechercher dans vos données
             </p>
             <div className="mt-4 space-y-1">
-              {[
-                "Qui était présent lors de la dernière AG ?",
-                "Quelles décisions ont été prises concernant les travaux ?",
-                "Résume la dernière réunion du conseil",
-              ].map((suggestion) => (
+              {searchSuggestions.map((suggestion) => (
                 <button
                   key={suggestion}
                   onClick={() => setInput(suggestion)}

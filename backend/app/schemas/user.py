@@ -28,5 +28,7 @@ class UserResponse(BaseModel):
     tenant_id: str
     is_active: bool
     enabled_modules: list[str] = []
+    tenant_sector: Optional[str] = None
+    sector_suggestions: Optional[dict] = None
 
     model_config = {"from_attributes": True}

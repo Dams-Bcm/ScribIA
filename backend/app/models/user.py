@@ -32,3 +32,7 @@ class User(UUIDMixin, TimestampMixin, Base):
     def enabled_modules(self) -> list[str]:
         """List of enabled module keys for this user's tenant."""
         return [m.module_key for m in self.tenant.modules if m.enabled]
+
+    @property
+    def tenant_sector(self) -> str | None:
+        return self.tenant.sector if self.tenant else None

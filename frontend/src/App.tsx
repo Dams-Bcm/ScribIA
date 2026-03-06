@@ -24,7 +24,7 @@ import { SearchPage } from "./pages/modules/SearchPage";
 import { FormPage } from "./pages/public/FormPage";
 
 // Admin pages
-import { OrganizationsPage } from "./pages/admin/OrganizationsPage";
+import { TenantsPage } from "./pages/admin/TenantsPage";
 import { UsersPage } from "./pages/admin/UsersPage";
 import { SpeakersPage } from "./pages/admin/SpeakersPage";
 import { AuditLogsPage } from "./pages/admin/AuditLogsPage";
@@ -87,7 +87,7 @@ function AppRoutes() {
           <Route path="privacy" element={<PrivacyPage />} />
 
           {/* Administration */}
-          <Route path="admin/organizations" element={<OrganizationsPage />} />
+          <Route path="admin/tenants" element={<TenantsPage />} />
           <Route path="admin/users" element={<UsersPage />} />
           <Route path="admin/speakers" element={<SpeakersPage />} />
           <Route path="admin/workflows" element={<WorkflowsPage />} />

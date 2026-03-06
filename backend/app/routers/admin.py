@@ -166,6 +166,18 @@ def list_available_modules(_: User = Depends(require_super_admin)):
 
 # ── Sectors CRUD ─────────────────────────────────────────────────────────────
 
+def _sector_response(s: Sector) -> dict:
+    return {
+        "id": s.id,
+        "key": s.key,
+        "label": s.label,
+        "description": s.description,
+        "default_modules": json.loads(s.default_modules) if s.default_modules else [],
+        "suggestions": json.loads(s.suggestions) if s.suggestions else None,
+        "is_active": s.is_active,
+    }
+
+
 @router.get("/sectors")
 def list_sectors(
     db: Session = Depends(get_db),
@@ -173,27 +185,21 @@ def list_sectors(
 ):
     """Liste tous les secteurs."""
     sectors = db.query(Sector).order_by(Sector.label).all()
-    return [
-        {
-            "id": s.id,
-            "key": s.key,
-            "label": s.label,
-            "default_modules": json.loads(s.default_modules) if s.default_modules else [],
-            "is_active": s.is_active,
-        }
-        for s in sectors
-    ]
+    return [_sector_response(s) for s in sectors]
 
 
 class SectorCreate(BaseModel):
     key: str
     label: str
+    description: str | None = None
     default_modules: list[str] = []
 
 
 class SectorUpdate(BaseModel):
     label: str | None = None
+    description: str | None = None
     default_modules: list[str] | None = None
+    suggestions: dict | None = None
     is_active: bool | None = None
 
 
@@ -210,18 +216,13 @@ def create_sector(
     sector = Sector(
         key=body.key,
         label=body.label,
+        description=body.description,
         default_modules=json.dumps(body.default_modules, ensure_ascii=False),
     )
     db.add(sector)
     db.commit()
     db.refresh(sector)
-    return {
-        "id": sector.id,
-        "key": sector.key,
-        "label": sector.label,
-        "default_modules": json.loads(sector.default_modules),
-        "is_active": sector.is_active,
-    }
+    return _sector_response(sector)
 
 
 @router.patch("/sectors/{sector_id}")
@@ -237,19 +238,17 @@ def update_sector(
         raise HTTPException(status_code=404, detail="Secteur introuvable")
     if body.label is not None:
         sector.label = body.label
+    if body.description is not None:
+        sector.description = body.description
     if body.default_modules is not None:
         sector.default_modules = json.dumps(body.default_modules, ensure_ascii=False)
+    if body.suggestions is not None:
+        sector.suggestions = json.dumps(body.suggestions, ensure_ascii=False)
     if body.is_active is not None:
         sector.is_active = body.is_active
     db.commit()
     db.refresh(sector)
-    return {
-        "id": sector.id,
-        "key": sector.key,
-        "label": sector.label,
-        "default_modules": json.loads(sector.default_modules),
-        "is_active": sector.is_active,
-    }
+    return _sector_response(sector)
 
 
 @router.delete("/sectors/{sector_id}", status_code=204)
@@ -264,6 +263,73 @@ def delete_sector(
         raise HTTPException(status_code=404, detail="Secteur introuvable")
     db.delete(sector)
     db.commit()
+
+
+@router.post("/sectors/{sector_id}/generate-suggestions")
+def generate_sector_suggestions(
+    sector_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Génère des suggestions contextuelles par module via IA à partir de la description du secteur."""
+    sector = db.query(Sector).filter_by(id=sector_id).first()
+    if not sector:
+        raise HTTPException(status_code=404, detail="Secteur introuvable")
+    if not sector.description or not sector.description.strip():
+        raise HTTPException(status_code=400, detail="Ajoutez une description au secteur avant de générer les suggestions.")
+
+    prompt = f"""Tu es un assistant qui configure une application de gestion documentaire pour un secteur professionnel.
+
+Secteur : {sector.label}
+Description : {sector.description}
+
+Génère des suggestions contextuelles au format JSON pour les modules suivants. Chaque suggestion doit être pertinente pour ce secteur d'activité.
+
+Réponds UNIQUEMENT avec un objet JSON valide (pas de texte avant/après), avec cette structure exacte :
+{{
+  "search": ["question exemple 1", "question exemple 2", "question exemple 3"],
+  "ai_documents": ["type de document 1", "type de document 2", "type de document 3"],
+  "transcription": {{
+    "speaker_labels": ["rôle 1", "rôle 2", "rôle 3"]
+  }},
+  "procedures": ["nom de procédure type 1", "nom de procédure type 2"]
+}}
+
+- "search" : 3-5 exemples de questions que les utilisateurs poseraient dans la recherche intelligente
+- "ai_documents" : 3-5 types de documents IA courants dans ce secteur
+- "transcription.speaker_labels" : 3-5 rôles de locuteurs typiques des réunions de ce secteur
+- "procedures" : 2-4 noms de procédures collaboratives courantes"""
+
+    try:
+        model = get_model_for_usage("sector_suggestions") or settings.ollama_default_model
+        resp = requests.post(
+            f"{settings.ollama_url}/api/generate",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.5, "num_predict": 1024},
+            },
+            timeout=60,
+        )
+        resp.raise_for_status()
+        raw = resp.json().get("response", "").strip()
+
+        # Extract JSON from response (handle markdown code blocks)
+        if "```" in raw:
+            raw = raw.split("```json")[-1].split("```")[0].strip() if "```json" in raw else raw.split("```")[1].split("```")[0].strip()
+
+        suggestions = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="L'IA n'a pas retourné un JSON valide. Réessayez.")
+    except Exception as exc:
+        logger.exception("[SECTOR] Suggestion generation failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Erreur lors de la génération des suggestions.")
+
+    sector.suggestions = json.dumps(suggestions, ensure_ascii=False)
+    db.commit()
+    db.refresh(sector)
+    return _sector_response(sector)
 
 
 # ── Sector workflow templates ────────────────────────────────────────────────
