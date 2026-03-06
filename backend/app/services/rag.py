@@ -46,6 +46,11 @@ def ask(tenant_id: str, question: str, source_filter: str | None = None) -> dict
     metadatas = results.get("metadatas", [[]])[0]
     distances = results.get("distances", [[]])[0]
 
+    logger.warning("[RAG] Query: %s", question[:100])
+    logger.warning("[RAG] Results count: %d", len(documents))
+    for i, (doc, meta, dist) in enumerate(zip(documents, metadatas, distances)):
+        logger.warning("[RAG] #%d dist=%.4f title=%s chunk=%s...", i, dist, meta.get("title"), doc[:80])
+
     if not documents:
         return {
             "answer": "Je n'ai trouvé aucun document pertinent pour répondre à cette question.",
