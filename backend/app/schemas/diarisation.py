@@ -62,3 +62,13 @@ class DiarisationJobUploadResponse(BaseModel):
 
 class SpeakerRenameRequest(BaseModel):
     display_name: str
+
+
+class EnrollFromSegmentRequest(BaseModel):
+    start_time: float
+    end_time: float
+    speaker_profile_id: Optional[str] = None  # existing profile
+    # Inline creation (bypass consent for super_admin test mode)
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    fonction: Optional[str] = None

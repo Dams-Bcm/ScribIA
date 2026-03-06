@@ -34,3 +34,38 @@ export function useEnrollFromDiarisation() {
     },
   });
 }
+
+export interface EnrollFromSegmentBody {
+  start_time: number;
+  end_time: number;
+  speaker_profile_id?: string;
+  first_name?: string;
+  last_name?: string;
+  fonction?: string;
+}
+
+export function useEnrollFromSegment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, body }: { jobId: string; body: EnrollFromSegmentBody }) =>
+      api.post<{ message: string; profile_id: string; display_name: string; duration: number }>(
+        `/diarisation/${jobId}/enroll-from-segment`,
+        body,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "speakers"] });
+      qc.invalidateQueries({ queryKey: ["diarisation"] });
+    },
+  });
+}
+
+export function useCreateSpeaker() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { first_name: string; last_name: string; fonction?: string }) =>
+      api.post<SpeakerProfile>("/speakers", body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "speakers"] });
+    },
+  });
+}

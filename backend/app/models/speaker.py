@@ -84,7 +84,7 @@ class SpeakerEnrollmentSegment(UUIDMixin, Base):
 
     speaker_profile_id = Column(String(36), ForeignKey("speaker_profiles.id"), nullable=False, index=True)
     job_id             = Column(String(36), ForeignKey("transcription_jobs.id"), nullable=False, index=True)
-    segment_id         = Column(String(36), ForeignKey("transcription_segments.id"), nullable=False)
+    segment_id         = Column(String(36), ForeignKey("transcription_segments.id"), nullable=True)
     start_time         = Column(Float, nullable=True)   # dénormalisé pour accès rapide
     end_time           = Column(Float, nullable=True)
 

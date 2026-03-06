@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Copy, Download, Check, Play, Pause, Loader2 } from "lucide-react";
+import { Copy, Download, Check, Play, Pause, Loader2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApplyDictionaryButton } from "@/components/dictionary/ApplyDictionaryButton";
+import { useAuth } from "@/stores/auth";
 import type { DiarisationSegment, DiarisationSpeaker } from "@/api/types";
 import { getSpeakerColor } from "./speakerColors";
 import { SpeakerPanel } from "./SpeakerPanel";
+import { EnrollFromSelectionModal } from "./EnrollFromSelectionModal";
 
 interface DiarisationResultProps {
   segments: DiarisationSegment[];
@@ -23,11 +25,17 @@ function formatTime(seconds: number): string {
 }
 
 export function DiarisationResult({ segments, speakers, jobId, title, onRenameSpeaker }: DiarisationResultProps) {
+  const { isSuperAdmin } = useAuth();
   const [copied, setCopied] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [playingSegId, setPlayingSegId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const stopAtRef = useRef<number | null>(null);
+
+  // Segment selection for enrollment
+  const [selectedSegIds, setSelectedSegIds] = useState<Set<string>>(new Set());
+  const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const lastClickedRef = useRef<number | null>(null);
 
   // Charger l'audio comme blob URL (pour passer le token d'auth)
   useEffect(() => {
@@ -76,6 +84,37 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
     }
   }
 
+  function toggleSegment(segId: string, index: number, shiftKey: boolean) {
+    setSelectedSegIds((prev) => {
+      const next = new Set(prev);
+
+      if (shiftKey && lastClickedRef.current !== null) {
+        // Range select
+        const start = Math.min(lastClickedRef.current, index);
+        const end = Math.max(lastClickedRef.current, index);
+        for (let i = start; i <= end && i < segments.length; i++) {
+          next.add(segments[i]!.id);
+        }
+      } else {
+        if (next.has(segId)) {
+          next.delete(segId);
+        } else {
+          next.add(segId);
+        }
+      }
+
+      lastClickedRef.current = index;
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedSegIds(new Set());
+    lastClickedRef.current = null;
+  }
+
+  const selectedSegments = segments.filter((s) => selectedSegIds.has(s.id));
+
   // Build speaker maps
   const speakerColorMap = new Map<string, number>();
   for (const sp of speakers) {
@@ -119,7 +158,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
       <div className="flex items-center gap-2 flex-wrap">
         <Button variant="outline" size="sm" onClick={handleCopy}>
           {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          {copied ? "Copié" : "Copier"}
+          {copied ? "Copie" : "Copier"}
         </Button>
         <Button variant="outline" size="sm" onClick={() => handleExport("txt")}>
           <Download className="w-4 h-4" />
@@ -140,7 +179,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
         />
       </div>
 
-      {/* Lecteur audio (masqué, contrôlé par les boutons segments) */}
+      {/* Lecteur audio (masque, controle par les boutons segments) */}
       {audioUrl ? (
         <audio
           ref={audioRef}
@@ -152,7 +191,28 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
       ) : (
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Loader2 className="w-3 h-3 animate-spin" />
-          Chargement de l'audio…
+          Chargement de l&apos;audio...
+        </div>
+      )}
+
+      {/* Selection floating bar */}
+      {isSuperAdmin && selectedSegIds.size > 0 && (
+        <div className="sticky top-0 z-20 flex items-center gap-3 bg-primary/10 border border-primary/30 rounded-lg px-4 py-2">
+          <span className="text-sm font-medium">
+            {selectedSegIds.size} segment{selectedSegIds.size > 1 ? "s" : ""} selectionne{selectedSegIds.size > 1 ? "s" : ""}
+          </span>
+          <Button
+            size="sm"
+            variant="default"
+            className="ml-auto"
+            onClick={() => setShowEnrollModal(true)}
+          >
+            <UserPlus className="w-4 h-4 mr-1" />
+            Enroller
+          </Button>
+          <Button size="sm" variant="ghost" onClick={clearSelection}>
+            <X className="w-4 h-4" />
+          </Button>
         </div>
       )}
 
@@ -165,24 +225,43 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
 
         {/* Segments */}
         <div className="flex-1 space-y-1 max-h-[60vh] overflow-y-auto">
-          {segments.map((seg) => {
+          {isSuperAdmin && (
+            <p className="text-xs text-muted-foreground mb-2">
+              Cliquez sur les segments pour les selectionner (Shift+clic pour une plage), puis &quot;Enroller&quot;.
+            </p>
+          )}
+          {segments.map((seg, index) => {
             const colorIndex = speakerColorMap.get(seg.speaker_id ?? "") ?? 0;
             const color = getSpeakerColor(colorIndex);
             const label = speakerLabelMap.get(seg.speaker_id ?? "") || seg.speaker_label || seg.speaker_id || "";
             const isPlaying = playingSegId === seg.id;
+            const isSelected = selectedSegIds.has(seg.id);
 
             return (
               <div
                 key={seg.id}
                 className={`flex gap-2 py-2 border-l-4 ${color.border} pl-3 rounded-r-lg transition-colors ${
-                  isPlaying ? "bg-primary/5" : "hover:bg-muted/40"
-                }`}
+                  isSelected
+                    ? "bg-primary/10 ring-1 ring-primary/30"
+                    : isPlaying
+                      ? "bg-primary/5"
+                      : "hover:bg-muted/40"
+                } ${isSuperAdmin ? "cursor-pointer" : ""}`}
+                onClick={(e) => {
+                  if (!isSuperAdmin) return;
+                  // Don't select when clicking play button
+                  if ((e.target as HTMLElement).closest("button")) return;
+                  toggleSegment(seg.id, index, e.shiftKey);
+                }}
               >
                 <button
-                  onClick={() => playSeg(seg)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    playSeg(seg);
+                  }}
                   disabled={!audioUrl}
                   className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-30"
-                  title={isPlaying ? "Pause" : "Écouter ce segment"}
+                  title={isPlaying ? "Pause" : "Ecouter ce segment"}
                 >
                   {isPlaying ? (
                     <Pause className="w-3 h-3" />
@@ -204,6 +283,18 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
           })}
         </div>
       </div>
+
+      {/* Enrollment modal */}
+      {showEnrollModal && selectedSegments.length > 0 && (
+        <EnrollFromSelectionModal
+          segments={selectedSegments}
+          jobId={jobId}
+          onClose={() => setShowEnrollModal(false)}
+          onSuccess={() => {
+            clearSelection();
+          }}
+        />
+      )}
     </div>
   );
 }

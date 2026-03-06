@@ -22,7 +22,9 @@ from app.schemas.diarisation import (
     DiarisationJobDetailResponse,
     DiarisationJobUploadResponse,
     SpeakerRenameRequest,
+    EnrollFromSegmentRequest,
 )
+from app.deps import require_super_admin
 from app.services.event_bus import event_bus
 from app.services.transcription import get_audio_duration
 from app.services.diarisation import run_diarisation_job_in_thread
@@ -401,3 +403,131 @@ def export_transcription(
         "\n".join(lines),
         headers={"Content-Disposition": f'attachment; filename="{safe_title}.vtt"'},
     )
+
+
+# ── Enroll from segment selection (super_admin test mode) ────────────────────
+
+@router.post("/{job_id}/enroll-from-segment")
+def enroll_from_segment(
+    job_id: str,
+    body: EnrollFromSegmentRequest,
+    user: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Enroll a speaker profile from a selected audio time range.
+    Super admin only — bypasses consent for test purposes.
+    Either provide speaker_profile_id (existing) or first_name+last_name (inline creation).
+    """
+    import tempfile
+    from datetime import datetime, timezone
+
+    from app.models.speaker import SpeakerProfile, SpeakerEnrollmentSegment
+    from app.services.transcription import convert_to_wav
+
+    # Validate time range
+    duration = body.end_time - body.start_time
+    if duration < 5.0:
+        raise HTTPException(400, f"Segment trop court ({duration:.1f}s). Minimum 5 secondes requis.")
+
+    # Load & authorise the job
+    job = (
+        db.query(TranscriptionJob)
+        .filter(TranscriptionJob.id == job_id, TranscriptionJob.mode == "diarisation")
+        .first()
+    )
+    if not job:
+        raise HTTPException(404, "Job introuvable")
+    if job.status != TranscriptionJobStatus.COMPLETED:
+        raise HTTPException(400, "La transcription n'est pas terminee")
+
+    audio_path = Path(settings.audio_path) / job.tenant_id / job.audio_filename
+    if not audio_path.exists():
+        raise HTTPException(400, "Fichier audio introuvable")
+
+    # Resolve or create profile
+    if body.speaker_profile_id:
+        profile = db.query(SpeakerProfile).filter_by(id=body.speaker_profile_id).first()
+        if not profile:
+            raise HTTPException(404, "Profil intervenant introuvable")
+    elif body.first_name and body.last_name:
+        # Inline creation — bypass consent
+        profile = SpeakerProfile(
+            tenant_id=job.tenant_id,
+            first_name=body.first_name.strip(),
+            last_name=body.last_name.strip().upper(),
+            display_name=f"{body.first_name.strip()} {body.last_name.strip().upper()}",
+            fonction=body.fonction,
+            consent_status="accepted",
+            consent_type="operator",
+            consent_date=datetime.now(timezone.utc),
+        )
+        db.add(profile)
+        db.flush()  # get profile.id
+    else:
+        raise HTTPException(400, "Fournir speaker_profile_id ou first_name + last_name")
+
+    # Extract audio segment via FFmpeg and compute embedding
+    wav_path = audio_path
+    temp_wav = None
+    temp_segment = None
+
+    try:
+        if audio_path.suffix.lower() != ".wav":
+            temp_wav = Path(tempfile.mktemp(suffix="_src.wav"))
+            convert_to_wav(audio_path, temp_wav)
+            wav_path = temp_wav
+
+        # Extract the selected time range
+        import subprocess
+        temp_segment = Path(tempfile.mktemp(suffix="_seg.wav"))
+        ffmpeg_cmd = [
+            "ffmpeg", "-y", "-i", str(wav_path),
+            "-ss", str(body.start_time), "-to", str(body.end_time),
+            "-af", "highpass=f=80,loudnorm=I=-16:TP=-1.5:LRA=11",
+            "-ar", "16000", "-ac", "1", "-f", "wav", str(temp_segment),
+        ]
+        result = subprocess.run(ffmpeg_cmd, capture_output=True, timeout=60)
+        if result.returncode != 0:
+            raise HTTPException(500, "Erreur lors de l'extraction audio")
+
+        from app.services.speaker_enrollment import extract_embedding_from_audio_segments
+        embedding = extract_embedding_from_audio_segments(temp_segment, [(0, duration)])
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur lors du calcul de l'empreinte vocale: {e}")
+    finally:
+        if temp_wav and temp_wav.exists():
+            temp_wav.unlink()
+        if temp_segment and temp_segment.exists():
+            temp_segment.unlink()
+
+    # Save enrollment
+    profile.embedding = json.dumps(embedding)
+    profile.enrollment_status = "enrolled"
+    profile.enrollment_method = "operator"
+    profile.enrolled_at = datetime.now(timezone.utc)
+
+    # Replace previous enrollment segments
+    db.query(SpeakerEnrollmentSegment).filter(
+        SpeakerEnrollmentSegment.speaker_profile_id == profile.id
+    ).delete()
+
+    db.add(SpeakerEnrollmentSegment(
+        speaker_profile_id=profile.id,
+        job_id=job.id,
+        segment_id=None,
+        start_time=body.start_time,
+        end_time=body.end_time,
+    ))
+
+    db.commit()
+    db.refresh(profile)
+    return {
+        "message": f"Intervenant '{profile.display_name}' enrolle avec succes",
+        "profile_id": profile.id,
+        "display_name": profile.display_name,
+        "duration": round(duration, 1),
+    }

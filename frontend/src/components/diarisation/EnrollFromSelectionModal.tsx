@@ -1,0 +1,217 @@
+import { useState } from "react";
+import { X, UserPlus, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useSpeakers, useEnrollFromSegment } from "@/api/hooks/useSpeakers";
+import { ApiError } from "@/api/client";
+import type { DiarisationSegment } from "@/api/types";
+
+interface Props {
+  segments: DiarisationSegment[];
+  jobId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+export function EnrollFromSelectionModal({ segments, jobId, onClose, onSuccess }: Props) {
+  const { data: profiles = [], isLoading: loadingProfiles } = useSpeakers();
+  const enroll = useEnrollFromSegment();
+
+  const [mode, setMode] = useState<"existing" | "create">("existing");
+  const [selectedProfileId, setSelectedProfileId] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [fonction, setFonction] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const startTime = Math.min(...segments.map((s) => s.start_time));
+  const endTime = Math.max(...segments.map((s) => s.end_time));
+  const duration = endTime - startTime;
+  const tooShort = duration < 5;
+
+  async function handleSubmit() {
+    setError(null);
+    try {
+      const body =
+        mode === "existing"
+          ? { start_time: startTime, end_time: endTime, speaker_profile_id: selectedProfileId }
+          : {
+              start_time: startTime,
+              end_time: endTime,
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              fonction: fonction.trim() || undefined,
+            };
+      const result = await enroll.mutateAsync({ jobId, body });
+      setSuccess(result.message);
+      setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 1500);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Une erreur est survenue");
+    }
+  }
+
+  const canSubmit =
+    !tooShort &&
+    !enroll.isPending &&
+    !success &&
+    (mode === "existing" ? !!selectedProfileId : firstName.trim() && lastName.trim());
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-background rounded-xl border border-border p-6 w-full max-w-md shadow-lg">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <UserPlus className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-bold">Enroller depuis la selection</h2>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Time range info */}
+        <div className="bg-muted/50 rounded-lg px-3 py-2 mb-4 text-sm">
+          <div className="flex items-center justify-between">
+            <span>
+              {segments.length} segment{segments.length > 1 ? "s" : ""} :{" "}
+              <span className="font-mono font-medium">
+                {formatTime(startTime)} - {formatTime(endTime)}
+              </span>
+            </span>
+            <span className="font-medium">{duration.toFixed(1)}s</span>
+          </div>
+          {tooShort && (
+            <div className="flex items-center gap-1.5 text-amber-600 mt-1">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span className="text-xs">Minimum 5 secondes requis</span>
+            </div>
+          )}
+        </div>
+
+        {/* Mode toggle */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setMode("existing")}
+            className={`flex-1 text-sm py-1.5 rounded-lg border transition-colors ${
+              mode === "existing"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border hover:bg-muted"
+            }`}
+          >
+            Profil existant
+          </button>
+          <button
+            onClick={() => setMode("create")}
+            className={`flex-1 text-sm py-1.5 rounded-lg border transition-colors ${
+              mode === "create"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border hover:bg-muted"
+            }`}
+          >
+            Nouveau profil
+          </button>
+        </div>
+
+        {/* Existing profile selector */}
+        {mode === "existing" && (
+          <div className="mb-4">
+            {loadingProfiles ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Chargement...
+              </div>
+            ) : profiles.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aucun profil intervenant. Utilisez &quot;Nouveau profil&quot;.
+              </p>
+            ) : (
+              <select
+                value={selectedProfileId}
+                onChange={(e) => setSelectedProfileId(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">-- Choisir un intervenant --</option>
+                {profiles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.display_name ?? `${p.first_name} ${p.last_name}`}
+                    {p.fonction ? ` - ${p.fonction}` : ""}
+                    {p.enrollment_status === "enrolled" ? " (enrolle)" : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+
+        {/* Create new profile */}
+        {mode === "create" && (
+          <div className="space-y-3 mb-4">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-xs font-medium">Prenom *</label>
+                <Input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Jean"
+                  className="mt-1"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs font-medium">Nom *</label>
+                <Input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="DUPONT"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium">Fonction</label>
+              <Input
+                value={fonction}
+                onChange={(e) => setFonction(e.target.value)}
+                placeholder="Maire, Directeur..."
+                className="mt-1"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Mode test : le consentement RGPD est automatiquement accepte.
+            </p>
+          </div>
+        )}
+
+        {/* Error / Success */}
+        {error && <p className="text-sm text-destructive mb-4">{error}</p>}
+        {success && (
+          <div className="flex items-center gap-2 text-sm text-green-600 mb-4">
+            <CheckCircle2 className="w-4 h-4" />
+            {success}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button size="sm" onClick={handleSubmit} disabled={!canSubmit}>
+            {enroll.isPending && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+            {enroll.isPending ? "Enrollment en cours..." : "Enroller"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
