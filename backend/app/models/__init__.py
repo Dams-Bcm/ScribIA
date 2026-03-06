@@ -12,6 +12,7 @@ from app.models.procedures import (
 )
 from app.models.contacts import ContactGroup, Contact
 from app.models.ai_settings import AISetting, AI_USAGES
+from app.models.sector import Sector
 
 __all__ = [
     "Base", "Tenant", "TenantModule", "User", "AVAILABLE_MODULES",
@@ -25,4 +26,5 @@ __all__ = [
     "Procedure", "ProcedureParticipant", "ProcedureStatus",
     "ContactGroup", "Contact",
     "AISetting", "AI_USAGES",
+    "Sector",
 ]

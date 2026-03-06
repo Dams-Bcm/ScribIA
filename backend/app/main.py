@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     _add_missing_columns()
     _seed_super_admin()
+    _seed_sectors()
     _sync_tenant_modules()
     yield
 
@@ -122,6 +123,31 @@ def _seed_super_admin():
             tenant_id=tenant.id,
         )
         db.add(user)
+        db.commit()
+    finally:
+        db.close()
+
+
+def _seed_sectors():
+    """Seed default sectors if the sectors table is empty."""
+    import json as _json
+    from app.database import SessionLocal
+    from app.models.sector import Sector
+
+    _DEFAULT_SECTORS = [
+        ("syndic_copro", "Syndic de copropriété", ["procedures", "ai_documents", "convocations", "transcription", "contacts"]),
+        ("education_spe", "Éducation spécialisée / MDPH", ["preparatory_phases", "ai_documents", "transcription", "transcription_diarisation", "procedures"]),
+        ("collectivite", "Collectivité territoriale", ["transcription", "transcription_diarisation", "ai_documents", "procedures"]),
+        ("chantier", "Gestion de chantier", ["procedures", "transcription", "ai_documents"]),
+        ("sante", "Santé / Médico-social", ["transcription", "transcription_diarisation", "ai_documents", "rgpd", "procedures"]),
+    ]
+
+    db = SessionLocal()
+    try:
+        if db.query(Sector).first() is not None:
+            return
+        for key, label, modules in _DEFAULT_SECTORS:
+            db.add(Sector(key=key, label=label, default_modules=_json.dumps(modules)))
         db.commit()
     finally:
         db.close()

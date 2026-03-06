@@ -94,7 +94,7 @@ export function AISettingsPage() {
   }
 
   function getModelForUsage(usage: AIUsage): string | null {
-    if (usage.usage_key in overrides) return overrides[usage.usage_key];
+    if (usage.usage_key in overrides) return overrides[usage.usage_key] ?? null;
     return usage.model_name;
   }
 
@@ -106,7 +106,7 @@ export function AISettingsPage() {
   async function handleSave() {
     const body = data!.usages.map((u) => ({
       usage_key: u.usage_key,
-      model_name: u.usage_key in overrides ? overrides[u.usage_key] : u.model_name,
+      model_name: u.usage_key in overrides ? (overrides[u.usage_key] ?? null) : u.model_name,
     }));
     await updateSettings.mutateAsync(body);
     setOverrides({});

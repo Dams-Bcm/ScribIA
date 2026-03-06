@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
 from app.database import get_db
-from app.models import Tenant, TenantModule, User, AVAILABLE_MODULES, AuditLog, AIDocumentTemplate, ProcedureTemplate, ProcedureTemplateRole, AISetting, AI_USAGES
+from app.models import Tenant, TenantModule, User, AVAILABLE_MODULES, AuditLog, AIDocumentTemplate, ProcedureTemplate, ProcedureTemplateRole, AISetting, AI_USAGES, Sector
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantModuleUpdate
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.services.auth import hash_password
@@ -162,6 +162,108 @@ def update_tenant_modules(
 @router.get("/modules")
 def list_available_modules(_: User = Depends(require_super_admin)):
     return [{"key": k, "label": v} for k, v in AVAILABLE_MODULES.items()]
+
+
+# ── Sectors CRUD ─────────────────────────────────────────────────────────────
+
+@router.get("/sectors")
+def list_sectors(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Liste tous les secteurs."""
+    sectors = db.query(Sector).order_by(Sector.label).all()
+    return [
+        {
+            "id": s.id,
+            "key": s.key,
+            "label": s.label,
+            "default_modules": json.loads(s.default_modules) if s.default_modules else [],
+            "is_active": s.is_active,
+        }
+        for s in sectors
+    ]
+
+
+class SectorCreate(BaseModel):
+    key: str
+    label: str
+    default_modules: list[str] = []
+
+
+class SectorUpdate(BaseModel):
+    label: str | None = None
+    default_modules: list[str] | None = None
+    is_active: bool | None = None
+
+
+@router.post("/sectors", status_code=201)
+def create_sector(
+    body: SectorCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Crée un nouveau secteur."""
+    existing = db.query(Sector).filter_by(key=body.key).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Le secteur '{body.key}' existe déjà")
+    sector = Sector(
+        key=body.key,
+        label=body.label,
+        default_modules=json.dumps(body.default_modules, ensure_ascii=False),
+    )
+    db.add(sector)
+    db.commit()
+    db.refresh(sector)
+    return {
+        "id": sector.id,
+        "key": sector.key,
+        "label": sector.label,
+        "default_modules": json.loads(sector.default_modules),
+        "is_active": sector.is_active,
+    }
+
+
+@router.patch("/sectors/{sector_id}")
+def update_sector(
+    sector_id: str,
+    body: SectorUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Met à jour un secteur."""
+    sector = db.query(Sector).filter_by(id=sector_id).first()
+    if not sector:
+        raise HTTPException(status_code=404, detail="Secteur introuvable")
+    if body.label is not None:
+        sector.label = body.label
+    if body.default_modules is not None:
+        sector.default_modules = json.dumps(body.default_modules, ensure_ascii=False)
+    if body.is_active is not None:
+        sector.is_active = body.is_active
+    db.commit()
+    db.refresh(sector)
+    return {
+        "id": sector.id,
+        "key": sector.key,
+        "label": sector.label,
+        "default_modules": json.loads(sector.default_modules),
+        "is_active": sector.is_active,
+    }
+
+
+@router.delete("/sectors/{sector_id}", status_code=204)
+def delete_sector(
+    sector_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Supprime un secteur."""
+    sector = db.query(Sector).filter_by(id=sector_id).first()
+    if not sector:
+        raise HTTPException(status_code=404, detail="Secteur introuvable")
+    db.delete(sector)
+    db.commit()
 
 
 # ── Sector workflow templates ────────────────────────────────────────────────

@@ -17,6 +17,7 @@ import {
   ClipboardList,
   BookUser,
   Settings2,
+  FolderCog,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../lib/utils";
@@ -50,6 +51,7 @@ export function Layout() {
     // ── Administration ──
     { to: "/admin/organizations", label: "Organisations", icon: Building2, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/users", label: "Utilisateurs", icon: Users, visible: isSuperAdmin, section: "Administration" },
+    { to: "/admin/sectors", label: "Secteurs", icon: FolderCog, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/workflows", label: "Workflows", icon: Settings2, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/speakers", label: "Intervenants", icon: Mic, visible: isAdmin, section: "Administration" },
     { to: "/admin/ai-settings", label: "Gestion IA", icon: Sparkles, visible: isSuperAdmin, section: "Administration" },

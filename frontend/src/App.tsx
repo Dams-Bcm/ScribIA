@@ -29,6 +29,7 @@ import { SpeakersPage } from "./pages/admin/SpeakersPage";
 import { AuditLogsPage } from "./pages/admin/AuditLogsPage";
 import { WorkflowsPage } from "./pages/admin/WorkflowsPage";
 import { AISettingsPage } from "./pages/admin/AISettingsPage";
+import { SectorsPage } from "./pages/admin/SectorsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -88,6 +89,7 @@ function AppRoutes() {
           <Route path="admin/users" element={<UsersPage />} />
           <Route path="admin/speakers" element={<SpeakersPage />} />
           <Route path="admin/workflows" element={<WorkflowsPage />} />
+          <Route path="admin/sectors" element={<SectorsPage />} />
           <Route path="admin/ai-settings" element={<AISettingsPage />} />
           <Route path="admin/audit-logs" element={<AuditLogsPage />} />
         </Route>

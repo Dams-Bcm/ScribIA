@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
-import { SECTOR_PRESETS, type TenantSector } from "../../api/types";
+import { useSectors } from "../../api/hooks/useSectors";
 import type { FormQuestion, ProcedureTemplateRole } from "../../api/types";
 import { Settings2, Plus, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -65,7 +65,7 @@ interface GeneratedTemplate {
 
 // ── Template manager for a sector ───────────────────────────────────────────
 
-function SectorTemplateManager({ sector }: { sector: TenantSector }) {
+function SectorTemplateManager({ sector }: { sector: string }) {
   const { data: templates = [], isLoading } = useSectorTemplates(sector);
   const createTemplate = useCreateSectorTemplate(sector);
   const deleteTemplate = useDeleteSectorTemplate(sector);
@@ -380,7 +380,8 @@ function SectorTemplateManager({ sector }: { sector: TenantSector }) {
 // ── Main page ───────────────────────────────────────────────────────────────
 
 export function WorkflowsPage() {
-  const [selectedSector, setSelectedSector] = useState<TenantSector | null>(null);
+  const { data: sectors = [], isLoading: sectorsLoading } = useSectors();
+  const [selectedSector, setSelectedSector] = useState<string | null>(null);
 
   return (
     <div>
@@ -397,20 +398,26 @@ export function WorkflowsPage() {
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-2">
             Secteurs
           </p>
-          {SECTOR_PRESETS.map((s) => (
-            <button
-              key={s.key}
-              onClick={() => setSelectedSector(s.key)}
-              className={`flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
-                selectedSector === s.key
-                  ? "bg-primary/5 border border-primary/20"
-                  : "hover:bg-accent border border-transparent"
-              }`}
-            >
-              <Settings2 className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="truncate">{s.label}</span>
-            </button>
-          ))}
+          {sectorsLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            sectors.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setSelectedSector(s.key)}
+                className={`flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
+                  selectedSector === s.key
+                    ? "bg-primary/5 border border-primary/20"
+                    : "hover:bg-accent border border-transparent"
+                }`}
+              >
+                <Settings2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className="truncate">{s.label}</span>
+              </button>
+            ))
+          )}
         </div>
 
         {/* Template manager for selected sector */}
@@ -419,7 +426,7 @@ export function WorkflowsPage() {
             <div className="bg-background rounded-xl border border-border p-6">
               <div className="mb-4">
                 <h2 className="text-lg font-bold">
-                  {SECTOR_PRESETS.find((s) => s.key === selectedSector)?.label}
+                  {sectors.find((s) => s.key === selectedSector)?.label}
                 </h2>
                 <p className="text-xs text-muted-foreground">
                   Ces templates seront copiés lors du provisionnement d'un nouveau client de ce secteur.

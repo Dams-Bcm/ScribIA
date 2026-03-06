@@ -6,7 +6,8 @@ import {
   useUpdateTenantModules,
   useProvisionTenant,
 } from "../../api/hooks/useTenants";
-import { AVAILABLE_MODULES, SECTOR_PRESETS, type Tenant, type TenantSector, type ProvisionResult } from "../../api/types";
+import { AVAILABLE_MODULES, type Tenant, type ProvisionResult } from "../../api/types";
+import { useSectors } from "../../api/hooks/useSectors";
 import { Building2, Plus, Trash2, X, CheckCircle2, Sparkles } from "lucide-react";
 
 export function OrganizationsPage() {
@@ -16,14 +17,16 @@ export function OrganizationsPage() {
   const updateModules = useUpdateTenantModules();
   const provisionTenant = useProvisionTenant();
 
+  const { data: sectors = [] } = useSectors();
+
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", slug: "", tenant_type: "organization" as string, sector: null as TenantSector | null, modules: [] as string[] });
+  const [form, setForm] = useState({ name: "", slug: "", tenant_type: "organization" as string, sector: null as string | null, modules: [] as string[] });
   const [provisionResult, setProvisionResult] = useState<ProvisionResult | null>(null);
 
-  function handleSectorChange(sector: TenantSector | null) {
-    const preset = sector ? SECTOR_PRESETS.find((p) => p.key === sector) : null;
-    setForm((f) => ({ ...f, sector, modules: preset ? preset.defaultModules : [] }));
+  function handleSectorChange(sector: string | null) {
+    const preset = sector ? sectors.find((p) => p.key === sector) : null;
+    setForm((f) => ({ ...f, sector, modules: preset ? preset.default_modules : [] }));
   }
 
   const selected = tenants.find((t) => t.id === selectedId) ?? null;
@@ -126,7 +129,7 @@ export function OrganizationsPage() {
               <p className="text-sm text-muted-foreground mb-4">
                 {selected.slug} &middot; {selected.tenant_type === "group" ? "Groupe" : "Organisation"}
                 {selected.sector && (
-                  <> &middot; <span className="font-medium text-foreground">{SECTOR_PRESETS.find((s) => s.key === selected.sector)?.label ?? selected.sector}</span></>
+                  <> &middot; <span className="font-medium text-foreground">{sectors.find((s) => s.key === selected.sector)?.label ?? selected.sector}</span></>
                 )}
               </p>
 
@@ -184,7 +187,7 @@ export function OrganizationsPage() {
                   <CheckCircle2 className="w-10 h-10 text-green-500" />
                   <p className="font-semibold">Provisionnement terminé</p>
                   <p className="text-sm text-muted-foreground">
-                    {SECTOR_PRESETS.find((s) => s.key === provisionResult.sector)?.label ?? provisionResult.sector}
+                    {sectors.find((s) => s.key === provisionResult.sector)?.label ?? provisionResult.sector}
                   </p>
                 </div>
                 <div className="space-y-3 mt-2">
@@ -273,11 +276,11 @@ export function OrganizationsPage() {
                     </label>
                     <select
                       value={form.sector ?? ""}
-                      onChange={(e) => handleSectorChange((e.target.value as TenantSector) || null)}
+                      onChange={(e) => handleSectorChange(e.target.value || null)}
                       className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                       <option value="">— Générique (sans provisionnement) —</option>
-                      {SECTOR_PRESETS.map((s) => (
+                      {sectors.map((s) => (
                         <option key={s.key} value={s.key}>{s.label}</option>
                       ))}
                     </select>
