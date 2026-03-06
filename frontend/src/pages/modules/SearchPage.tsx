@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Search, Send, Loader2, FileText, Mic, ClipboardList, RefreshCw, Filter } from "lucide-react";
+import { Search, Send, Loader2, FileText, Mic, ClipboardList, RefreshCw, Filter, BookUser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -21,12 +21,14 @@ const SOURCE_ICONS: Record<string, React.ElementType> = {
   ai_document: FileText,
   transcription: Mic,
   procedure: ClipboardList,
+  contact: BookUser,
 };
 
 const SOURCE_LABELS: Record<string, string> = {
   ai_document: "Document IA",
   transcription: "Transcription",
   procedure: "Procédure",
+  contact: "Contact",
 };
 
 const FILTER_OPTIONS = [
@@ -34,6 +36,7 @@ const FILTER_OPTIONS = [
   { value: "ai_document", label: "Documents IA" },
   { value: "transcription", label: "Transcriptions" },
   { value: "procedure", label: "Procédures" },
+  { value: "contact", label: "Contacts" },
 ];
 
 export function SearchPage() {
@@ -226,7 +229,7 @@ function SearchChat() {
       {reindex.isSuccess && reindex.data && (
         <p className="text-xs text-muted-foreground mt-1">
           Réindexation terminée : {reindex.data.chunks_total} chunks
-          ({reindex.data.ai_documents} docs, {reindex.data.transcriptions} transcriptions, {reindex.data.procedures} procédures)
+          ({reindex.data.ai_documents} docs, {reindex.data.transcriptions} transcriptions, {reindex.data.procedures} procédures, {reindex.data.contacts} groupes contacts)
         </p>
       )}
     </div>

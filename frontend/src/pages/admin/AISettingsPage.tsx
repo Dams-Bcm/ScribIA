@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle } from "lucide-react";
+import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search } from "lucide-react";
 
 interface AIUsage {
   usage_key: string;
@@ -22,10 +22,29 @@ interface AISettingsResponse {
   ollama_url: string;
 }
 
+interface RAGSetting {
+  key: string;
+  label: string;
+  value: string;
+  default: string;
+}
+
+interface RAGSettingsResponse {
+  settings: RAGSetting[];
+  chroma_url: string;
+}
+
 function useAISettings() {
   return useQuery({
     queryKey: ["ai-settings"],
     queryFn: () => api.get<AISettingsResponse>("/admin/ai-settings"),
+  });
+}
+
+function useRAGSettings() {
+  return useQuery({
+    queryKey: ["rag-settings"],
+    queryFn: () => api.get<RAGSettingsResponse>("/admin/rag-settings"),
   });
 }
 
@@ -35,6 +54,15 @@ function useUpdateAISettings() {
     mutationFn: (body: { usage_key: string; model_name: string | null }[]) =>
       api.put("/admin/ai-settings", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ai-settings"] }),
+  });
+}
+
+function useUpdateRAGSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { key: string; value: string }[]) =>
+      api.put("/admin/rag-settings", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rag-settings"] }),
   });
 }
 
@@ -77,13 +105,17 @@ function useDeleteModel() {
 
 export function AISettingsPage() {
   const { data, isLoading } = useAISettings();
+  const { data: ragData } = useRAGSettings();
   const updateSettings = useUpdateAISettings();
+  const updateRAG = useUpdateRAGSettings();
   const pullModel = usePullModel();
   const deleteModel = useDeleteModel();
 
   const [overrides, setOverrides] = useState<Record<string, string | null>>({});
+  const [ragOverrides, setRAGOverrides] = useState<Record<string, string>>({});
   const [pullName, setPullName] = useState("");
   const [saved, setSaved] = useState(false);
+  const [ragSaved, setRAGSaved] = useState(false);
 
   if (isLoading || !data) {
     return (
@@ -114,6 +146,14 @@ export function AISettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   }
 
+  async function handleRAGSave() {
+    const body = Object.entries(ragOverrides).map(([key, value]) => ({ key, value }));
+    await updateRAG.mutateAsync(body);
+    setRAGOverrides({});
+    setRAGSaved(true);
+    setTimeout(() => setRAGSaved(false), 2000);
+  }
+
   async function handlePull() {
     if (!pullName.trim()) return;
     await pullModel.mutateAsync(pullName.trim());
@@ -121,19 +161,21 @@ export function AISettingsPage() {
   }
 
   const hasChanges = Object.keys(overrides).length > 0;
+  const hasRAGChanges = Object.keys(ragOverrides).length > 0;
 
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Gestion IA</h1>
         <p className="text-sm text-muted-foreground">
-          Configurez les modèles Ollama utilisés par chaque module
+          Configurez les modèles Ollama et les paramètres de recherche
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-        {/* Model assignments */}
+        {/* Left panel */}
         <div className="space-y-6">
+          {/* Model assignments */}
           <div className="bg-background rounded-xl border border-border p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Affectation des modèles</h2>
@@ -183,6 +225,54 @@ export function AISettingsPage() {
               })}
             </div>
           </div>
+
+          {/* RAG Settings */}
+          {ragData && (
+            <div className="bg-background rounded-xl border border-border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Search className="w-4 h-4" />
+                  <h2 className="text-lg font-semibold">Recherche intelligente (RAG)</h2>
+                </div>
+                <Button size="sm" onClick={handleRAGSave} disabled={!hasRAGChanges && !ragSaved || updateRAG.isPending}>
+                  {ragSaved ? (
+                    <><Check className="w-4 h-4 mr-1" /> Sauvegardé</>
+                  ) : updateRAG.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Sauvegarde…</>
+                  ) : (
+                    <><Save className="w-4 h-4 mr-1" /> Sauvegarder</>
+                  )}
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground mb-4">
+                ChromaDB : <span className="font-mono font-medium text-foreground">{ragData.chroma_url}</span>
+              </p>
+
+              <div className="space-y-4">
+                {ragData.settings.map((s) => (
+                  <div key={s.key} className="flex items-center gap-4">
+                    <div className="w-60 shrink-0">
+                      <Label className="text-sm font-medium">{s.label}</Label>
+                      <p className="text-xs text-muted-foreground">défaut : {s.default}</p>
+                    </div>
+                    <Input
+                      className="flex-1 font-mono text-sm"
+                      value={ragOverrides[s.key] ?? s.value}
+                      onChange={(e) => {
+                        setRAGOverrides({ ...ragOverrides, [s.key]: e.target.value });
+                        setRAGSaved(false);
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-muted-foreground mt-4">
+                Les modifications sont appliquées immédiatement. Une réindexation est nécessaire après changement de la taille des chunks.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Right panel: models management */}

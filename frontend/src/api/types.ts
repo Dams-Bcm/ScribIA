@@ -701,5 +701,6 @@ export interface ReindexResponse {
   ai_documents: number;
   transcriptions: number;
   procedures: number;
+  contacts: number;
   chunks_total: number;
 }

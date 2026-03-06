@@ -133,6 +133,44 @@ def index_procedure(tenant_id: str, procedure_id: str, title: str,
     return len(chunks)
 
 
+def index_contact_group(tenant_id: str, group_id: str, group_name: str,
+                        description: Optional[str], contacts: list[dict]) -> int:
+    """Indexe un groupe de contacts avec tous ses membres."""
+    parts = [f"[Groupe de contacts : {group_name}]"]
+    if description:
+        parts.append(description)
+
+    for c in contacts:
+        line = c.get("name", "")
+        if c.get("role"):
+            line += f" ({c['role']})"
+        if c.get("email"):
+            line += f" — {c['email']}"
+        if c.get("phone"):
+            line += f" — {c['phone']}"
+        custom = c.get("custom_fields", {})
+        if custom:
+            extras = [f"{k}: {v}" for k, v in custom.items() if v]
+            if extras:
+                line += f" — {', '.join(extras)}"
+        parts.append(line)
+
+    full_text = "\n".join(parts)
+    if len(full_text.strip()) < 10:
+        return 0
+
+    chunks = _chunk_text(full_text)
+    doc_ids = [f"contact_{group_id}_{i}" for i in range(len(chunks))]
+    metadatas = [
+        {"source_type": "contact", "source_id": group_id, "title": group_name, "chunk_index": i}
+        for i in range(len(chunks))
+    ]
+
+    embeddings = embed_texts(chunks)
+    vectorstore.add_documents(tenant_id, doc_ids, embeddings, chunks, metadatas)
+    return len(chunks)
+
+
 def delete_source(tenant_id: str, source_type: str, source_id: str) -> None:
     """Supprime un document source de l'index."""
     vectorstore.delete_by_source(tenant_id, source_type, source_id)
@@ -145,7 +183,7 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
     """Réindexe toutes les données d'un tenant. Retourne un récapitulatif."""
     from app.models import AIDocument, Procedure, ProcedureParticipant
 
-    stats = {"ai_documents": 0, "transcriptions": 0, "procedures": 0, "chunks_total": 0}
+    stats = {"ai_documents": 0, "transcriptions": 0, "procedures": 0, "contacts": 0, "chunks_total": 0}
 
     # Purge existing data for this tenant before reindex
     try:
@@ -157,10 +195,11 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
         pass  # collection may not exist yet
 
     # 1. Documents IA
-    docs = db.query(AIDocument).filter(
-        AIDocument.tenant_id == tenant_id,
-        AIDocument.status == "completed",
-    ).all()
+    all_docs = db.query(AIDocument).filter(AIDocument.tenant_id == tenant_id).all()
+    logger.warning("[RAG] Total AI documents for tenant %s: %d (statuses: %s)",
+                   tenant_id, len(all_docs),
+                   {d.status for d in all_docs} if all_docs else "none")
+    docs = [d for d in all_docs if d.status == "completed"]
     logger.warning("[RAG] Found %d completed AI documents for tenant %s", len(docs), tenant_id)
     for doc in docs:
         if doc.result_text:
@@ -212,5 +251,32 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
         stats["procedures"] += 1
         stats["chunks_total"] += n
 
-    logger.info("[RAG] Reindexed tenant %s: %s", tenant_id, stats)
+    # 4. Contacts
+    from app.models.contacts import ContactGroup, Contact
+    groups = db.query(ContactGroup).filter(
+        ContactGroup.tenant_id == tenant_id,
+    ).all()
+    for group in groups:
+        contacts_list = db.query(Contact).filter_by(group_id=group.id).all()
+        if contacts_list:
+            c_data = []
+            for c in contacts_list:
+                custom = {}
+                if c.custom_fields:
+                    try:
+                        custom = json.loads(c.custom_fields)
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                c_data.append({
+                    "name": c.name,
+                    "email": c.email or "",
+                    "phone": c.phone or "",
+                    "role": c.role or "",
+                    "custom_fields": custom,
+                })
+            n = index_contact_group(tenant_id, group.id, group.name, group.description, c_data)
+            stats["contacts"] += 1
+            stats["chunks_total"] += n
+
+    logger.warning("[RAG] Reindexed tenant %s: %s", tenant_id, stats)
     return stats

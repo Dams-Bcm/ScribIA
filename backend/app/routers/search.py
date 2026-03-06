@@ -47,6 +47,7 @@ class ReindexResponse(BaseModel):
     ai_documents: int
     transcriptions: int
     procedures: int
+    contacts: int
     chunks_total: int
 
 
@@ -63,7 +64,7 @@ def ask_question(
     if not body.question.strip():
         raise HTTPException(status_code=400, detail="La question ne peut pas être vide.")
 
-    if body.source_filter and body.source_filter not in ("ai_document", "transcription", "procedure"):
+    if body.source_filter and body.source_filter not in ("ai_document", "transcription", "procedure", "contact"):
         raise HTTPException(status_code=400, detail="Filtre source invalide.")
 
     result = rag.ask(user.tenant_id, body.question, body.source_filter)

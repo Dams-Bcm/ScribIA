@@ -962,6 +962,60 @@ def update_ai_settings(
     return {"message": "Configuration IA mise à jour"}
 
 
+# ── RAG / Search Settings ────────────────────────────────────────────────────
+
+RAG_SETTINGS_KEYS = {
+    "rag_chunk_size": ("Taille des chunks (caractères)", "1500"),
+    "rag_chunk_overlap": ("Chevauchement des chunks", "200"),
+    "rag_top_k": ("Nombre de résultats (top-k)", "10"),
+    "embedding_model": ("Modèle d'embeddings", "nomic-embed-text"),
+}
+
+
+@router.get("/rag-settings")
+def get_rag_settings(
+    _: User = Depends(require_super_admin),
+):
+    """Retourne la configuration RAG actuelle."""
+    return {
+        "settings": [
+            {
+                "key": key,
+                "label": label,
+                "value": str(getattr(settings, key, default)),
+                "default": default,
+            }
+            for key, (label, default) in RAG_SETTINGS_KEYS.items()
+        ],
+        "chroma_url": settings.chroma_url,
+    }
+
+
+class RAGSettingUpdate(BaseModel):
+    key: str
+    value: str
+
+
+@router.put("/rag-settings")
+def update_rag_settings(
+    body: list[RAGSettingUpdate],
+    _: User = Depends(require_super_admin),
+):
+    """Met à jour les paramètres RAG (appliqués au runtime)."""
+    for item in body:
+        if item.key not in RAG_SETTINGS_KEYS:
+            continue
+        # Update settings object at runtime
+        if item.key in ("rag_chunk_size", "rag_chunk_overlap", "rag_top_k"):
+            try:
+                setattr(settings, item.key, int(item.value))
+            except ValueError:
+                pass
+        elif item.key == "embedding_model":
+            settings.embedding_model = item.value
+    return {"message": "Paramètres RAG mis à jour"}
+
+
 # ── Audit logs ────────────────────────────────────────────────────────────────
 
 
