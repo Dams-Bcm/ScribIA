@@ -15,7 +15,7 @@ from app.models import Base, Tenant, TenantModule, User, AVAILABLE_MODULES
 print("[BOOT] importing auth...", flush=True)
 from app.services.auth import hash_password
 print("[BOOT] importing routers...", flush=True)
-from app.routers import health, auth, admin, privacy, transcription, diarisation, compliance, preparatory_phases, ai_documents, speakers, contacts, search, dictionary
+from app.routers import health, auth, admin, privacy, transcription, diarisation, compliance, preparatory_phases, ai_documents, speakers, contacts, search, dictionary, consent
 print("[BOOT] importing procedures...", flush=True)
 from app.routers.procedures import router as procedures_router, public_router as procedures_public_router
 print("[BOOT] importing middleware...", flush=True)
@@ -154,6 +154,14 @@ def _add_missing_columns():
                 "ALTER TABLE procedures ADD current_step_index INT NULL"
             ))
 
+        # speaker_profiles: contact_id
+        if "speaker_profiles" in insp.get_table_names():
+            sp_cols = {c["name"] for c in insp.get_columns("speaker_profiles")}
+            if "contact_id" not in sp_cols:
+                conn.execute(text(
+                    "ALTER TABLE speaker_profiles ADD contact_id VARCHAR(36) NULL"
+                ))
+
         conn.commit()
 
 
@@ -274,3 +282,4 @@ app.include_router(procedures_public_router)
 app.include_router(contacts.router)
 app.include_router(search.router)
 app.include_router(dictionary.router)
+app.include_router(consent.router)

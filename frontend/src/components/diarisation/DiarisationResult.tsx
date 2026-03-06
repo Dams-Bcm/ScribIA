@@ -7,6 +7,7 @@ import type { DiarisationSegment, DiarisationSpeaker } from "@/api/types";
 import { getSpeakerColor } from "./speakerColors";
 import { SpeakerPanel } from "./SpeakerPanel";
 import { EnrollFromSelectionModal } from "./EnrollFromSelectionModal";
+import { ConsentPanel } from "./ConsentPanel";
 
 interface DiarisationResultProps {
   segments: DiarisationSegment[];
@@ -178,6 +179,9 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
           previewText={segments.map((s) => s.text).join("\n")}
         />
       </div>
+
+      {/* Consent panel */}
+      <ConsentPanel jobId={jobId} />
 
       {/* Lecteur audio (masque, controle par les boutons segments) */}
       {audioUrl ? (

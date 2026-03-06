@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../client";
-import type { SpeakerProfile } from "../types";
+import type { SpeakerProfile, OralConsentDetection, CollectiveConsentResult } from "../types";
 
 export function useSpeakers() {
   return useQuery<SpeakerProfile[]>({
@@ -64,6 +64,45 @@ export function useCreateSpeaker() {
   return useMutation({
     mutationFn: (body: { first_name: string; last_name: string; fonction?: string }) =>
       api.post<SpeakerProfile>("/speakers", body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "speakers"] });
+    },
+  });
+}
+
+export function useDetectOralConsent() {
+  return useMutation({
+    mutationFn: (jobId: string) =>
+      api.post<OralConsentDetection>(`/diarisation/${jobId}/detect-oral-consent`),
+  });
+}
+
+export function useValidateCollectiveConsent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      jobId,
+      body,
+    }: {
+      jobId: string;
+      body: { consent_segment_id?: string; contact_ids: string[] };
+    }) =>
+      api.post<CollectiveConsentResult>(
+        `/diarisation/${jobId}/validate-collective-consent`,
+        body,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "speakers"] });
+      qc.invalidateQueries({ queryKey: ["diarisation"] });
+    },
+  });
+}
+
+export function useSendConsent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (profileId: string) =>
+      api.post<SpeakerProfile>(`/speakers/${profileId}/send-consent`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "speakers"] });
     },

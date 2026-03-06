@@ -62,8 +62,12 @@ class SpeakerProfile(UUIDMixin, TimestampMixin, Base):
     # Partage avec le tenant parent (EPCI)
     share_with_parent_tenant = Column(Boolean, nullable=False, default=False)
 
+    # ── Lien Contact (module Contacts) ────────────────────────────────────────
+    contact_id = Column(String(36), ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True)
+
     # ── Relations ───────────────────────────────────────────────────────────────
     tenant               = relationship("Tenant", back_populates="speaker_profiles")
+    contact              = relationship("Contact", foreign_keys=[contact_id])
     consent_validator    = relationship("User", foreign_keys=[consent_validated_by])
     consent_segment      = relationship("TranscriptionSegment", foreign_keys=[consent_segment_id])
     enrollment_segments  = relationship(

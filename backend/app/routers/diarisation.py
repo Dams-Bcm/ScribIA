@@ -23,6 +23,7 @@ from app.schemas.diarisation import (
     DiarisationJobUploadResponse,
     SpeakerRenameRequest,
     EnrollFromSegmentRequest,
+    ValidateCollectiveConsentRequest,
 )
 from app.deps import require_super_admin
 from app.services.event_bus import event_bus
@@ -530,4 +531,252 @@ def enroll_from_segment(
         "profile_id": profile.id,
         "display_name": profile.display_name,
         "duration": round(duration, 1),
+    }
+
+
+# ── Oral consent detection via LLM ──────────────────────────────────────────
+
+@router.post("/{job_id}/detect-oral-consent")
+def detect_oral_consent(
+    job_id: str,
+    user: User = Depends(get_current_user),
+    _mod: bool = Depends(require_module("transcription_diarisation")),
+    db: Session = Depends(get_db),
+):
+    """
+    Use LLM to analyze the transcription and detect if an oral consent
+    phrase is present (e.g. 'cette reunion va etre enregistree').
+    Returns the detected phrase, the segment, and a confidence level.
+    """
+    from app.schemas.diarisation import OralConsentDetectionResponse
+
+    job = (
+        db.query(TranscriptionJob)
+        .filter(
+            TranscriptionJob.id == job_id,
+            TranscriptionJob.tenant_id == user.tenant_id,
+            TranscriptionJob.mode == "diarisation",
+        )
+        .first()
+    )
+    if not job:
+        raise HTTPException(404, "Job introuvable")
+    if job.status != TranscriptionJobStatus.COMPLETED:
+        raise HTTPException(400, "La transcription n'est pas terminee")
+
+    segments = (
+        db.query(TranscriptionSegment)
+        .filter(TranscriptionSegment.job_id == job_id)
+        .order_by(TranscriptionSegment.order_index)
+        .all()
+    )
+    if not segments:
+        return OralConsentDetectionResponse(detected=False)
+
+    # Build transcript text for LLM analysis (first ~50 segments should be enough)
+    analysis_segments = segments[:50]
+    transcript_lines = []
+    for seg in analysis_segments:
+        label = seg.speaker_label or seg.speaker_id or ""
+        prefix = f"[{label}] " if label else ""
+        transcript_lines.append(f"[{seg.start_time:.1f}-{seg.end_time:.1f}] {prefix}{seg.text}")
+    transcript_text = "\n".join(transcript_lines)
+
+    # Call LLM
+    import requests as http_requests
+    from app.config import settings as app_settings
+    from app.services.ai_config import get_model_for_usage
+
+    model = get_model_for_usage("consent_detection")
+
+    system_prompt = (
+        "Tu es un assistant d'analyse de transcriptions de reunions. "
+        "Tu dois determiner si la transcription contient une phrase de consentement oral "
+        "a l'enregistrement, telle que : 'cette reunion va etre enregistree', "
+        "'nous enregistrons cette seance', 'l'enregistrement est en cours', "
+        "'vous acceptez l'enregistrement', ou toute formulation equivalente.\n\n"
+        "Reponds UNIQUEMENT en JSON valide avec cette structure :\n"
+        '{"detected": true/false, "phrase": "la phrase exacte trouvee ou null", '
+        '"segment_time": "start_time-end_time ou null", '
+        '"confidence": "high/medium/low", '
+        '"explanation": "courte explication"}\n\n'
+        "Si aucune phrase de consentement n'est trouvee, reponds :\n"
+        '{"detected": false, "phrase": null, "segment_time": null, "confidence": null, "explanation": "Aucune phrase de consentement detectee."}'
+    )
+
+    user_prompt = f"Analyse cette transcription :\n\n{transcript_text}"
+
+    try:
+        resp = http_requests.post(
+            f"{app_settings.ollama_url}/api/generate",
+            json={
+                "model": model,
+                "system": system_prompt,
+                "prompt": user_prompt,
+                "stream": False,
+                "keep_alive": 0,
+                "options": {"temperature": 0.1},
+            },
+            timeout=120,
+        )
+        resp.raise_for_status()
+        llm_response = resp.json().get("response", "")
+    except Exception as e:
+        raise HTTPException(500, f"Erreur lors de l'analyse LLM : {e}")
+
+    # Parse LLM JSON response
+    import re
+    json_match = re.search(r'\{[^{}]*\}', llm_response, re.DOTALL)
+    if not json_match:
+        return OralConsentDetectionResponse(detected=False, explanation="Reponse LLM non exploitable.")
+
+    try:
+        result = json.loads(json_match.group())
+    except json.JSONDecodeError:
+        return OralConsentDetectionResponse(detected=False, explanation="Reponse LLM non exploitable.")
+
+    if not result.get("detected"):
+        return OralConsentDetectionResponse(
+            detected=False,
+            explanation=result.get("explanation", "Aucune phrase de consentement detectee."),
+        )
+
+    # Find the matching segment
+    consent_phrase = result.get("phrase", "")
+    matched_seg = None
+    seg_time = result.get("segment_time")
+
+    if seg_time and "-" in str(seg_time):
+        try:
+            start_str, end_str = str(seg_time).split("-", 1)
+            target_start = float(start_str)
+            for seg in analysis_segments:
+                if abs(seg.start_time - target_start) < 2.0:
+                    matched_seg = seg
+                    break
+        except (ValueError, TypeError):
+            pass
+
+    # Fallback: search by text content
+    if not matched_seg and consent_phrase:
+        phrase_lower = consent_phrase.lower()
+        for seg in analysis_segments:
+            if phrase_lower[:30] in seg.text.lower():
+                matched_seg = seg
+                break
+
+    return OralConsentDetectionResponse(
+        detected=True,
+        consent_phrase=consent_phrase,
+        segment_id=matched_seg.id if matched_seg else None,
+        start_time=matched_seg.start_time if matched_seg else None,
+        end_time=matched_seg.end_time if matched_seg else None,
+        confidence=result.get("confidence", "medium"),
+        explanation=result.get("explanation"),
+    )
+
+
+# ── Validate collective oral consent ────────────────────────────────────────
+
+@router.post("/{job_id}/validate-collective-consent")
+def validate_collective_consent(
+    job_id: str,
+    body: ValidateCollectiveConsentRequest,
+    user: User = Depends(get_current_user),
+    _mod: bool = Depends(require_module("transcription_diarisation")),
+    db: Session = Depends(get_db),
+):
+    """
+    Admin validates collective oral consent for a list of contacts.
+    Creates or updates SpeakerProfiles linked to the contacts, tagging them
+    with consent_status='accepted', consent_type='oral_recording', consent_scope='collective'.
+    """
+    import secrets
+    from datetime import datetime, timezone
+
+    from app.models.speaker import SpeakerProfile
+    from app.models.contacts import Contact
+
+    if not user.is_admin:
+        raise HTTPException(403, "Acces reserve aux administrateurs")
+
+    job = (
+        db.query(TranscriptionJob)
+        .filter(
+            TranscriptionJob.id == job_id,
+            TranscriptionJob.tenant_id == user.tenant_id,
+            TranscriptionJob.mode == "diarisation",
+        )
+        .first()
+    )
+    if not job:
+        raise HTTPException(404, "Job introuvable")
+
+    if not body.contact_ids:
+        raise HTTPException(400, "Aucun contact selectionne")
+
+    # Fetch contacts
+    contacts = (
+        db.query(Contact)
+        .filter(
+            Contact.id.in_(body.contact_ids),
+            Contact.tenant_id == user.tenant_id,
+        )
+        .all()
+    )
+    if not contacts:
+        raise HTTPException(404, "Aucun contact trouve")
+
+    now = datetime.now(timezone.utc)
+    results = []
+
+    for contact in contacts:
+        # Check if a SpeakerProfile already exists for this contact
+        profile = (
+            db.query(SpeakerProfile)
+            .filter(SpeakerProfile.contact_id == contact.id)
+            .first()
+        )
+
+        if profile:
+            # Update existing profile consent
+            profile.consent_status = "accepted"
+            profile.consent_type = "oral_recording"
+            profile.consent_scope = "collective"
+            profile.consent_date = now
+            profile.consent_validated_by = user.id
+            if body.consent_segment_id:
+                profile.consent_segment_id = body.consent_segment_id
+        else:
+            # Create new SpeakerProfile linked to the contact
+            # Parse contact name into first/last
+            name_parts = contact.name.strip().split(" ", 1)
+            first_name = name_parts[0] if name_parts else contact.name
+            last_name = name_parts[1] if len(name_parts) > 1 else ""
+
+            profile = SpeakerProfile(
+                tenant_id=user.tenant_id,
+                contact_id=contact.id,
+                first_name=first_name,
+                last_name=last_name.upper(),
+                display_name=contact.name,
+                fonction=contact.role,
+                email=contact.email,
+                phone_number=contact.phone,
+                consent_status="accepted",
+                consent_type="oral_recording",
+                consent_scope="collective",
+                consent_date=now,
+                consent_validated_by=user.id,
+                consent_segment_id=body.consent_segment_id,
+                withdrawal_token=secrets.token_urlsafe(32),
+            )
+            db.add(profile)
+
+        results.append({"contact_id": contact.id, "name": contact.name})
+
+    db.commit()
+    return {
+        "message": f"Consentement collectif valide pour {len(results)} contact(s)",
+        "contacts": results,
     }

@@ -72,3 +72,18 @@ class EnrollFromSegmentRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     fonction: Optional[str] = None
+
+
+class OralConsentDetectionResponse(BaseModel):
+    detected: bool
+    consent_phrase: Optional[str] = None
+    segment_id: Optional[str] = None
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+    confidence: Optional[str] = None  # "high" | "medium" | "low"
+    explanation: Optional[str] = None
+
+
+class ValidateCollectiveConsentRequest(BaseModel):
+    consent_segment_id: Optional[str] = None  # segment where consent was detected
+    contact_ids: list[str] = []  # contacts to tag as consented

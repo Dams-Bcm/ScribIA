@@ -9,6 +9,7 @@ class SpeakerProfileCreate(BaseModel):
     fonction: Optional[str] = None
     email: Optional[str] = None
     phone_number: Optional[str] = None
+    contact_id: Optional[str] = None
 
 
 class SpeakerProfileUpdate(BaseModel):
@@ -28,6 +29,7 @@ class SpeakerProfileResponse(BaseModel):
     fonction: Optional[str]
     email: Optional[str]
     phone_number: Optional[str]
+    contact_id: Optional[str] = None
     consent_status: Optional[str]
     consent_type: Optional[str]
     consent_scope: Optional[str]

@@ -448,6 +448,7 @@ export interface SpeakerProfile {
   fonction: string | null;
   email: string | null;
   phone_number: string | null;
+  contact_id: string | null;
   consent_status: ConsentStatus | null;
   consent_type: ConsentType | null;
   consent_scope: ConsentScope | null;
@@ -458,6 +459,21 @@ export interface SpeakerProfile {
   share_with_parent_tenant: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface OralConsentDetection {
+  detected: boolean;
+  consent_phrase: string | null;
+  segment_id: string | null;
+  start_time: number | null;
+  end_time: number | null;
+  confidence: "high" | "medium" | "low" | null;
+  explanation: string | null;
+}
+
+export interface CollectiveConsentResult {
+  message: string;
+  contacts: { contact_id: string; name: string }[];
 }
 
 export interface SpeakerProfileCreate {

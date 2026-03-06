@@ -48,6 +48,7 @@ def create_speaker(
         fonction=body.fonction,
         email=body.email.strip().lower() if body.email else None,
         phone_number=body.phone_number,
+        contact_id=body.contact_id,
     )
     db.add(profile)
     db.commit()
@@ -216,11 +217,18 @@ def send_consent_email(
     from datetime import datetime
 
     profile.consent_type = "email"
+    profile.consent_scope = "individual"
     profile.consent_status = "sent"
     profile.consent_token = secrets.token_urlsafe(32)
     profile.consent_token_expires = datetime.now(timezone.utc) + timedelta(days=30)
+    if not profile.withdrawal_token:
+        profile.withdrawal_token = secrets.token_urlsafe(32)
 
     # TODO: envoyer l'email réel quand le service email sera configuré
+    # Liens :
+    #   Accepter : /api/consent/accept?token={profile.consent_token}
+    #   Refuser  : /api/consent/decline?token={profile.consent_token}
+    #   Retirer  : /api/consent/withdraw?token={profile.withdrawal_token}
 
     db.commit()
     db.refresh(profile)
