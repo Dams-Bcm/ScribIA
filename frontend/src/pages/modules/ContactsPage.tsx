@@ -7,6 +7,10 @@ import {
   ArrowLeft,
   UserPlus,
   Loader2,
+  ShieldCheck,
+  ShieldX,
+  Send,
+  Mic,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -108,6 +112,39 @@ function AddContactForm({ groupId, onDone }: { groupId: string; onDone: () => vo
   );
 }
 
+// ── Consent / Enrollment badges ─────────────────────────────────────────────
+
+function ConsentBadge({ status, type }: { status: string | null; type: string | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  const map: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
+    accepted: { label: "Accepté", cls: "bg-green-100 text-green-700", icon: <ShieldCheck className="w-3 h-3" /> },
+    declined: { label: "Refusé", cls: "bg-red-100 text-red-700", icon: <ShieldX className="w-3 h-3" /> },
+    sent: { label: "Envoyé", cls: "bg-yellow-100 text-yellow-700", icon: <Send className="w-3 h-3" /> },
+    withdrawn: { label: "Retiré", cls: "bg-gray-100 text-gray-600", icon: <ShieldX className="w-3 h-3" /> },
+  };
+  const info = map[status] ?? { label: status, cls: "bg-muted text-muted-foreground", icon: null };
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${info.cls}`}>
+      {info.icon} {info.label}
+      {type === "oral_recording" && <Mic className="w-3 h-3 ml-0.5" />}
+    </span>
+  );
+}
+
+function EnrollmentBadge({ status }: { status: string | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  const map: Record<string, { label: string; cls: string }> = {
+    enrolled: { label: "Enrollé", cls: "bg-purple-100 text-purple-700" },
+    pending_online: { label: "En attente", cls: "bg-yellow-100 text-yellow-700" },
+  };
+  const info = map[status] ?? { label: status, cls: "bg-muted text-muted-foreground" };
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${info.cls}`}>
+      {info.label}
+    </span>
+  );
+}
+
 // ── Group detail view ───────────────────────────────────────────────────────
 
 function GroupDetail({ groupId, onBack }: { groupId: string; onBack: () => void }) {
@@ -155,6 +192,8 @@ function GroupDetail({ groupId, onBack }: { groupId: string; onBack: () => void 
                 <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">Email</th>
                 <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Téléphone</th>
                 <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Rôle</th>
+                <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Consentement</th>
+                <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Enrollment</th>
                 <th className="px-4 py-3 w-10" />
               </tr>
             </thead>
@@ -165,6 +204,8 @@ function GroupDetail({ groupId, onBack }: { groupId: string; onBack: () => void 
                   <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{c.email ?? "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{c.phone ?? "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{c.role ?? "—"}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell"><ConsentBadge status={c.consent_status} type={c.consent_type} /></td>
+                  <td className="px-4 py-3 hidden lg:table-cell"><EnrollmentBadge status={c.enrollment_status} /></td>
                   <td className="px-4 py-3">
                     <button
                       onClick={() => deleteContact.mutate({ groupId, contactId: c.id })}

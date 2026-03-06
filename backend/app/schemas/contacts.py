@@ -27,6 +27,9 @@ class ContactResponse(BaseModel):
     role: str | None
     custom_fields: dict | None
     created_at: datetime
+    consent_status: str | None = None
+    consent_type: str | None = None
+    enrollment_status: str | None = None
 
     model_config = {"from_attributes": True}
 

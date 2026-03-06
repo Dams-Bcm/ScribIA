@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.deps import get_current_user, require_module
 from app.models.contacts import Contact, ContactGroup
+from app.models.speaker import SpeakerProfile
 from app.models.user import User
 from app.schemas.contacts import (
     ContactCreate,
@@ -54,7 +55,7 @@ def _to_group_response(g: ContactGroup) -> ContactGroupResponse:
     )
 
 
-def _to_contact_response(c: Contact) -> ContactResponse:
+def _to_contact_response(c: Contact, speaker_profile=None) -> ContactResponse:
     return ContactResponse(
         id=c.id,
         group_id=c.group_id,
@@ -64,6 +65,9 @@ def _to_contact_response(c: Contact) -> ContactResponse:
         role=c.role,
         custom_fields=_parse_json(c.custom_fields),
         created_at=c.created_at,
+        consent_status=speaker_profile.consent_status if speaker_profile else None,
+        consent_type=speaker_profile.consent_type if speaker_profile else None,
+        enrollment_status=speaker_profile.enrollment_status if speaker_profile else None,
     )
 
 
@@ -125,9 +129,21 @@ def get_group(
     db: Session = Depends(get_db),
 ):
     g = _get_group(db, group_id, user.tenant_id)
+
+    # Load consent status from linked speaker profiles
+    contact_ids = [c.id for c in g.contacts]
+    profile_map: dict[str, SpeakerProfile] = {}
+    if contact_ids:
+        profiles = db.query(SpeakerProfile).filter(
+            SpeakerProfile.contact_id.in_(contact_ids),
+            SpeakerProfile.tenant_id == user.tenant_id,
+        ).all()
+        for p in profiles:
+            profile_map[p.contact_id] = p
+
     return ContactGroupDetailResponse(
         **_to_group_response(g).model_dump(),
-        contacts=[_to_contact_response(c) for c in g.contacts],
+        contacts=[_to_contact_response(c, profile_map.get(c.id)) for c in g.contacts],
     )
 
 
