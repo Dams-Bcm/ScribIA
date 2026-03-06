@@ -391,16 +391,12 @@ class WorkflowGenerateRequest(BaseModel):
 @router.post("/sectors/generate-workflow")
 def generate_workflow(
     body: WorkflowGenerateRequest,
+    db: Session = Depends(get_db),
     _: User = Depends(require_super_admin),
 ):
     """Génère un workflow structuré via LLM à partir d'une description textuelle."""
-    sector_label = body.sector
-    for sp in [("syndic_copro", "Syndic de copropriété"), ("collectivite", "Collectivité territoriale"),
-               ("education_spe", "Éducation spécialisée / MDPH"), ("chantier", "Gestion de chantier"),
-               ("sante", "Santé / Médico-social")]:
-        if sp[0] == body.sector:
-            sector_label = sp[1]
-            break
+    sector_obj = db.query(Sector).filter_by(key=body.sector).first()
+    sector_label = sector_obj.label if sector_obj else body.sector
 
     user_prompt = (
         f"Secteur d'activité : {sector_label}\n\n"

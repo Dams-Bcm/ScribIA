@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scrib' IA v2 - Mockup</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-hover: #1a1a26;
+  --bg-active: #1e1e2e;
+  --border: #222233;
+  --border-hover: #333348;
+  --text: #e8e8f0;
+  --text-muted: #6b6b80;
+  --text-dim: #4a4a5e;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-soft: rgba(99,102,241,0.12);
+  --accent-glow: rgba(99,102,241,0.25);
+  --green: #22c55e;
+  --green-soft: rgba(34,197,94,0.12);
+  --red: #ef4444;
+  --red-soft: rgba(239,68,68,0.1);
+  --orange: #f59e0b;
+  --orange-soft: rgba(245,158,11,0.12);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,0.4);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+
+/* ── Layout ── */
+.app { display: flex; min-height: 100vh; }
+.sidebar { width: 260px; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; bottom: 0; z-index: 10; }
+.main { flex: 1; margin-left: 260px; padding: 40px; max-width: 1200px; }
+
+/* ── Sidebar ── */
+.logo { padding: 24px; display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), #a855f7); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.logo-icon svg { width: 18px; height: 18px; color: white; }
+.logo-text { font-weight: 800; font-size: 18px; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--text), var(--text-muted)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+.nav { flex: 1; padding: 0 12px; overflow-y: auto; }
+.nav-section { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); padding: 24px 14px 8px; }
+.nav-item { display: flex; align-items: center; gap: 12px; padding: 9px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; color: var(--text-muted); cursor: pointer; transition: all 0.2s; text-decoration: none; margin: 1px 0; position: relative; }
+.nav-item:hover { color: var(--text); background: var(--bg-hover); }
+.nav-item.active { color: #fff; background: linear-gradient(135deg, var(--accent), #7c3aed); box-shadow: 0 2px 12px var(--accent-glow); }
+.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.7; }
+.nav-item.active svg { opacity: 1; }
+
+.nav-footer { padding: 16px; border-top: 1px solid var(--border); }
+.user-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-hover); margin-bottom: 8px; }
+.user-avatar { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), #a855f7); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: white; flex-shrink: 0; }
+.user-info .user-name { font-size: 13px; font-weight: 600; }
+.user-info .user-role { font-size: 11px; color: var(--text-dim); }
+
+/* ── Page header ── */
+.page-header { margin-bottom: 32px; }
+.page-header-row { display: flex; align-items: flex-start; justify-content: space-between; }
+.page-header h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--text), var(--text-muted)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.page-header p { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+/* ── Cards ── */
+.card { background: var(--bg-card); border-radius: var(--radius); border: 1px solid var(--border); padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--border-hover); }
+.card h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+.card h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+.card-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; margin-top: 4px; }
+
+/* ── Grid ── */
+.grid-2col { display: grid; grid-template-columns: 280px 1fr; gap: 24px; }
+.grid-settings { display: grid; grid-template-columns: 1fr 340px; gap: 24px; }
+
+/* ── Buttons ── */
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+.btn-primary { background: linear-gradient(135deg, var(--accent), #7c3aed); color: #fff; box-shadow: 0 2px 12px var(--accent-glow); }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px var(--accent-glow); }
+.btn-sm { padding: 7px 14px; font-size: 12px; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.btn-ghost { background: transparent; border: none; color: var(--text-dim); padding: 6px; border-radius: 8px; }
+.btn-ghost:hover { background: var(--red-soft); color: var(--red); }
+.btn-icon { width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+.btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── List items ── */
+.list-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.2s; border: 1px solid transparent; margin-bottom: 4px; }
+.list-item:hover { background: var(--bg-hover); }
+.list-item.active { background: var(--accent-soft); border-color: rgba(99,102,241,0.2); }
+.list-item-content { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.list-item-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--bg-hover); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.list-item-icon svg { width: 16px; height: 16px; color: var(--text-muted); }
+.list-item.active .list-item-icon { background: var(--accent-soft); }
+.list-item.active .list-item-icon svg { color: var(--accent); }
+.list-item-label { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-item-sub { font-size: 11px; color: var(--text-dim); font-family: 'SF Mono', 'Fira Code', monospace; margin-top: 1px; }
+
+/* ── Form ── */
+.form-group { margin-bottom: 20px; }
+.form-label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.form-input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg); color: var(--text); outline: none; font-family: inherit; transition: all 0.2s; }
+.form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.form-select { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg); color: var(--text); outline: none; font-family: inherit; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6b80' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; transition: all 0.2s; }
+.form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ── Badges ── */
+.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 6px; }
+.badge-accent { background: var(--accent-soft); color: var(--accent-hover); }
+.badge-green { background: var(--green-soft); color: var(--green); }
+.badge-orange { background: var(--orange-soft); color: var(--orange); }
+.badge-muted { background: var(--bg-hover); color: var(--text-dim); }
+
+/* ── Select row ── */
+.select-row { display: flex; align-items: center; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.select-row:last-child { border-bottom: none; }
+.select-label { width: 220px; flex-shrink: 0; }
+.select-label-name { font-size: 13px; font-weight: 600; }
+.select-label-key { font-size: 11px; color: var(--text-dim); font-family: monospace; margin-top: 2px; }
+
+/* ── Model list ── */
+.model-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: var(--radius-sm); transition: all 0.15s; margin-bottom: 2px; }
+.model-item:hover { background: var(--bg-hover); }
+.model-name { font-size: 13px; font-family: 'SF Mono', 'Fira Code', monospace; font-weight: 500; }
+
+/* ── Checkbox ── */
+.checkbox-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; cursor: pointer; }
+.checkbox { width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 5px; background: var(--bg); appearance: none; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+.checkbox:checked { background: var(--accent); border-color: var(--accent); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3'%3E%3Cpath d='M20 6L9 17l-5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; }
+.checkbox:hover { border-color: var(--accent); }
+.checkbox-label { font-size: 13px; font-weight: 500; }
+
+/* ── Template card ── */
+.template-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 10px; transition: all 0.2s; background: var(--bg); }
+.template-card:hover { border-color: var(--border-hover); transform: translateY(-1px); box-shadow: var(--shadow); }
+.template-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+.template-card-title { font-size: 15px; font-weight: 700; }
+.template-card-meta { font-size: 12px; color: var(--text-dim); display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.template-card-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+/* ── Info bar ── */
+.info-bar { font-size: 12px; color: var(--text-dim); margin-bottom: 20px; padding: 12px 16px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--border); }
+.info-bar code { font-family: 'SF Mono', monospace; font-weight: 600; color: var(--accent-hover); }
+
+/* ── Input row ── */
+.input-row { display: flex; gap: 8px; }
+.input-row .form-input { flex: 1; }
+
+/* ── Status dot ── */
+.status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.status-active { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+/* ── Utility ── */
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.mb-6 { margin-bottom: 24px; }
+.mt-2 { margin-top: 8px; }
+.text-xs { font-size: 11px; }
+.text-muted { color: var(--text-muted); }
+.text-dim { color: var(--text-dim); }
+.text-mono { font-family: 'SF Mono', monospace; }
+.font-medium { font-weight: 500; }
+.hidden { display: none; }
+.separator { height: 1px; background: var(--border); margin: 20px 0; }
+
+/* ── Glow accents ── */
+.glow-line { height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); margin: 0 -24px; opacity: 0.3; }
+
+/* ── Stats cards ── */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+.stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.stat-card .stat-value { font-size: 28px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
+.stat-card .stat-value.accent { color: var(--accent-hover); }
+.stat-card .stat-value.green { color: var(--green); }
+.stat-card .stat-value.orange { color: var(--orange); }
+.stat-card .stat-label { font-size: 12px; color: var(--text-dim); font-weight: 500; }
+
+/* ── Dashboard ── */
+.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* ── Animations ── */
+.page { animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ======== SIDEBAR ======== -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <span class="logo-text">Scrib' IA</span>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-section">General</div>
+      <a class="nav-item" onclick="showPage('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Tableau de bord
+      </a>
+
+      <div class="nav-section">Modules</div>
+      <a class="nav-item" onclick="showPage('transcription')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+        Transcription
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        T + Diarisation
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Phases prep.
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.5 4.5H18l-3.6 2.7 1.4 4.3L12 12l-3.8 2.5 1.4-4.3L6 7.5h4.5z"/></svg>
+        Documents IA
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        Convocations
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+        Procedures
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Contacts
+      </a>
+
+      <div class="nav-section">Administration</div>
+      <a class="nav-item" onclick="showPage('organizations')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/></svg>
+        Organisations
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        Utilisateurs
+      </a>
+      <a class="nav-item" onclick="showPage('sectors')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><path d="M12 10v6"/><path d="m15 13-3-3-3 3"/></svg>
+        Secteurs
+      </a>
+      <a class="nav-item" onclick="showPage('workflows')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>
+        Workflows
+      </a>
+      <a class="nav-item" onclick="showPage('ai-settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.5 4.5H18l-3.6 2.7 1.4 4.3L12 12l-3.8 2.5 1.4-4.3L6 7.5h4.5z"/></svg>
+        Gestion IA
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Journal d'audit
+      </a>
+
+      <div class="nav-section">Compte</div>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Confidentialite
+      </a>
+    </nav>
+
+    <div class="nav-footer">
+      <div class="user-card">
+        <div class="user-avatar">SA</div>
+        <div class="user-info">
+          <div class="user-name">Super Admin</div>
+          <div class="user-role">super_admin</div>
+        </div>
+      </div>
+      <a class="nav-item" style="color:var(--text-dim);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Deconnexion
+      </a>
+    </div>
+  </aside>
+
+  <!-- ======== MAIN ======== -->
+  <main class="main">
+
+    <!-- ===== DASHBOARD ===== -->
+    <div id="page-dashboard" class="page hidden">
+      <div class="page-header">
+        <h1>Tableau de bord</h1>
+        <p>Vue d'ensemble de votre instance Scrib' IA</p>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value accent">3</div><div class="stat-label">Organisations</div></div>
+        <div class="stat-card"><div class="stat-value green">12</div><div class="stat-label">Utilisateurs actifs</div></div>
+        <div class="stat-card"><div class="stat-value">47</div><div class="stat-label">Transcriptions</div></div>
+        <div class="stat-card"><div class="stat-value orange">5</div><div class="stat-label">Secteurs</div></div>
+      </div>
+      <div class="dash-grid">
+        <div class="card">
+          <h3>Activite recente</h3>
+          <div style="font-size:13px;color:var(--text-muted);line-height:2;">
+            <div class="flex items-center gap-2"><span class="badge badge-accent" style="width:8px;height:8px;padding:0;border-radius:50%;"></span> Transcription "Reunion CS mars" terminee</div>
+            <div class="flex items-center gap-2"><span class="badge badge-green" style="width:8px;height:8px;padding:0;border-radius:50%;"></span> Document IA genere pour AG annuelle</div>
+            <div class="flex items-center gap-2"><span class="badge badge-orange" style="width:8px;height:8px;padding:0;border-radius:50%;"></span> Nouveau client "Mairie Bordeaux" cree</div>
+            <div class="flex items-center gap-2"><span class="badge badge-accent" style="width:8px;height:8px;padding:0;border-radius:50%;"></span> Workflow "AG Copropriete" genere par IA</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Modeles IA</h3>
+          <div style="font-size:13px;color:var(--text-muted);line-height:2.2;">
+            <div class="flex items-center justify-between"><span>llama3.1:8b</span><span class="badge badge-accent">defaut</span></div>
+            <div class="flex items-center justify-between"><span>mistral:7b</span><span class="badge badge-muted">workflows</span></div>
+            <div class="flex items-center justify-between"><span>qwen2.5:14b</span><span class="badge badge-muted">disponible</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTORS ===== -->
+    <div id="page-sectors" class="page">
+      <div class="page-header page-header-row">
+        <div>
+          <h1>Secteurs d'activite</h1>
+          <p>Gerez les secteurs et leurs modules par defaut</p>
+        </div>
+        <button class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nouveau secteur
+        </button>
+      </div>
+
+      <div class="grid-2col">
+        <div>
+          <div class="list-item active">
+            <div class="list-item-content">
+              <div class="list-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/></svg></div>
+              <div><div class="list-item-label">Syndic de copropriete</div><div class="list-item-sub">syndic_copro</div></div>
+            </div>
+            <button class="btn-ghost"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+          </div>
+          <div class="list-item">
+            <div class="list-item-content">
+              <div class="list-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+              <div><div class="list-item-label">Education specialisee / MDPH</div><div class="list-item-sub">education_spe</div></div>
+            </div>
+            <button class="btn-ghost"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+          </div>
+          <div class="list-item">
+            <div class="list-item-content">
+              <div class="list-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg></div>
+              <div><div class="list-item-label">Collectivite territoriale</div><div class="list-item-sub">collectivite</div></div>
+            </div>
+            <button class="btn-ghost"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+          </div>
+          <div class="list-item">
+            <div class="list-item-content">
+              <div class="list-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/></svg></div>
+              <div><div class="list-item-label">Gestion de chantier</div><div class="list-item-sub">chantier</div></div>
+            </div>
+            <button class="btn-ghost"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+          </div>
+          <div class="list-item">
+            <div class="list-item-content">
+              <div class="list-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+              <div><div class="list-item-label">Sante / Medico-social</div><div class="list-item-sub">sante</div></div>
+            </div>
+            <button class="btn-ghost"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Syndic de copropriete</h2>
+          <div class="card-subtitle text-mono">syndic_copro</div>
+
+          <div class="form-group">
+            <label class="form-label">Libelle</label>
+            <input class="form-input" value="Syndic de copropriete" />
+          </div>
+
+          <div>
+            <label class="form-label">Modules par defaut</label>
+            <p class="text-xs text-dim" style="margin-bottom:14px;">Ces modules seront actives lors de la creation d'un client dans ce secteur.</p>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" checked /><span class="checkbox-label">Transcription simple</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" /><span class="checkbox-label">Transcription + Diarisation</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" /><span class="checkbox-label">Phase(s) preparatoire(s)</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" /><span class="checkbox-label">RGPD</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" checked /><span class="checkbox-label">Generation de documents IA</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" checked /><span class="checkbox-label">Convocations</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" checked /><span class="checkbox-label">Procedures collaboratives</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" checked /><span class="checkbox-label">Carnet de contacts</span></label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== WORKFLOWS ===== -->
+    <div id="page-workflows" class="page hidden">
+      <div class="page-header">
+        <h1>Workflows</h1>
+        <p>Gerez les templates de procedure par secteur d'activite</p>
+      </div>
+
+      <div class="grid-2col">
+        <div>
+          <div class="text-xs font-medium text-dim" style="text-transform:uppercase;letter-spacing:1.5px;padding:0 14px;margin-bottom:12px;">Secteurs</div>
+          <div class="list-item active">
+            <div class="list-item-content">
+              <div class="list-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/></svg></div>
+              <span class="list-item-label">Syndic de copropriete</span>
+            </div>
+          </div>
+          <div class="list-item">
+            <div class="list-item-content">
+              <div class="list-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+              <span class="list-item-label">Education specialisee</span>
+            </div>
+          </div>
+          <div class="list-item">
+            <div class="list-item-content">
+              <div class="list-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg></div>
+              <span class="list-item-label">Collectivite territoriale</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h2>Syndic de copropriete</h2>
+              <p class="text-xs text-dim mt-2">Ces templates seront copies lors du provisionnement d'un nouveau client.</p>
+            </div>
+            <div class="flex gap-2">
+              <button class="btn btn-outline btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.5 4.5H18l-3.6 2.7 1.4 4.3L12 12l-3.8 2.5 1.4-4.3L6 7.5h4.5z"/></svg>
+                Generer avec IA
+              </button>
+              <button class="btn btn-primary btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nouveau
+              </button>
+            </div>
+          </div>
+
+          <div class="template-card">
+            <div class="template-card-header">
+              <div class="template-card-title">AG Copropriete</div>
+              <span class="badge badge-green"><span class="status-dot status-active"></span> Actif</span>
+            </div>
+            <div class="template-card-meta">
+              <span class="badge badge-muted">3 roles</span>
+              <span class="text-dim">Syndic, Coproprietaire, Conseil syndical</span>
+            </div>
+            <div class="template-card-desc">Assemblee generale annuelle ou extraordinaire. Phases : cadrage, preparation dossier, ODJ, convocation, gestion avant AG, tenue, PV, execution des decisions.</div>
+          </div>
+
+          <div class="template-card">
+            <div class="template-card-header">
+              <div class="template-card-title">Reunion Conseil Syndical</div>
+              <span class="badge badge-green"><span class="status-dot status-active"></span> Actif</span>
+            </div>
+            <div class="template-card-meta">
+              <span class="badge badge-muted">2 roles</span>
+              <span class="text-dim">Syndic, Membre du conseil</span>
+            </div>
+            <div class="template-card-desc">Reunion periodique du conseil syndical avec le syndic pour le suivi de la gestion courante.</div>
+          </div>
+
+          <div class="template-card">
+            <div class="template-card-header">
+              <div class="template-card-title">Visite technique immeuble</div>
+              <span class="badge badge-green"><span class="status-dot status-active"></span> Actif</span>
+            </div>
+            <div class="template-card-meta">
+              <span class="badge badge-muted">2 roles</span>
+              <span class="text-dim">Syndic, Prestataire</span>
+            </div>
+            <div class="template-card-desc">Visite technique avec compte-rendu et suivi des travaux a realiser.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== AI SETTINGS ===== -->
+    <div id="page-ai-settings" class="page hidden">
+      <div class="page-header">
+        <h1>Gestion IA</h1>
+        <p>Configurez les modeles Ollama utilises par chaque module</p>
+      </div>
+
+      <div class="grid-settings">
+        <div class="card">
+          <div class="flex justify-between items-center mb-4">
+            <h2>Affectation des modeles</h2>
+            <button class="btn btn-primary btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Sauvegarder
+            </button>
+          </div>
+
+          <div class="info-bar">
+            Modele par defaut : <code>llama3.1:8b</code> <span style="margin-left:12px;color:var(--text-dim)">http://ollama:11434</span>
+          </div>
+
+          <div class="select-row">
+            <div class="select-label">
+              <div class="select-label-name">Generation de documents IA</div>
+              <div class="select-label-key">ai_documents</div>
+            </div>
+            <select class="form-select" style="flex:1;">
+              <option selected>Par defaut (llama3.1:8b)</option>
+              <option>llama3.1:70b</option>
+              <option>mistral:7b</option>
+              <option>qwen2.5:14b</option>
+            </select>
+          </div>
+
+          <div class="select-row">
+            <div class="select-label">
+              <div class="select-label-name">Generation de workflows</div>
+              <div class="select-label-key">workflow_generation</div>
+            </div>
+            <select class="form-select" style="flex:1;">
+              <option>Par defaut (llama3.1:8b)</option>
+              <option>llama3.1:70b</option>
+              <option selected>mistral:7b</option>
+              <option>qwen2.5:14b</option>
+            </select>
+          </div>
+
+          <div class="select-row">
+            <div class="select-label">
+              <div class="select-label-name">Generation de convocations</div>
+              <div class="select-label-key">convocations</div>
+            </div>
+            <select class="form-select" style="flex:1;">
+              <option selected>Par defaut (llama3.1:8b)</option>
+              <option>llama3.1:70b</option>
+              <option>mistral:7b</option>
+              <option>qwen2.5:14b</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <div class="card mb-6">
+            <h3>Telecharger un modele</h3>
+            <div class="input-row">
+              <input class="form-input" placeholder="ex: llama3.1:70b" />
+              <button class="btn-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Modeles installes</h3>
+            <div class="model-item">
+              <div class="flex items-center gap-3">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent-glow);"></div>
+                <span class="model-name">llama3.1:8b</span>
+                <span class="badge badge-accent">defaut</span>
+              </div>
+              <button class="btn-ghost"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+            </div>
+            <div class="model-item">
+              <div class="flex items-center gap-3">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(34,197,94,0.3);"></div>
+                <span class="model-name">mistral:7b</span>
+              </div>
+              <button class="btn-ghost"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+            </div>
+            <div class="model-item">
+              <div class="flex items-center gap-3">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(34,197,94,0.3);"></div>
+                <span class="model-name">qwen2.5:14b</span>
+              </div>
+              <button class="btn-ghost"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ORGANIZATIONS ===== -->
+    <div id="page-organizations" class="page hidden">
+      <div class="page-header page-header-row">
+        <div>
+          <h1>Organisations</h1>
+          <p>3 organisations</p>
+        </div>
+        <button class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nouveau client
+        </button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:24px;">
+        <div>
+          <div class="text-xs font-medium text-dim" style="text-transform:uppercase;letter-spacing:1.5px;padding:0 14px;margin-bottom:12px;">Organisations</div>
+          <div class="list-item active">
+            <div class="list-item-content">
+              <div class="list-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/></svg></div>
+              <div><div class="list-item-label">Cabinet Gestion ABC</div><div class="list-item-sub">Syndic de copropriete</div></div>
+            </div>
+            <button class="btn-ghost"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+          </div>
+          <div class="list-item">
+            <div class="list-item-content">
+              <div class="list-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/></svg></div>
+              <div><div class="list-item-label">Mairie de Bordeaux</div><div class="list-item-sub">Collectivite</div></div>
+            </div>
+            <button class="btn-ghost"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+          </div>
+          <div class="list-item">
+            <div class="list-item-content">
+              <div class="list-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/></svg></div>
+              <div><div class="list-item-label">MDPH 33</div><div class="list-item-sub">Education specialisee</div></div>
+            </div>
+            <button class="btn-ghost"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex justify-between items-center mb-2">
+            <h2>Cabinet Gestion ABC</h2>
+            <span class="badge badge-accent">Syndic de copropriete</span>
+          </div>
+          <div class="card-subtitle">cabinet-gestion-abc &middot; Organisation</div>
+
+          <button class="btn btn-outline btn-sm mb-6">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.5 4.5H18l-3.6 2.7 1.4 4.3L12 12l-3.8 2.5 1.4-4.3L6 7.5h4.5z"/></svg>
+            Provisionner les templates
+          </button>
+
+          <label class="form-label">Modules actives</label>
+          <div style="margin-top:8px;">
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" checked /><span class="checkbox-label">Transcription simple</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" /><span class="checkbox-label">Transcription + Diarisation</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" /><span class="checkbox-label">Phase(s) preparatoire(s)</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" /><span class="checkbox-label">RGPD</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" checked /><span class="checkbox-label">Generation de documents IA</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" checked /><span class="checkbox-label">Convocations</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" checked /><span class="checkbox-label">Procedures collaboratives</span></label>
+            <label class="checkbox-row"><input type="checkbox" class="checkbox" checked /><span class="checkbox-label">Carnet de contacts</span></label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const page = document.getElementById('page-' + name);
+  if (page) { page.classList.remove('hidden'); page.style.animation = 'none'; page.offsetHeight; page.style.animation = ''; }
+  document.querySelectorAll('.nav-item').forEach(item => {
+    if (item.getAttribute('onclick') && item.getAttribute('onclick').includes("'" + name + "'")) item.classList.add('active');
+  });
+}
+showPage('sectors');
+</script>
+</body>
+</html>
