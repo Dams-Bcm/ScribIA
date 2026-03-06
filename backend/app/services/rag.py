@@ -1,9 +1,10 @@
 """Service RAG — Retrieval-Augmented Generation.
 
-Orchestre : question → embedding → recherche vectorielle → contexte → LLM → réponse.
+Orchestre : question → embedding → recherche hybride (sémantique + mots-clés) → contexte → LLM → réponse.
 """
 
 import logging
+import re
 import requests
 
 from app.config import settings
@@ -23,31 +24,91 @@ Règles :
 - Si la question est ambiguë, demande des précisions.
 """
 
+# Mots vides à ignorer pour la recherche par mots-clés
+_STOP_WORDS = {
+    "je", "tu", "il", "elle", "nous", "vous", "ils", "elles", "on",
+    "le", "la", "les", "un", "une", "des", "du", "de", "d",
+    "ce", "cette", "ces", "mon", "ma", "mes", "ton", "ta", "tes",
+    "son", "sa", "ses", "notre", "votre", "leur", "leurs",
+    "et", "ou", "mais", "donc", "car", "ni", "que", "qui", "quoi",
+    "dans", "sur", "sous", "avec", "sans", "pour", "par", "en", "à", "au", "aux",
+    "est", "sont", "a", "ont", "fait", "être", "avoir", "faire",
+    "ne", "pas", "plus", "moins", "très", "bien", "mal",
+    "quel", "quelle", "quels", "quelles", "comment", "où", "quand", "pourquoi",
+    "recherche", "cherche", "trouve", "trouver", "discussion", "conversation",
+    "parle", "parler", "concerne", "concernant", "propos", "sujet",
+}
+
+
+def _extract_keywords(question: str) -> list[str]:
+    """Extrait les mots-clés significatifs de la question."""
+    words = re.findall(r"[a-zA-ZÀ-ÿ]+", question.lower())
+    return [w for w in words if w not in _STOP_WORDS and len(w) >= 3]
+
 
 def ask(tenant_id: str, question: str, source_filter: str | None = None) -> dict:
-    """Pose une question et obtient une réponse basée sur les documents du tenant.
-
-    Args:
-        tenant_id: ID du tenant pour l'isolation des données.
-        question: Question en langage naturel.
-        source_filter: Filtrer par type de source ("ai_document", "transcription", "procedure").
-
-    Returns:
-        {"answer": str, "sources": list[dict], "chunks_used": int}
-    """
+    """Pose une question et obtient une réponse basée sur les documents du tenant."""
     # 1. Embedding de la question
     query_embedding = embed_query(question)
 
-    # 2. Recherche vectorielle
+    # 2. Recherche hybride : sémantique + mots-clés
     where = {"source_type": source_filter} if source_filter else None
-    results = vectorstore.search(tenant_id, query_embedding, where=where)
 
-    documents = results.get("documents", [[]])[0]
-    metadatas = results.get("metadatas", [[]])[0]
-    distances = results.get("distances", [[]])[0]
+    # 2a. Recherche par mots-clés (via ChromaDB where_document)
+    keywords = _extract_keywords(question)
+    keyword_results = []
+    for kw in keywords:
+        try:
+            kw_res = vectorstore.search(
+                tenant_id, query_embedding,
+                where=where,
+                where_document={"$contains": kw},
+                top_k=5,
+            )
+            kw_docs = kw_res.get("documents", [[]])[0]
+            kw_metas = kw_res.get("metadatas", [[]])[0]
+            kw_dists = kw_res.get("distances", [[]])[0]
+            for doc, meta, dist in zip(kw_docs, kw_metas, kw_dists):
+                keyword_results.append((doc, meta, dist, kw))
+        except Exception:
+            pass
 
-    logger.warning("[RAG] Query: %s", question[:100])
-    logger.warning("[RAG] Results count: %d", len(documents))
+    # 2b. Recherche sémantique pure
+    semantic_results = vectorstore.search(tenant_id, query_embedding, where=where)
+    sem_docs = semantic_results.get("documents", [[]])[0]
+    sem_metas = semantic_results.get("metadatas", [[]])[0]
+    sem_dists = semantic_results.get("distances", [[]])[0]
+
+    # 3. Fusionner et dédupliquer (priorité aux résultats mots-clés)
+    seen_chunks = set()
+    merged = []
+
+    # D'abord les résultats par mots-clés (boost de pertinence)
+    for doc, meta, dist, kw in keyword_results:
+        chunk_key = doc[:100]
+        if chunk_key not in seen_chunks:
+            seen_chunks.add(chunk_key)
+            # Bonus pour les résultats mots-clés : réduire la distance
+            merged.append((doc, meta, dist * 0.7))
+
+    # Puis les résultats sémantiques
+    for doc, meta, dist in zip(sem_docs, sem_metas, sem_dists):
+        chunk_key = doc[:100]
+        if chunk_key not in seen_chunks:
+            seen_chunks.add(chunk_key)
+            merged.append((doc, meta, dist))
+
+    # Trier par distance et limiter
+    merged.sort(key=lambda x: x[2])
+    merged = merged[:settings.rag_top_k]
+
+    documents = [m[0] for m in merged]
+    metadatas = [m[1] for m in merged]
+    distances = [m[2] for m in merged]
+
+    logger.warning("[RAG] Query: %s | Keywords: %s", question[:100], keywords)
+    logger.warning("[RAG] Keyword results: %d, Semantic results: %d, Merged: %d",
+                   len(keyword_results), len(sem_docs), len(merged))
     for i, (doc, meta, dist) in enumerate(zip(documents, metadatas, distances)):
         logger.warning("[RAG] #%d dist=%.4f title=%s chunk=%s...", i, dist, meta.get("title"), doc[:80])
 
@@ -58,7 +119,7 @@ def ask(tenant_id: str, question: str, source_filter: str | None = None) -> dict
             "chunks_used": 0,
         }
 
-    # 3. Assembler le contexte
+    # 4. Assembler le contexte
     context_parts = []
     sources_seen = set()
     sources = []
@@ -77,12 +138,12 @@ def ask(tenant_id: str, question: str, source_filter: str | None = None) -> dict
                 "type": source_type,
                 "id": source_id,
                 "title": title,
-                "relevance": round(1 - dist, 3),  # cosine distance → similarity
+                "relevance": round(max(0, 1 - dist), 3),
             })
 
     context = "\n".join(context_parts)
 
-    # 4. Appel LLM via Ollama
+    # 5. Appel LLM via Ollama
     prompt = f"""Voici les extraits de documents disponibles :
 
 {context}

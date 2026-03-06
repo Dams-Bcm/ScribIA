@@ -58,6 +58,7 @@ def search(
     query_embedding: list[float],
     top_k: int | None = None,
     where: dict | None = None,
+    where_document: dict | None = None,
 ) -> dict:
     """Recherche sémantique dans la collection du tenant."""
     collection = get_collection(tenant_id)
@@ -68,6 +69,8 @@ def search(
     }
     if where:
         kwargs["where"] = where
+    if where_document:
+        kwargs["where_document"] = where_document
     return collection.query(**kwargs)
 
 
