@@ -50,6 +50,7 @@ export function useEnrollFromDiarisation() {
       qc.invalidateQueries({ queryKey: ["admin", "speakers"] });
       qc.invalidateQueries({ queryKey: ["speakers", "contacts-for-enrollment"] });
       qc.invalidateQueries({ queryKey: ["diarisation"] });
+      qc.invalidateQueries({ queryKey: ["contacts"] });
     },
     onError: (err) => {
       console.error("Enrollment failed", err instanceof ApiError ? err.message : err);
@@ -84,6 +85,7 @@ export interface EnrollFromSegmentBody {
   start_time: number;
   end_time: number;
   speaker_profile_id?: string;
+  contact_id?: string;
   first_name?: string;
   last_name?: string;
   fonction?: string;
@@ -99,7 +101,9 @@ export function useEnrollFromSegment() {
       ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "speakers"] });
+      qc.invalidateQueries({ queryKey: ["speakers", "contacts-for-enrollment"] });
       qc.invalidateQueries({ queryKey: ["diarisation"] });
+      qc.invalidateQueries({ queryKey: ["contacts"] });
     },
   });
 }

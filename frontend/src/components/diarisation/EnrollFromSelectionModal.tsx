@@ -44,10 +44,10 @@ export function EnrollFromSelectionModal({ segments, jobId, onClose, onSuccess }
           ? (() => {
               const contact = contacts.find((c) => c.id === selectedContactId);
               if (contact?.speaker_profile?.profile_id) {
-                return { start_time: startTime, end_time: endTime, speaker_profile_id: contact.speaker_profile.profile_id };
+                return { start_time: startTime, end_time: endTime, speaker_profile_id: contact.speaker_profile.profile_id, contact_id: contact.id };
               }
               const parts = (contact?.name ?? "").split(" ", 2);
-              return { start_time: startTime, end_time: endTime, first_name: parts[0], last_name: parts[1] ?? parts[0] };
+              return { start_time: startTime, end_time: endTime, first_name: parts[0], last_name: parts[1] ?? parts[0], contact_id: contact?.id };
             })()
           : {
               start_time: startTime,

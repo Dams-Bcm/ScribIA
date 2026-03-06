@@ -58,7 +58,8 @@ export function Layout() {
 
   function cycleTheme() {
     const idx = THEMES.findIndex((t) => t.key === theme);
-    setTheme(THEMES[(idx + 1) % THEMES.length].key);
+    const next = THEMES[(idx + 1) % THEMES.length]!;
+    setTheme(next.key);
   }
 
   const currentTheme = THEMES.find((t) => t.key === theme)!;

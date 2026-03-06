@@ -672,6 +672,10 @@ def enroll_from_segment(
     profile.enrollment_method = "operator"
     profile.enrolled_at = datetime.now(timezone.utc)
 
+    # Link to contact if provided
+    if body.contact_id and not profile.contact_id:
+        profile.contact_id = body.contact_id
+
     # Replace previous enrollment segments
     db.query(SpeakerEnrollmentSegment).filter(
         SpeakerEnrollmentSegment.speaker_profile_id == profile.id
