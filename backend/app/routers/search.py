@@ -91,8 +91,13 @@ def reindex(
 
     # Super admin can target a specific tenant or all tenants
     if user.role == "super_admin" and body.tenant_id == "all":
-        from app.models.tenant import Tenant
-        tenants = db.query(Tenant).all()
+        from app.models.tenant import Tenant, TenantModule
+        tenants = (
+            db.query(Tenant)
+            .join(TenantModule, TenantModule.tenant_id == Tenant.id)
+            .filter(TenantModule.module_key == "search", TenantModule.enabled == True)
+            .all()
+        )
         total_stats = {"ai_documents": 0, "transcriptions": 0, "procedures": 0, "contacts": 0, "chunks_total": 0}
         for tenant in tenants:
             logger.warning("[SEARCH] Reindexing tenant %s (%s)", tenant.id, tenant.name)
