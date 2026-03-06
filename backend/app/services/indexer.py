@@ -196,9 +196,15 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
 
     # 1. Documents IA
     all_docs = db.query(AIDocument).filter(AIDocument.tenant_id == tenant_id).all()
-    logger.warning("[RAG] Total AI documents for tenant %s: %d (statuses: %s)",
-                   tenant_id, len(all_docs),
-                   {d.status for d in all_docs} if all_docs else "none")
+    if not all_docs:
+        # Debug: show which tenant_ids actually have AI documents
+        from sqlalchemy import func
+        tenant_counts = db.query(AIDocument.tenant_id, func.count(AIDocument.id)).group_by(AIDocument.tenant_id).all()
+        logger.warning("[RAG] No AI docs for tenant %s. Existing tenants with docs: %s", tenant_id, tenant_counts)
+    else:
+        logger.warning("[RAG] Total AI documents for tenant %s: %d (statuses: %s)",
+                       tenant_id, len(all_docs),
+                       {d.status for d in all_docs})
     docs = [d for d in all_docs if d.status == "completed"]
     logger.warning("[RAG] Found %d completed AI documents for tenant %s", len(docs), tenant_id)
     for doc in docs:

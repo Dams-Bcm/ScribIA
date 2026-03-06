@@ -75,20 +75,45 @@ def ask_question(
     return AskResponse(**result)
 
 
+class ReindexRequest(BaseModel):
+    tenant_id: Optional[str] = None  # None = tenant courant (admin) ou tous (super_admin avec "all")
+
+
 @router.post("/reindex", response_model=ReindexResponse)
 def reindex(
+    body: ReindexRequest = ReindexRequest(),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Réindexe toutes les données du tenant (admin/super_admin uniquement)."""
+    """Réindexe les données. Super_admin peut choisir un tenant ou tous."""
     if user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Réservé aux administrateurs.")
 
-    logger.warning("[SEARCH] Starting reindex for tenant %s", user.tenant_id)
-    stats = indexer.reindex_tenant(user.tenant_id, db)
+    # Super admin can target a specific tenant or all tenants
+    if user.role == "super_admin" and body.tenant_id == "all":
+        from app.models.tenant import Tenant
+        tenants = db.query(Tenant).all()
+        total_stats = {"ai_documents": 0, "transcriptions": 0, "procedures": 0, "contacts": 0, "chunks_total": 0}
+        for tenant in tenants:
+            logger.warning("[SEARCH] Reindexing tenant %s (%s)", tenant.id, tenant.name)
+            stats = indexer.reindex_tenant(tenant.id, db)
+            for k in total_stats:
+                total_stats[k] += stats.get(k, 0)
+        logger.warning("[SEARCH] Full reindex result (%d tenants): %s", len(tenants), total_stats)
+        log_action(db, "search_reindex", user_id=user.id, tenant_id=user.tenant_id,
+                   resource="search", details={**total_stats, "tenants": len(tenants)})
+        return ReindexResponse(**total_stats)
+
+    # Determine target tenant
+    target_tenant_id = user.tenant_id
+    if user.role == "super_admin" and body.tenant_id and body.tenant_id != "all":
+        target_tenant_id = body.tenant_id
+
+    logger.warning("[SEARCH] Starting reindex for tenant %s", target_tenant_id)
+    stats = indexer.reindex_tenant(target_tenant_id, db)
     logger.warning("[SEARCH] Reindex result: %s", stats)
 
-    log_action(db, "search_reindex", user_id=user.id, tenant_id=user.tenant_id,
+    log_action(db, "search_reindex", user_id=user.id, tenant_id=target_tenant_id,
                resource="search", details=stats)
 
     return ReindexResponse(**stats)

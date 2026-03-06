@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ModuleGuard } from "@/components/ModuleGuard";
 import { useAuth } from "@/stores/auth";
 import { useAskQuestion, useReindex } from "@/api/hooks/useSearch";
+import { useTenants } from "@/api/hooks/useTenants";
 import type { SearchSource } from "@/api/types";
 
 interface Message {
@@ -48,12 +49,14 @@ export function SearchPage() {
 }
 
 function SearchChat() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isSuperAdmin } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [reindexTenant, setReindexTenant] = useState("all");
   const ask = useAskQuestion();
   const reindex = useReindex();
+  const { data: tenants = [] } = useTenants();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -118,19 +121,34 @@ function SearchChat() {
             </SelectContent>
           </Select>
           {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => reindex.mutate()}
-              disabled={reindex.isPending}
-            >
-              {reindex.isPending ? (
-                <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-              ) : (
-                <RefreshCw className="w-3.5 h-3.5 mr-1" />
+            <div className="flex items-center gap-1.5">
+              {isSuperAdmin && (
+                <Select value={reindexTenant} onValueChange={setReindexTenant}>
+                  <SelectTrigger className="w-48 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les tenants</SelectItem>
+                    {tenants.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
-              Réindexer
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => reindex.mutate(isSuperAdmin ? reindexTenant : undefined)}
+                disabled={reindex.isPending}
+              >
+                {reindex.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                )}
+                Réindexer
+              </Button>
+            </div>
           )}
         </div>
       </div>

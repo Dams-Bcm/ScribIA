@@ -11,6 +11,9 @@ export function useAskQuestion() {
 
 export function useReindex() {
   return useMutation({
-    mutationFn: () => api.post<ReindexResponse>("/search/reindex", {}),
+    mutationFn: (tenantId?: string) =>
+      api.post<ReindexResponse>("/search/reindex", {
+        tenant_id: tenantId ?? null,
+      }),
   });
 }

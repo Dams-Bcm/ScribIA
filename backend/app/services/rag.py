@@ -42,8 +42,8 @@ _STOP_WORDS = {
 
 def _extract_keywords(question: str) -> list[str]:
     """Extrait les mots-clés significatifs de la question."""
-    words = re.findall(r"[a-zA-ZÀ-ÿ]+", question.lower())
-    return [w for w in words if w not in _STOP_WORDS and len(w) >= 3]
+    words = re.findall(r"[a-zA-ZÀ-ÿ0-9]+", question.lower())
+    return [w for w in words if w not in _STOP_WORDS and len(w) >= 2]
 
 
 def ask(tenant_id: str, question: str, source_filter: str | None = None) -> dict:
