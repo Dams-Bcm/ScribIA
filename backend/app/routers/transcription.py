@@ -179,8 +179,19 @@ def delete_job(
         if audio_path.exists():
             audio_path.unlink()
 
-    # Delete enrollment segments referencing this job's transcription segments
-    from app.models.speaker import SpeakerEnrollmentSegment
+    # Clear FK references from speaker tables before deleting segments
+    from app.models.speaker import SpeakerProfile, SpeakerEnrollmentSegment
+    from app.models.transcription import TranscriptionSegment
+
+    seg_ids = [s.id for s in db.query(TranscriptionSegment.id).filter(
+        TranscriptionSegment.job_id == job_id
+    ).all()]
+
+    if seg_ids:
+        db.query(SpeakerProfile).filter(
+            SpeakerProfile.consent_segment_id.in_(seg_ids)
+        ).update({SpeakerProfile.consent_segment_id: None}, synchronize_session=False)
+
     db.query(SpeakerEnrollmentSegment).filter(
         SpeakerEnrollmentSegment.job_id == job_id
     ).delete(synchronize_session=False)
