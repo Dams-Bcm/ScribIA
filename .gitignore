@@ -40,3 +40,6 @@ data/
 
 # ── Logs ──
 *.log
+
+# ── Revue ──
+revue.txt

@@ -50,6 +50,13 @@ class Settings(BaseSettings):
     ollama_default_model: str = "llama3.1:8b"
     ai_docs_path: str = "/data/ai_docs"
 
+    # ── RAG / ChromaDB ──────────────────────────────────────────────────────────
+    chroma_url: str = "http://chroma:8000"
+    embedding_model: str = "nomic-embed-text"
+    rag_chunk_size: int = 500          # chars per chunk
+    rag_chunk_overlap: int = 50        # overlap between chunks
+    rag_top_k: int = 8                 # number of chunks to retrieve
+
     # ── App ────────────────────────────────────────────────────────────────────
     app_name: str = "ScribIA"
     debug: bool = False

@@ -7,7 +7,7 @@ from app.config import settings
 from app.database import engine
 from app.models import Base, Tenant, TenantModule, User, AVAILABLE_MODULES
 from app.services.auth import hash_password
-from app.routers import health, auth, admin, privacy, transcription, diarisation, compliance, preparatory_phases, ai_documents, speakers, contacts
+from app.routers import health, auth, admin, privacy, transcription, diarisation, compliance, preparatory_phases, ai_documents, speakers, contacts, search
 from app.routers.procedures import router as procedures_router, public_router as procedures_public_router
 
 
@@ -205,3 +205,4 @@ app.include_router(speakers.router)
 app.include_router(procedures_router)
 app.include_router(procedures_public_router)
 app.include_router(contacts.router)
+app.include_router(search.router)

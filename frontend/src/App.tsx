@@ -20,6 +20,7 @@ import { ConvocationsPage } from "./pages/modules/ConvocationsPage";
 import { PreparatoryPhasesPage } from "./pages/modules/PreparatoryPhasesPage";
 import { ProceduresPage } from "./pages/modules/ProceduresPage";
 import { ContactsPage } from "./pages/modules/ContactsPage";
+import { SearchPage } from "./pages/modules/SearchPage";
 import { FormPage } from "./pages/public/FormPage";
 
 // Admin pages
@@ -80,6 +81,7 @@ function AppRoutes() {
           <Route path="convocations" element={<ConvocationsPage />} />
           <Route path="procedures" element={<ProceduresPage />} />
           <Route path="contacts" element={<ContactsPage />} />
+          <Route path="recherche" element={<SearchPage />} />
 
           {/* Compte */}
           <Route path="privacy" element={<PrivacyPage />} />

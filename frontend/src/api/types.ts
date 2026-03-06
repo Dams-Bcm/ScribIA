@@ -680,3 +680,25 @@ export interface ContactUpdate {
   role?: string | null;
   custom_fields?: Record<string, unknown> | null;
 }
+
+// ── Search / RAG ──────────────────────────────────────────────────────────────
+
+export interface SearchSource {
+  type: string;
+  id: string;
+  title: string;
+  relevance: number;
+}
+
+export interface SearchResponse {
+  answer: string;
+  sources: SearchSource[];
+  chunks_used: number;
+}
+
+export interface ReindexResponse {
+  ai_documents: number;
+  transcriptions: number;
+  procedures: number;
+  chunks_total: number;
+}

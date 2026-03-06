@@ -304,6 +304,13 @@ def _run_generation(doc_id: str):
         event_bus.publish(doc_id, {"status": "completed"})
         logger.info(f"[AI] Document {doc_id} généré ({len(result_text)} chars)")
 
+        # Indexation RAG automatique
+        try:
+            from app.services.indexer import index_ai_document
+            index_ai_document(doc.tenant_id, doc.id, doc.title, result_text)
+        except Exception as exc:
+            logger.warning(f"[AI] Indexation RAG échouée pour {doc_id}: {exc}")
+
     except Exception as exc:
         logger.exception(f"[AI] Erreur génération {doc_id}: {exc}")
         try:

@@ -229,6 +229,15 @@ def process_transcription_job(job_id: str):
 
         logger.info(f"Job {job_id} completed: {len(segments)} segments")
 
+        # Indexation RAG automatique
+        try:
+            from app.services.indexer import index_transcription
+            seg_data = [{"speaker": s.speaker_label or "", "text": s.text} for s in
+                        db.query(TranscriptionSegment).filter_by(job_id=job_id).order_by(TranscriptionSegment.start_time).all()]
+            index_transcription(job.tenant_id, job.id, job.original_filename or "Transcription", seg_data)
+        except Exception as exc:
+            logger.warning(f"[RAG] Indexation échouée pour transcription {job_id}: {exc}")
+
     except Exception as e:
         logger.exception(f"Job {job_id} failed unexpectedly")
         try:

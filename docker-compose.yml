@@ -69,6 +69,16 @@ services:
               count: 1
               capabilities: [gpu]
 
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "${CHROMA_PORT:-8100}:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - ANONYMIZED_TELEMETRY=FALSE
+      - IS_PERSISTENT=TRUE
+
   frontend:
     build: ./frontend
     ports:
@@ -80,3 +90,4 @@ volumes:
   prep_docs:
   ai_docs:
   ollama_data:
+  chroma_data:
