@@ -69,12 +69,13 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
-  // Detect text selection in enroll mode
-  const handleMouseUp = useCallback(() => {
+  // Detect text selection in enroll mode (Shift adds to existing selection)
+  const handleMouseUp = useCallback((e: MouseEvent) => {
     if (mode !== "enroll") return;
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) {
-      setEnrollSegIds([]);
+      // Don't clear if Shift is held (user is building a multi-selection)
+      if (!e.shiftKey) setEnrollSegIds([]);
       return;
     }
 
@@ -84,16 +85,24 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
 
     const range = sel.getRangeAt(0);
     const segElements = container.querySelectorAll("[data-seg-id]");
-    const ids: string[] = [];
+    const newIds: string[] = [];
 
     for (const el of segElements) {
       if (range.intersectsNode(el)) {
         const segId = (el as HTMLElement).dataset.segId;
-        if (segId) ids.push(segId);
+        if (segId) newIds.push(segId);
       }
     }
 
-    setEnrollSegIds(ids);
+    if (e.shiftKey) {
+      // Accumulate: merge with existing selection
+      setEnrollSegIds((prev) => {
+        const merged = new Set([...prev, ...newIds]);
+        return Array.from(merged);
+      });
+    } else {
+      setEnrollSegIds(newIds);
+    }
   }, [mode]);
 
   useEffect(() => {
