@@ -35,7 +35,14 @@ async def lifespan(app: FastAPI):
 
     # Create tables on startup (Alembic will replace this in production)
     print("[LIFESPAN] create_all...", flush=True)
-    Base.metadata.create_all(bind=engine)
+    try:
+        with engine.connect() as _conn:
+            print("[LIFESPAN] DB connection OK", flush=True)
+        Base.metadata.create_all(bind=engine)
+        print("[LIFESPAN] create_all done!", flush=True)
+    except Exception as _e:
+        print(f"[LIFESPAN] create_all FAILED: {_e}", flush=True)
+        raise
     _log.info("[STARTUP] add_missing_columns...")
     _add_missing_columns()
     _log.info("[STARTUP] seed_super_admin...")
