@@ -15,16 +15,26 @@ from app.middleware.tenant_db import TenantDBMiddleware
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
+    import logging as _logging
+    _log = _logging.getLogger("scribia.startup")
+
     from app.services.event_bus import event_bus
     event_bus.set_loop(asyncio.get_running_loop())
 
     # Create tables on startup (Alembic will replace this in production)
+    _log.info("[STARTUP] create_all...")
     Base.metadata.create_all(bind=engine)
+    _log.info("[STARTUP] add_missing_columns...")
     _add_missing_columns()
+    _log.info("[STARTUP] seed_super_admin...")
     _seed_super_admin()
+    _log.info("[STARTUP] seed_sectors...")
     _seed_sectors()
+    _log.info("[STARTUP] sync_tenant_modules...")
     _sync_tenant_modules()
+    _log.info("[STARTUP] load_dedicated_db_cache...")
     _load_dedicated_db_cache()
+    _log.info("[STARTUP] done!")
     yield
 
 
