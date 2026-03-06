@@ -102,7 +102,6 @@ function StepWorkflowView({
 }) {
   const [formData, setFormData] = useState<Record<string, string>>({});
 
-  const activeStep = proc.steps.find((s) => s.status === "active");
   const allDone = proc.steps.every((s) => s.status === "completed" || s.status === "skipped");
   const notStarted = proc.steps.every((s) => s.status === "pending");
 
@@ -142,7 +141,6 @@ function StepWorkflowView({
           const Icon = info.icon;
           const isActive = step.status === "active";
           const isCompleted = step.status === "completed";
-          const isPending = step.status === "pending";
 
           return (
             <div key={step.id}>
