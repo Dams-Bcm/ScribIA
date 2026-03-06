@@ -353,12 +353,18 @@ def run_diarization(
             max_speakers=2,
         )
     else:
-        logger.info(f"[DIARIZATION] Using min_speakers={settings.min_speakers}, max_speakers={settings.max_speakers}")
-        result = pipeline(
-            diarization_params,
-            min_speakers=settings.min_speakers,
-            max_speakers=settings.max_speakers,
-        )
+        # Only pass min/max speakers if explicitly set (non-default values)
+        # Otherwise let pyannote use clustering threshold alone (true auto mode)
+        kwargs = {}
+        if settings.min_speakers and settings.min_speakers > 0:
+            kwargs["min_speakers"] = settings.min_speakers
+        if settings.max_speakers and settings.max_speakers > 0:
+            kwargs["max_speakers"] = settings.max_speakers
+        if kwargs:
+            logger.info(f"[DIARIZATION] Using constraints: {kwargs}")
+        else:
+            logger.info("[DIARIZATION] Auto mode (clustering threshold only, no min/max speakers)")
+        result = pipeline(diarization_params, **kwargs)
 
     # pyannote 4.x compatibility
     if hasattr(result, "speaker_diarization"):
