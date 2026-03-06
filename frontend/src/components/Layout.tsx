@@ -34,7 +34,7 @@ interface NavItem {
 }
 
 export function Layout() {
-  const { user, isSuperAdmin, isAdmin, hasModule, logout } = useAuth();
+  const { user, isSuperAdmin, hasModule, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navItems: NavItem[] = [
