@@ -43,6 +43,8 @@ class TenantResponse(BaseModel):
     parent_id: Optional[str]
     is_large: bool
     is_active: bool
+    db_mode: str = "shared"
+    dedicated_db_name: Optional[str] = None
     modules: list[ModuleResponse] = []
 
     model_config = {"from_attributes": True}

@@ -58,6 +58,8 @@ export interface Tenant {
   parent_id: string | null;
   is_large: boolean;
   is_active: boolean;
+  db_mode: "shared" | "dedicated";
+  dedicated_db_name: string | null;
   modules: TenantModule[];
 }
 

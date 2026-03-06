@@ -55,3 +55,21 @@ export function useProvisionTenant() {
     mutationFn: (tenantId: string) => api.post<ProvisionResult>(`/admin/tenants/${tenantId}/provision`, {}),
   });
 }
+
+export function useProvisionDedicatedDb() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tenantId: string) =>
+      api.post<{ message: string; db_name: string }>(`/admin/tenants/${tenantId}/provision-db`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "tenants"] }),
+  });
+}
+
+export function useDeprovisionDedicatedDb() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tenantId: string) =>
+      api.post<{ message: string }>(`/admin/tenants/${tenantId}/deprovision-db`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "tenants"] }),
+  });
+}

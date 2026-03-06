@@ -9,6 +9,7 @@ from app.models import Base, Tenant, TenantModule, User, AVAILABLE_MODULES
 from app.services.auth import hash_password
 from app.routers import health, auth, admin, privacy, transcription, diarisation, compliance, preparatory_phases, ai_documents, speakers, contacts, search
 from app.routers.procedures import router as procedures_router, public_router as procedures_public_router
+from app.middleware.tenant_db import TenantDBMiddleware
 
 
 @asynccontextmanager
@@ -23,6 +24,7 @@ async def lifespan(app: FastAPI):
     _seed_super_admin()
     _seed_sectors()
     _sync_tenant_modules()
+    _load_dedicated_db_cache()
     yield
 
 
@@ -69,11 +71,19 @@ def _add_missing_columns():
                 "ALTER TABLE diarisation_speakers ADD embedding NVARCHAR(MAX) NULL"
             ))
 
-        # tenants: sector
+        # tenants: sector, db_mode, dedicated_db_name
         tenant_cols = {c["name"] for c in insp.get_columns("tenants")}
         if "sector" not in tenant_cols:
             conn.execute(text(
                 "ALTER TABLE tenants ADD sector VARCHAR(50) NULL"
+            ))
+        if "db_mode" not in tenant_cols:
+            conn.execute(text(
+                "ALTER TABLE tenants ADD db_mode VARCHAR(20) NOT NULL DEFAULT 'shared'"
+            ))
+        if "dedicated_db_name" not in tenant_cols:
+            conn.execute(text(
+                "ALTER TABLE tenants ADD dedicated_db_name VARCHAR(100) NULL"
             ))
 
         # procedure_templates: sector + make tenant_id nullable
@@ -188,13 +198,28 @@ def _sync_tenant_modules():
         db.close()
 
 
+def _load_dedicated_db_cache():
+    """Load tenant DB routing cache and ensure dedicated DBs have all tables."""
+    from app.database import SessionLocal, load_tenant_db_cache, get_engine_for_db
+    db = SessionLocal()
+    try:
+        load_tenant_db_cache(db)
+        # Ensure dedicated databases have up-to-date schema
+        for tenant in db.query(Tenant).filter(Tenant.db_mode == "dedicated").all():
+            if tenant.dedicated_db_name:
+                ded_engine = get_engine_for_db(tenant.dedicated_db_name)
+                Base.metadata.create_all(bind=ded_engine)
+    finally:
+        db.close()
+
+
 app = FastAPI(
     title=settings.app_name,
     version="2.0.0",
     lifespan=lifespan,
 )
 
-# CORS
+# Middleware — order matters: CORS first, then tenant DB routing
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins.split(","),
@@ -202,6 +227,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(TenantDBMiddleware)
 
 # Routers
 app.include_router(health.router)

@@ -164,6 +164,47 @@ def list_available_modules(_: User = Depends(require_super_admin)):
     return [{"key": k, "label": v} for k, v in AVAILABLE_MODULES.items()]
 
 
+# ── Dedicated database ───────────────────────────────────────────────────────
+
+
+@router.post("/tenants/{tenant_id}/provision-db")
+def provision_dedicated_database(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Create a dedicated database for a tenant and migrate its data."""
+    from app.services.dedicated_db import provision_dedicated_db
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant introuvable")
+    if tenant.db_mode == "dedicated":
+        raise HTTPException(status_code=400, detail="Ce tenant a déjà une BDD dédiée")
+
+    db_name = provision_dedicated_db(db, tenant)
+    return {"message": f"BDD dédiée '{db_name}' créée avec succès", "db_name": db_name}
+
+
+@router.post("/tenants/{tenant_id}/deprovision-db")
+def deprovision_dedicated_database(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Move data back to shared DB and remove dedicated database assignment."""
+    from app.services.dedicated_db import deprovision_dedicated_db
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant introuvable")
+    if tenant.db_mode != "dedicated":
+        raise HTTPException(status_code=400, detail="Ce tenant utilise déjà la BDD partagée")
+
+    deprovision_dedicated_db(db, tenant)
+    return {"message": "Données rapatriées vers la BDD partagée"}
+
+
 # ── Sectors CRUD ─────────────────────────────────────────────────────────────
 
 def _sector_response(s: Sector) -> dict:

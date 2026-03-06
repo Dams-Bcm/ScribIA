@@ -5,10 +5,12 @@ import {
   useDeleteTenant,
   useUpdateTenantModules,
   useProvisionTenant,
+  useProvisionDedicatedDb,
+  useDeprovisionDedicatedDb,
 } from "../../api/hooks/useTenants";
 import { AVAILABLE_MODULES, type Tenant, type ProvisionResult } from "../../api/types";
 import { useSectors } from "../../api/hooks/useSectors";
-import { Building2, Plus, Trash2, X, CheckCircle2, Sparkles } from "lucide-react";
+import { Building2, Plus, Trash2, X, CheckCircle2, Sparkles, Database, Loader2 } from "lucide-react";
 
 export function TenantsPage() {
   const { data: tenants = [], isLoading } = useTenants();
@@ -16,6 +18,8 @@ export function TenantsPage() {
   const deleteTenant = useDeleteTenant();
   const updateModules = useUpdateTenantModules();
   const provisionTenant = useProvisionTenant();
+  const provisionDb = useProvisionDedicatedDb();
+  const deprovisionDb = useDeprovisionDedicatedDb();
 
   const { data: sectors = [] } = useSectors();
 
@@ -160,6 +164,69 @@ export function TenantsPage() {
                     </label>
                   );
                 })}
+              </div>
+
+              {/* Base de données dédiée */}
+              <div className="mt-6 pt-6 border-t border-border">
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Database className="w-4 h-4" />
+                  Base de données
+                </h3>
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                    selected.db_mode === "dedicated"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    <Database className="w-3 h-3" />
+                    {selected.db_mode === "dedicated" ? "Dédiée" : "Partagée"}
+                  </span>
+                  {selected.dedicated_db_name && (
+                    <span className="text-xs text-muted-foreground font-mono">{selected.dedicated_db_name}</span>
+                  )}
+                </div>
+
+                {selected.db_mode === "shared" ? (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Migrer "${selected.name}" vers une BDD dédiée ?\n\nCela va :\n- Créer une nouvelle base de données\n- Migrer toutes les données existantes\n- Rediriger automatiquement les requêtes`)) {
+                        provisionDb.mutate(selected.id);
+                      }
+                    }}
+                    disabled={provisionDb.isPending}
+                    className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-blue-200 text-blue-700 bg-blue-50 text-sm hover:bg-blue-100 transition-colors disabled:opacity-50 dark:border-blue-800 dark:text-blue-400 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
+                  >
+                    {provisionDb.isPending ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Migration en cours...</>
+                    ) : (
+                      <><Database className="w-3.5 h-3.5" /> Passer en BDD dédiée</>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Rapatrier "${selected.name}" vers la BDD partagée ?\n\nCela va migrer toutes les données vers la base commune.`)) {
+                        deprovisionDb.mutate(selected.id);
+                      }
+                    }}
+                    disabled={deprovisionDb.isPending}
+                    className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-sm hover:bg-accent transition-colors disabled:opacity-50"
+                  >
+                    {deprovisionDb.isPending ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Rapatriement en cours...</>
+                    ) : (
+                      "Revenir en BDD partagée"
+                    )}
+                  </button>
+                )}
+
+                {(provisionDb.isError || deprovisionDb.isError) && (
+                  <p className="mt-2 text-sm text-destructive">
+                    {(provisionDb.error ?? deprovisionDb.error) instanceof Error
+                      ? (provisionDb.error ?? deprovisionDb.error)!.message
+                      : "Erreur lors de la migration"}
+                  </p>
+                )}
               </div>
             </div>
           ) : (
@@ -361,6 +428,9 @@ function OrgRow({
         <span className="text-sm font-medium truncate">{tenant.name}</span>
         {tenant.tenant_type === "group" && (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Groupe</span>
+        )}
+        {tenant.db_mode === "dedicated" && (
+          <Database className="w-3 h-3 text-blue-500 shrink-0" />
         )}
       </div>
       <button

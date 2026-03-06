@@ -12,9 +12,13 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+        return self.database_url_for(self.db_name)
+
+    def database_url_for(self, db_name: str) -> str:
+        """Build a connection string for a given database name."""
         return (
             f"mssql+pyodbc://{self.db_user}:{self.db_password}"
-            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+            f"@{self.db_host}:{self.db_port}/{db_name}"
             f"?driver={self.db_driver.replace(' ', '+')}"
             "&TrustServerCertificate=yes"
         )
