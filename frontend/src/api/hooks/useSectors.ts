@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../client";
-import type { SectorDefinition } from "../types";
+import type { SectorDefinition, SectorSuggestions } from "../types";
 
 export function useSectors() {
   return useQuery({
@@ -21,7 +21,7 @@ export function useCreateSector() {
 export function useUpdateSector() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...body }: { id: string; label?: string; description?: string; default_modules?: string[]; suggestions?: Record<string, unknown>; is_active?: boolean }) =>
+    mutationFn: ({ id, ...body }: { id: string; label?: string; description?: string; default_modules?: string[]; suggestions?: SectorSuggestions; is_active?: boolean }) =>
       api.patch<SectorDefinition>(`/admin/sectors/${id}`, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sectors"] }),
   });
