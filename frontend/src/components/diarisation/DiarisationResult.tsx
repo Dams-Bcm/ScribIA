@@ -388,20 +388,17 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
             const label = speakerLabelMap.get(seg.speaker_id ?? "") || seg.speaker_label || seg.speaker_id || "";
             const isPlaying = playingSegId === seg.id;
             const isSelected = mode === "normal" && selectedSegIds.has(seg.id);
-            const isEnrollHighlighted = mode === "enroll" && enrollSegIds.includes(seg.id);
 
             return (
               <div
                 key={seg.id}
                 data-seg-id={seg.id}
                 className={`flex gap-2 py-2 pl-3 rounded-r-lg transition-colors ${
-                  isEnrollHighlighted
-                    ? "bg-purple-50/80 border-l-4 border-purple-500 ring-1 ring-purple-200/60"
-                    : isSelected
-                      ? "bg-primary/10 ring-1 ring-primary/30 border-l-4 " + color.border
-                      : isPlaying
-                        ? "bg-primary/5 border-l-4 " + color.border
-                        : "hover:bg-muted/40 border-l-4 " + color.border
+                  isSelected
+                    ? "bg-primary/10 ring-1 ring-primary/30 border-l-4 " + color.border
+                    : isPlaying
+                      ? "bg-primary/5 border-l-4 " + color.border
+                      : "hover:bg-muted/40 border-l-4 " + color.border
                 } ${mode === "normal" && isAdmin ? "cursor-pointer" : ""} ${mode === "enroll" ? "select-text" : ""}`}
                 onClick={(e) => {
                   if (mode !== "normal" || !isAdmin) return;
