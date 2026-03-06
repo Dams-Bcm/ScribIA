@@ -38,7 +38,7 @@ const FILTER_OPTIONS = [
 
 export function SearchPage() {
   return (
-    <ModuleGuard module="search" label="Recherche intelligente">
+    <ModuleGuard module="search">
       <SearchChat />
     </ModuleGuard>
   );
