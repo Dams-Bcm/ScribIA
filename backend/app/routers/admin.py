@@ -1147,9 +1147,9 @@ def update_whisper_settings(
 # ── Pyannote / Diarisation Settings ──────────────────────────────────────────
 
 PYANNOTE_SETTINGS_KEYS = {
-    "min_speakers": ("Nombre min de locuteurs", "2"),
-    "max_speakers": ("Nombre max de locuteurs", "8"),
-    "clustering_threshold": ("Seuil de clustering", "0.65"),
+    "min_speakers": ("Nombre min de locuteurs (0 = auto)", "0"),
+    "max_speakers": ("Nombre max de locuteurs (0 = auto)", "0"),
+    "clustering_threshold": ("Seuil de clustering", "0.70"),
     "speaker_matching_threshold": ("Seuil matching enrollment", "0.75"),
 }
 

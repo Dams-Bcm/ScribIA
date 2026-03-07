@@ -45,9 +45,9 @@ class Settings(BaseSettings):
 
     # ── Diarisation ────────────────────────────────────────────────────────────
     hf_token: str = ""
-    min_speakers: int = 2
-    max_speakers: int = 8
-    clustering_threshold: float = 0.65
+    min_speakers: int = 0
+    max_speakers: int = 0
+    clustering_threshold: float = 0.70
     speaker_matching_threshold: float = 0.75  # cosine similarity threshold for auto-match
 
     # ── Preparatory Phases ──────────────────────────────────────────────────
