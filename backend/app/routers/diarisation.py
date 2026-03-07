@@ -25,7 +25,7 @@ from app.schemas.diarisation import (
     EnrollFromSegmentRequest,
     ValidateCollectiveConsentRequest,
 )
-from app.deps import require_super_admin
+from app.deps import require_admin as require_admin_dep
 from app.services.event_bus import event_bus
 from app.services.transcription import get_audio_duration
 from app.services.diarisation import run_diarisation_job_in_thread
@@ -580,13 +580,13 @@ def export_transcription(
     )
 
 
-# ── Enroll from segment selection (super_admin test mode) ────────────────────
+# ── Enroll from segment selection ─────────────────────────────────────────────
 
 @router.post("/{job_id}/enroll-from-segment")
 def enroll_from_segment(
     job_id: str,
     body: EnrollFromSegmentRequest,
-    user: User = Depends(require_super_admin),
+    user: User = Depends(require_admin_dep),
     db: Session = Depends(get_db),
 ):
     """

@@ -9,6 +9,7 @@ import type { DiarisationSegment } from "@/api/types";
 interface Props {
   segments: DiarisationSegment[];
   jobId: string;
+  timeRange?: { start: number; end: number };
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -19,7 +20,7 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export function EnrollFromSelectionModal({ segments, jobId, onClose, onSuccess }: Props) {
+export function EnrollFromSelectionModal({ segments, jobId, timeRange, onClose, onSuccess }: Props) {
   const { data: contacts = [], isLoading: loadingContacts } = useContactsForEnrollment();
   const enroll = useEnrollFromSegment();
 
@@ -31,8 +32,9 @@ export function EnrollFromSelectionModal({ segments, jobId, onClose, onSuccess }
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const startTime = Math.min(...segments.map((s) => s.start_time));
-  const endTime = Math.max(...segments.map((s) => s.end_time));
+  // Use proportional time range from text selection if available, otherwise full segment bounds
+  const startTime = timeRange?.start ?? Math.min(...segments.map((s) => s.start_time));
+  const endTime = timeRange?.end ?? Math.max(...segments.map((s) => s.end_time));
   const duration = endTime - startTime;
   const tooShort = duration < 5;
 

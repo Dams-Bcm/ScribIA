@@ -48,6 +48,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
 
   // Enrollment text highlight state
   const [enrollSegIds, setEnrollSegIds] = useState<string[]>([]);
+  const [enrollTimeRange, setEnrollTimeRange] = useState<{ start: number; end: number } | null>(null);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
 
   // Audio loading
@@ -71,6 +72,22 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
+  // Compute proportional time within a segment based on character offset in its <p>
+  const computeProportionalTime = useCallback(
+    (segEl: Element, seg: DiarisationSegment, container: Node, offset: number, isStart: boolean) => {
+      const pEl = segEl.querySelector("p");
+      if (!pEl || !pEl.contains(container)) return isStart ? seg.start_time : seg.end_time;
+      const totalChars = pEl.textContent?.length || 1;
+      const preRange = document.createRange();
+      preRange.selectNodeContents(pEl);
+      preRange.setEnd(container, offset);
+      const charsBefore = preRange.toString().length;
+      const proportion = charsBefore / totalChars;
+      return seg.start_time + proportion * (seg.end_time - seg.start_time);
+    },
+    [],
+  );
+
   // Detect text selection in enroll mode (Shift adds to existing selection)
   const handleMouseUp = useCallback((e: MouseEvent) => {
     if (mode !== "enroll") return;
@@ -80,30 +97,58 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
 
     // Only clear selection when clicking inside the segments container (not on toolbar buttons)
     if (!sel || sel.isCollapsed) {
-      if (!e.shiftKey && container.contains(e.target as Node)) setEnrollSegIds([]);
+      if (!e.shiftKey && container.contains(e.target as Node)) {
+        setEnrollSegIds([]);
+        setEnrollTimeRange(null);
+      }
       return;
     }
 
     const range = sel.getRangeAt(0);
     const segElements = container.querySelectorAll("[data-seg-id]");
-    const newIds: string[] = [];
+    const intersecting: { el: Element; seg: DiarisationSegment }[] = [];
 
     for (const el of segElements) {
       if (range.intersectsNode(el)) {
         const segId = (el as HTMLElement).dataset.segId;
-        if (segId) newIds.push(segId);
+        const seg = segId ? segments.find((s) => s.id === segId) : undefined;
+        if (seg) intersecting.push({ el, seg });
       }
     }
+
+    if (intersecting.length === 0) return;
+
+    const newIds = intersecting.map((x) => x.seg.id);
+
+    // Compute proportional start time from first segment
+    const first = intersecting[0]!;
+    const startTime = computeProportionalTime(
+      first.el, first.seg, range.startContainer, range.startOffset, true,
+    );
+
+    // Compute proportional end time from last segment
+    const last = intersecting[intersecting.length - 1]!;
+    const endTime = computeProportionalTime(
+      last.el, last.seg, range.endContainer, range.endOffset, false,
+    );
+
+    const newRange = { start: startTime, end: endTime };
 
     if (e.shiftKey) {
       setEnrollSegIds((prev) => {
         const merged = new Set([...prev, ...newIds]);
         return Array.from(merged);
       });
+      setEnrollTimeRange((prev) =>
+        prev
+          ? { start: Math.min(prev.start, newRange.start), end: Math.max(prev.end, newRange.end) }
+          : newRange,
+      );
     } else {
       setEnrollSegIds(newIds);
+      setEnrollTimeRange(newRange);
     }
-  }, [mode]);
+  }, [mode, segments, computeProportionalTime]);
 
   useEffect(() => {
     document.addEventListener("mouseup", handleMouseUp);
@@ -114,6 +159,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
   function switchMode(newMode: "normal" | "enroll") {
     setSelectedSegIds(new Set());
     setEnrollSegIds([]);
+    setEnrollTimeRange(null);
     lastClickedRef.current = null;
     setMode(newMode);
   }
@@ -332,7 +378,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
         <div className="sticky top-0 z-20 flex items-center gap-3 bg-purple-100 border border-purple-300 rounded-lg px-4 py-2">
           <span className="text-sm font-medium text-purple-800">
             {enrollSegIds.length} segment{enrollSegIds.length > 1 ? "s" : ""} surligne{enrollSegIds.length > 1 ? "s" : ""}
-            {" "}({formatTime(Math.min(...enrollSelectedSegments.map((s) => s.start_time)))} - {formatTime(Math.max(...enrollSelectedSegments.map((s) => s.end_time)))})
+            {" "}({formatTime(enrollTimeRange?.start ?? Math.min(...enrollSelectedSegments.map((s) => s.start_time)))} - {formatTime(enrollTimeRange?.end ?? Math.max(...enrollSelectedSegments.map((s) => s.end_time)))})
           </span>
           <Button
             size="sm"
@@ -349,6 +395,7 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
             onClick={() => {
               window.getSelection()?.removeAllRanges();
               setEnrollSegIds([]);
+              setEnrollTimeRange(null);
             }}
           >
             <X className="w-4 h-4" />
@@ -450,10 +497,12 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
         <EnrollFromSelectionModal
           segments={enrollSelectedSegments}
           jobId={jobId}
+          timeRange={enrollTimeRange ?? undefined}
           onClose={() => setShowEnrollModal(false)}
           onSuccess={() => {
             window.getSelection()?.removeAllRanges();
             setEnrollSegIds([]);
+            setEnrollTimeRange(null);
           }}
         />
       )}
