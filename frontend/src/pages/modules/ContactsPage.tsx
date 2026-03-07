@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import {
-  BookUser,
   Plus,
   Trash2,
   UserPlus,
