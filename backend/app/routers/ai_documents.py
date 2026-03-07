@@ -115,7 +115,15 @@ def delete_template(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    from app.models.procedures import ProcedureTemplate, Procedure
     tpl = _get_template_or_404(template_id, user.tenant_id, db)
+    # Nettoyer les FK avant suppression
+    db.query(AIDocument).filter(AIDocument.template_id == template_id).update(
+        {AIDocument.template_id: None}, synchronize_session=False)
+    db.query(ProcedureTemplate).filter(ProcedureTemplate.document_template_id == template_id).update(
+        {ProcedureTemplate.document_template_id: None}, synchronize_session=False)
+    db.query(Procedure).filter(Procedure.document_template_id == template_id).update(
+        {Procedure.document_template_id: None}, synchronize_session=False)
     db.delete(tpl)
     db.commit()
 

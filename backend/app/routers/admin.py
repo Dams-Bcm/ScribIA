@@ -1422,23 +1422,19 @@ def test_email_settings(
     _: User = Depends(require_super_admin),
 ):
     """Envoie un email de test pour vérifier la configuration SMTP."""
-    from app.services.email import _send_email
+    from app.services.email import send_generic_email
 
     if not settings.smtp_host:
         return {"success": False, "error": "SMTP non configuré (smtp_host vide)"}
 
-    test_html = """
-    <html>
-    <body style="font-family: Arial, sans-serif; color: #333;">
-      <h2 style="color: #2563eb;">Test SMTP — ScribIA</h2>
-      <p>Si vous recevez cet email, la configuration SMTP est correcte.</p>
-    </body>
-    </html>
-    """
-    success = _send_email(
+    test_body = (
+        '<p style="margin:0 0 16px 0; font-size:16px; font-weight:bold;">Test SMTP</p>'
+        '<p style="margin:0;">Si vous recevez cet email, la configuration SMTP est correcte.</p>'
+    )
+    success = send_generic_email(
         settings.smtp_from_email,
         "Test SMTP — ScribIA",
-        test_html,
+        test_body,
     )
     if success:
         return {"success": True, "message": f"Email de test envoyé à {settings.smtp_from_email}"}
