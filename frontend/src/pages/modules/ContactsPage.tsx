@@ -418,41 +418,8 @@ export function ContactsPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   // Auto-select "Tous" by default
-  const effectiveGroupId = selectedGroupId ?? (groups && groups.length > 0 ? "__all__" : null);
+  const effectiveGroupId = selectedGroupId ?? "__all__";
   const totalContacts = groups?.reduce((sum, g) => sum + g.contact_count, 0) ?? 0;
-
-  // No groups: empty state
-  if (!isLoading && (!groups || groups.length === 0) && !showCreate) {
-    return (
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Contacts</h1>
-            <p className="text-sm text-muted-foreground">Gérez vos groupes et contacts</p>
-          </div>
-        </div>
-        <div className="bg-background rounded-xl border border-border p-8">
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
-              <BookUser className="w-8 h-8" />
-            </div>
-            <h2 className="text-lg font-semibold mb-2">Aucun groupe de contacts</h2>
-            <p className="text-sm text-muted-foreground mb-6 max-w-md">
-              Créez un groupe (résidence, commission, lot…) puis ajoutez-y vos contacts.
-            </p>
-            <Button onClick={() => setShowCreate(true)}>
-              <Plus className="w-4 h-4" /> Nouveau groupe
-            </Button>
-          </div>
-        </div>
-        {showCreate && (
-          <div className="mt-4">
-            <SidebarCreateForm onDone={() => setShowCreate(false)} onCreated={(id) => setSelectedGroupId(id)} />
-          </div>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div>
