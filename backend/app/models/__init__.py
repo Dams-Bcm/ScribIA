@@ -17,6 +17,7 @@ from app.models.ai_settings import AISetting, AI_USAGES
 from app.models.sector import Sector
 from app.models.substitution import SubstitutionRule
 from app.models.announcement import Announcement, announcement_tenants
+from app.models.system_settings import SystemSetting
 
 __all__ = [
     "Base", "Tenant", "TenantModule", "User", "AVAILABLE_MODULES",
@@ -35,4 +36,5 @@ __all__ = [
     "Sector",
     "SubstitutionRule",
     "Announcement", "announcement_tenants",
+    "SystemSetting",
 ]

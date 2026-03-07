@@ -153,6 +153,27 @@ def respond_consent_request(
             decided_by="system",
         )
 
+    # Sync SpeakerProfile consent_status (used by Contacts page)
+    profile = db.query(SpeakerProfile).filter(
+        SpeakerProfile.contact_id == cr.contact_id
+    ).first()
+    if profile:
+        profile.consent_status = "accepted" if action == "accept" else "declined"
+        profile.consent_type = "email"
+        profile.consent_date = now
+    elif action == "accept":
+        contact = db.query(Contact).filter(Contact.id == cr.contact_id).first()
+        if contact:
+            profile = SpeakerProfile(
+                tenant_id=cr.tenant_id,
+                contact_id=contact.id,
+                display_name=contact.name,
+                consent_status="accepted",
+                consent_type="email",
+                consent_date=now,
+            )
+            db.add(profile)
+
     db.commit()
     if action == "accept":
         return ConsentActionResponse(status="accepted", message="Votre consentement a ete enregistre. Merci.")

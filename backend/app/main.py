@@ -62,6 +62,8 @@ async def lifespan(app: FastAPI):
     _sync_tenant_modules()
     print("[LIFESPAN] load_dedicated_db_cache...", flush=True)
     _load_dedicated_db_cache()
+    print("[LIFESPAN] load_system_settings...", flush=True)
+    _load_system_settings()
     print("[LIFESPAN] done! App ready.", flush=True)
     yield
 
@@ -299,6 +301,29 @@ def _load_dedicated_db_cache():
             if tenant.dedicated_db_name:
                 ded_engine = get_engine_for_db(tenant.dedicated_db_name)
                 Base.metadata.create_all(bind=ded_engine)
+    finally:
+        db.close()
+
+
+def _load_system_settings():
+    """Load persisted system settings (SMTP, etc.) from DB into runtime config."""
+    from app.database import SessionLocal
+    from app.models.system_settings import SystemSetting
+    db = SessionLocal()
+    try:
+        rows = db.query(SystemSetting).all()
+        for row in rows:
+            if row.value is None:
+                continue
+            if row.key == "smtp_port":
+                try:
+                    settings.smtp_port = int(row.value)
+                except ValueError:
+                    pass
+            elif row.key == "smtp_use_tls":
+                settings.smtp_use_tls = row.value.lower() in ("true", "1", "yes")
+            elif hasattr(settings, row.key):
+                setattr(settings, row.key, row.value)
     finally:
         db.close()
 

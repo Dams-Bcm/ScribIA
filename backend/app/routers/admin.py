@@ -1347,15 +1347,19 @@ class EmailSettingUpdate(BaseModel):
 @router.put("/email-settings")
 def update_email_settings(
     body: list[EmailSettingUpdate],
+    db: Session = Depends(get_db),
     _: User = Depends(require_super_admin),
 ):
-    """Met à jour les paramètres Email/SMTP (appliqués au runtime)."""
+    """Met à jour les paramètres Email/SMTP (appliqués au runtime + persistés en DB)."""
+    from app.models.system_settings import SystemSetting
+
     for item in body:
         if item.key not in EMAIL_SETTINGS_KEYS:
             continue
         # Skip masked password (no change)
         if item.key == "smtp_password" and item.value == "••••••••":
             continue
+        # Apply to runtime
         if item.key == "smtp_port":
             try:
                 settings.smtp_port = int(item.value)
@@ -1365,6 +1369,13 @@ def update_email_settings(
             settings.smtp_use_tls = item.value.lower() in ("true", "1", "yes")
         else:
             setattr(settings, item.key, item.value)
+        # Persist to DB
+        existing = db.query(SystemSetting).filter(SystemSetting.key == item.key).first()
+        if existing:
+            existing.value = item.value
+        else:
+            db.add(SystemSetting(key=item.key, value=item.value))
+    db.commit()
     return {"message": "Paramètres email mis à jour"}
 
 
