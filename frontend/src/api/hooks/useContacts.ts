@@ -126,3 +126,16 @@ export function useDeleteContact() {
     },
   });
 }
+
+export function useAddContactToGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ contactId, groupId }: { contactId: string; groupId: string }) =>
+      api.post(`/contacts/contacts/${contactId}/groups/${groupId}`),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: KEYS.group(vars.groupId) });
+      qc.invalidateQueries({ queryKey: KEYS.group("__all__") });
+      qc.invalidateQueries({ queryKey: KEYS.groups });
+    },
+  });
+}
