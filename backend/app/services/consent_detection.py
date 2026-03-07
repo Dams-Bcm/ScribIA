@@ -34,8 +34,9 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
     if not segments:
         return None
 
-    # Build transcript text for LLM analysis (first ~50 segments)
-    analysis_segments = segments[:50]
+    # Build transcript text for LLM analysis — only first 10 segments
+    # (consent/refusal always happens at the very start of a meeting)
+    analysis_segments = segments[:10]
     transcript_lines = []
     for seg in analysis_segments:
         label = seg.speaker_label or seg.speaker_id or ""
@@ -50,29 +51,21 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
     model = get_model_for_usage("consent_detection")
     logger.info(f"[CONSENT] Using model '{model}' for job {job.id}")
 
-    system_prompt = "You analyze meeting transcripts to detect recording consent. Respond ONLY with a JSON object."
-
     user_prompt = (
-        "Does this French meeting transcript contain consent to being recorded?\n\n"
-        "Look for:\n"
-        "- Someone announcing the recording (e.g. 'cette seance va etre enregistree')\n"
-        "- Participants accepting (e.g. 'ok', 'd'accord', 'c'est bon', no objection)\n"
-        "- OR someone refusing (e.g. 'je refuse d'etre enregistre')\n\n"
-        "Respond with this exact JSON structure:\n"
-        '{"detected": true, "type": "collective_consent", '
-        '"announcement": "the announcement phrase", '
-        '"phrase": "the acceptance/refusal phrase", '
-        '"segment_time": "1.2-10.8", '
-        '"speaker_id": "SPEAKER_XX", '
-        '"confidence": "high", '
-        '"explanation": "short explanation"}\n\n'
-        "If no consent detected:\n"
-        '{"detected": false, "type": null, "announcement": null, "phrase": null, '
+        "Task: detect if participants consent to being recorded in this meeting opening.\n\n"
+        "Example 1 — consent detected:\n"
+        "Input: [0.0-8.0] [SPEAKER_00] Bonjour, cette reunion va etre enregistree, pas d'objection ? Ok parfait.\n"
+        'Output: {"detected": true, "type": "collective_consent", "announcement": "cette reunion va etre enregistree", '
+        '"phrase": "Ok parfait", "segment_time": "0.0-8.0", "speaker_id": "SPEAKER_00", "confidence": "high", '
+        '"explanation": "Announcement followed by implicit acceptance"}\n\n'
+        "Example 2 — no consent:\n"
+        "Input: [0.0-5.0] [SPEAKER_00] Bonjour, on commence la reunion.\n"
+        'Output: {"detected": false, "type": null, "announcement": null, "phrase": null, '
         '"segment_time": null, "speaker_id": null, "confidence": null, '
-        '"explanation": "No consent detected"}\n\n'
-        f"TRANSCRIPT:\n{transcript_text}"
+        '"explanation": "No recording announcement found"}\n\n'
+        f"Now analyze this transcript and respond with JSON only:\n{transcript_text}"
     )
-    logger.info(f"[CONSENT] Sending {len(analysis_segments)} segments to LLM for job {job.id}. First 300 chars: {transcript_text[:300]}")
+    logger.info(f"[CONSENT] Sending {len(analysis_segments)} segments to LLM for job {job.id}. Transcript: {transcript_text[:300]}")
 
     try:
         resp = http_requests.post(
@@ -80,7 +73,6 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
             json={
                 "model": model,
                 "messages": [
-                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
                 "stream": False,
