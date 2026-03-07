@@ -241,17 +241,13 @@ def _map_reduce_generate(
 
     # ── Passe 1 : résumer chaque chunk ──
     map_system = (
-        "Tu es un assistant spécialisé dans l'analyse de transcriptions de réunions. "
-        "On te donne un extrait d'une transcription découpée en plusieurs parties. "
-        "Tu dois produire un résumé DÉTAILLÉ et FIDÈLE de cet extrait. "
-        "RÈGLES IMPORTANTES :\n"
-        "- Conserve TOUS les noms des intervenants mentionnés\n"
-        "- Note TOUTES les décisions prises, même mineures\n"
-        "- Liste les actions à suivre avec les responsables si mentionnés\n"
-        "- Conserve les chiffres, dates, montants exacts\n"
-        "- Garde les citations importantes entre guillemets\n"
-        "- Écris en prose structurée, PAS en template vide\n"
-        "- Ne génère JAMAIS de placeholders comme [nom] ou [date] — utilise les vraies infos du texte"
+        "Tu es un assistant qui extrait les points clés d'une transcription de réunion. "
+        "Tu produis un résumé COURT en bullet points (5 à 8 points maximum). "
+        "RÈGLES :\n"
+        "- Chaque point fait UNE phrase maximum\n"
+        "- Note les noms des intervenants, les décisions, les chiffres/dates importants\n"
+        "- Ne génère JAMAIS de placeholders comme [nom] ou [date]\n"
+        "- Sois CONCIS : 400 à 600 caractères maximum pour tout le résumé"
     )
 
     summaries = []
@@ -264,17 +260,16 @@ def _map_reduce_generate(
         logger.info(f"[AI] Map-Reduce passe 1: chunk {i+1}/{len(chunks)} ({len(chunk)} chars)")
 
         map_prompt = (
-            f"Voici la partie {i+1} sur {len(chunks)} d'une transcription de réunion.\n\n"
-            f"EXTRAIT DE TRANSCRIPTION :\n{chunk}\n\n"
-            "Produis un résumé détaillé de cet extrait. "
-            "Inclus tous les éléments factuels : qui a dit quoi, quelles décisions, quelles actions."
+            f"Extrait {i+1}/{len(chunks)} d'une transcription de réunion :\n\n"
+            f"{chunk}\n\n"
+            "Résume en bullet points courts (5-8 points max, 400-600 caractères max au total)."
         )
 
         parts = []
-        for text in _call_ollama(model, map_system, map_prompt, temperature, num_predict=2048):
+        for text in _call_ollama(model, map_system, map_prompt, temperature, num_predict=512, keep_alive="10m"):
             parts.append(text)
         summary = "".join(parts)
-        summaries.append(f"=== Partie {i+1}/{len(chunks)} ===\n{summary}")
+        summaries.append(f"[Partie {i+1}/{len(chunks)}]\n{summary}")
         logger.info(f"[AI] Map-Reduce chunk {i+1}: résumé de {len(summary)} chars")
 
     # ── Passe 2 : synthèse finale ──
@@ -324,14 +319,14 @@ def _map_reduce_generate(
 
 # ── Appel Ollama ──────────────────────────────────────────────────────────────
 
-def _call_ollama(model: str, system_prompt: str, user_prompt: str, temperature: float, num_predict: int = 4096) -> Generator[str, None, None]:
+def _call_ollama(model: str, system_prompt: str, user_prompt: str, temperature: float, num_predict: int = 4096, keep_alive: int | str = 0) -> Generator[str, None, None]:
     """Appelle Ollama en streaming et yield les chunks de texte."""
     payload = {
         "model": model,
         "system": system_prompt,
         "prompt": user_prompt,
         "stream": True,
-        "keep_alive": 0,  # décharge le modèle de la VRAM immédiatement après génération
+        "keep_alive": keep_alive,
         "options": {
             "temperature": temperature,
             "num_predict": num_predict,
