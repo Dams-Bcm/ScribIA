@@ -100,11 +100,13 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
 
     try:
         resp = http_requests.post(
-            f"{settings.ollama_url}/api/generate",
+            f"{settings.ollama_url}/api/chat",
             json={
                 "model": model,
-                "system": system_prompt,
-                "prompt": user_prompt,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
                 "stream": False,
                 "keep_alive": 0,
                 "format": "json",
@@ -113,7 +115,7 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
             timeout=120,
         )
         resp.raise_for_status()
-        llm_response = resp.json().get("response", "")
+        llm_response = resp.json().get("message", {}).get("content", "")
     except Exception as e:
         logger.warning(f"[CONSENT] LLM detection failed for job {job.id}: {e}")
         return None
