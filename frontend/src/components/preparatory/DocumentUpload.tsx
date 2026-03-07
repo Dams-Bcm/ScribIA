@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Upload, FileText, Trash2, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useUploadDocument, useDeleteDocument } from "@/api/hooks/usePreparatoryPhases";
 import type { DossierDocument } from "@/api/types";
 
@@ -34,6 +35,7 @@ async function downloadFile(dossierId: string, docId: string, filename: string) 
 }
 
 export function DocumentUpload({ dossierId, agendaPointId, documents, label }: DocumentUploadProps) {
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const uploadDoc = useUploadDocument();
   const deleteDoc = useDeleteDocument();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -57,9 +59,11 @@ export function DocumentUpload({ dossierId, agendaPointId, documents, label }: D
   };
 
   const handleDelete = (docId: string) => {
-    if (confirm("Supprimer ce document ?")) {
-      deleteDoc.mutate({ dossierId, docId });
-    }
+    confirm({
+      title: "Supprimer ce document ?",
+      confirmLabel: "Supprimer",
+      onConfirm: () => deleteDoc.mutate({ dossierId, docId }),
+    });
   };
 
   return (
@@ -97,6 +101,8 @@ export function DocumentUpload({ dossierId, agendaPointId, documents, label }: D
           </>
         )}
       </div>
+
+      {confirmDialog}
 
       {/* File list */}
       {filteredDocs.length > 0 && (

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Plus, ChevronUp, ChevronDown, Trash2, Pencil, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import {
   useAddPoint,
@@ -16,6 +17,7 @@ interface AgendaEditorProps {
 }
 
 export function AgendaEditor({ dossierId, points }: AgendaEditorProps) {
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const addPoint = useAddPoint();
   const updatePoint = useUpdatePoint();
   const deletePoint = useDeletePoint();
@@ -49,9 +51,11 @@ export function AgendaEditor({ dossierId, points }: AgendaEditorProps) {
   const cancelEdit = () => setEditingId(null);
 
   const handleDelete = (pointId: string) => {
-    if (confirm("Supprimer ce point ?")) {
-      deletePoint.mutate({ dossierId, pointId });
-    }
+    confirm({
+      title: "Supprimer ce point ?",
+      confirmLabel: "Supprimer",
+      onConfirm: () => deletePoint.mutate({ dossierId, pointId }),
+    });
   };
 
   const movePoint = (index: number, direction: -1 | 1) => {
@@ -129,6 +133,8 @@ export function AgendaEditor({ dossierId, points }: AgendaEditorProps) {
           ))}
         </div>
       )}
+
+      {confirmDialog}
 
       <div className="flex gap-2">
         <Input

@@ -1,5 +1,6 @@
 import { Eye, Trash2, Calendar, FileText, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import type { PreparatoryDossier } from "@/api/types";
 
@@ -16,7 +17,11 @@ interface DossierListProps {
 }
 
 export function DossierList({ dossiers, onSelect, onDelete }: DossierListProps) {
+  const { confirm, dialog: confirmDialog } = useConfirm();
+
   return (
+    <>
+    {confirmDialog}
     <div className="bg-background rounded-xl border border-border overflow-hidden">
       <table className="w-full text-sm">
         <thead>
@@ -80,7 +85,11 @@ export function DossierList({ dossiers, onSelect, onDelete }: DossierListProps) 
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm("Supprimer ce dossier ?")) onDelete(d.id);
+                        confirm({
+                          title: "Supprimer ce dossier ?",
+                          confirmLabel: "Supprimer",
+                          onConfirm: () => onDelete(d.id),
+                        });
                       }}
                     >
                       <Trash2 className="w-3.5 h-3.5 text-red-500" />
@@ -93,5 +102,6 @@ export function DossierList({ dossiers, onSelect, onDelete }: DossierListProps) 
         </tbody>
       </table>
     </div>
+    </>
   );
 }

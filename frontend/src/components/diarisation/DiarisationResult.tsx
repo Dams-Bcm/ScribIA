@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Copy, Download, Check, Play, Pause, Loader2, UserPlus, X, Mic, Trash2, Merge } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ApplyDictionaryButton } from "@/components/dictionary/ApplyDictionaryButton";
 import { useAuth } from "@/stores/auth";
 import type { DiarisationSegment, DiarisationSpeaker } from "@/api/types";
@@ -28,6 +29,7 @@ function formatTime(seconds: number): string {
 
 export function DiarisationResult({ segments, speakers, jobId, title, onRenameSpeaker }: DiarisationResultProps) {
   const { isAdmin, hasModule } = useAuth();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const deleteSegments = useDeleteSegments();
   const mergeSegments = useMergeSegments();
   const [copied, setCopied] = useState(false);
@@ -300,11 +302,14 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
               size="sm"
               variant="destructive"
               onClick={() => {
-                if (!confirm(`Supprimer ${selectedSegIds.size} segment(s) ? Cette action est irreversible.`)) return;
-                deleteSegments.mutate(
-                  { jobId, segmentIds: Array.from(selectedSegIds) },
-                  { onSuccess: () => clearSelection() },
-                );
+                confirm({
+                  title: `Supprimer ${selectedSegIds.size} segment(s) ? Cette action est irreversible.`,
+                  confirmLabel: "Supprimer",
+                  onConfirm: () => deleteSegments.mutate(
+                    { jobId, segmentIds: Array.from(selectedSegIds) },
+                    { onSuccess: () => clearSelection() },
+                  ),
+                });
               }}
               disabled={isBusy}
             >
@@ -437,6 +442,8 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
           })}
         </div>
       </div>
+
+      {confirmDialog}
 
       {/* Enrollment modal */}
       {showEnrollModal && enrollSelectedSegments.length > 0 && (

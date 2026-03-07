@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -55,6 +56,7 @@ export function RetentionPolicies() {
   const updatePolicy = useUpdateRetentionPolicy();
   const deletePolicy = useDeleteRetentionPolicy();
 
+  const { confirm: confirmAction, dialog: confirmDialog } = useConfirm();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<RetentionPolicy | null>(null);
   const [form, setForm] = useState<PolicyFormData>(EMPTY_FORM);
@@ -91,9 +93,11 @@ export function RetentionPolicies() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Supprimer cette politique de rétention ?")) {
-      deletePolicy.mutate(id);
-    }
+    confirmAction({
+      title: "Supprimer cette politique de rétention ?",
+      confirmLabel: "Supprimer",
+      onConfirm: () => deletePolicy.mutate(id),
+    });
   };
 
   if (isLoading) {
@@ -167,6 +171,8 @@ export function RetentionPolicies() {
           </table>
         </div>
       )}
+
+      {confirmDialog}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
