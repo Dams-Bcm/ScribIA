@@ -358,7 +358,7 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
 
 // ── Sidebar: create group form ───────────────────────────────────────────────
 
-function SidebarCreateForm({ onDone }: { onDone: () => void }) {
+function SidebarCreateForm({ onDone, onCreated }: { onDone: () => void; onCreated?: (id: string) => void }) {
   const create = useCreateContactGroup();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -366,7 +366,7 @@ function SidebarCreateForm({ onDone }: { onDone: () => void }) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const body: ContactGroupCreate = { name, description: description || null };
-    create.mutate(body, { onSuccess: () => onDone() });
+    create.mutate(body, { onSuccess: (group) => { onCreated?.(group.id); onDone(); } });
   }
 
   return (
@@ -434,7 +434,7 @@ export function ContactsPage() {
         </div>
         {showCreate && (
           <div className="mt-4">
-            <SidebarCreateForm onDone={() => setShowCreate(false)} />
+            <SidebarCreateForm onDone={() => setShowCreate(false)} onCreated={(id) => setSelectedGroupId(id)} />
           </div>
         )}
       </div>
@@ -492,7 +492,7 @@ export function ContactsPage() {
 
             {/* New group button / form */}
             {showCreate ? (
-              <SidebarCreateForm onDone={() => setShowCreate(false)} />
+              <SidebarCreateForm onDone={() => setShowCreate(false)} onCreated={(id) => setSelectedGroupId(id)} />
             ) : (
               <button
                 onClick={() => setShowCreate(true)}
