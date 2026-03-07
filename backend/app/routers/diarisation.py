@@ -755,18 +755,28 @@ def detect_oral_consent(
     model = get_model_for_usage("consent_detection")
 
     system_prompt = (
-        "Tu es un assistant d'analyse de transcriptions de reunions. "
-        "Tu dois determiner si la transcription contient une phrase de consentement oral "
-        "a l'enregistrement, telle que : 'cette reunion va etre enregistree', "
-        "'nous enregistrons cette seance', 'l'enregistrement est en cours', "
-        "'vous acceptez l'enregistrement', ou toute formulation equivalente.\n\n"
+        "Tu es un assistant d'analyse de transcriptions de reunions.\n"
+        "Tu dois analyser la transcription pour detecter :\n"
+        "1. Un CONSENTEMENT collectif a l'enregistrement (ex: 'cette reunion va etre enregistree', "
+        "'nous enregistrons cette seance', 'vous acceptez l'enregistrement', 'pas d'objection').\n"
+        "2. Un REFUS individuel d'etre enregistre (ex: 'je refuse d'etre enregistre', "
+        "'non je ne suis pas d'accord', 'je m'oppose a l'enregistrement').\n\n"
+        "IMPORTANT : Cherche d'abord le consentement, puis verifie s'il y a un refus apres.\n"
+        "Si un consentement ET un refus sont detectes, retourne le REFUS (plus critique).\n\n"
         "Reponds UNIQUEMENT en JSON valide avec cette structure :\n"
-        '{"detected": true/false, "phrase": "la phrase exacte trouvee ou null", '
-        '"segment_time": "start_time-end_time ou null", '
-        '"confidence": "high/medium/low", '
-        '"explanation": "courte explication"}\n\n'
-        "Si aucune phrase de consentement n'est trouvee, reponds :\n"
-        '{"detected": false, "phrase": null, "segment_time": null, "confidence": null, "explanation": "Aucune phrase de consentement detectee."}'
+        "{\n"
+        '  "detected": true/false,\n'
+        '  "type": "collective_consent" ou "individual_refusal" ou null,\n'
+        '  "phrase": "la phrase exacte trouvee ou null",\n'
+        '  "segment_time": "start_time-end_time ou null",\n'
+        '  "speaker_id": "le SPEAKER_XX qui a prononce la phrase ou null",\n'
+        '  "confidence": "high/medium/low",\n'
+        '  "explanation": "courte explication"\n'
+        "}\n\n"
+        "Si aucune phrase de consentement ni de refus n'est trouvee :\n"
+        '{"detected": false, "type": null, "phrase": null, "segment_time": null, '
+        '"speaker_id": null, "confidence": null, '
+        '"explanation": "Aucune phrase de consentement ou de refus detectee."}'
     )
 
     user_prompt = f"Analyse cette transcription :\n\n{transcript_text}"
@@ -830,14 +840,44 @@ def detect_oral_consent(
                 matched_seg = seg
                 break
 
+    # Resolve refusal speaker label if available
+    detection_type = result.get("type")
+    refusal_speaker_id = result.get("speaker_id")
+    refusal_speaker_label = None
+    if detection_type == "individual_refusal" and refusal_speaker_id:
+        for seg in analysis_segments:
+            if seg.speaker_id == refusal_speaker_id and seg.speaker_label:
+                refusal_speaker_label = seg.speaker_label
+                break
+
+    # Save ConsentDetection record for audit trail
+    from app.models.consent import ConsentDetection
+    cd = ConsentDetection(
+        tenant_id=job.tenant_id,
+        job_id=job_id,
+        detection_type=detection_type or "collective_consent",
+        segment_start_ms=matched_seg.start_time * 1000 if matched_seg else None,
+        segment_end_ms=matched_seg.end_time * 1000 if matched_seg else None,
+        transcript_text=consent_phrase,
+        speaker_id=refusal_speaker_id,
+        ai_confidence={"high": 0.9, "medium": 0.6, "low": 0.3}.get(
+            result.get("confidence", "medium"), 0.5
+        ),
+    )
+    db.add(cd)
+    db.commit()
+
     return OralConsentDetectionResponse(
         detected=True,
+        detection_type=detection_type,
         consent_phrase=consent_phrase,
         segment_id=matched_seg.id if matched_seg else None,
         start_time=matched_seg.start_time if matched_seg else None,
         end_time=matched_seg.end_time if matched_seg else None,
         confidence=result.get("confidence", "medium"),
         explanation=result.get("explanation"),
+        refusal_speaker_id=refusal_speaker_id,
+        refusal_speaker_label=refusal_speaker_label,
     )
 
 
@@ -939,6 +979,38 @@ def validate_collective_consent(
             db.add(profile)
 
         results.append({"contact_id": contact.id, "name": contact.name})
+
+    # Update attendees[] if they exist on this job
+    if job.attendees:
+        import json as _json
+        try:
+            att_list = _json.loads(job.attendees)
+        except (ValueError, TypeError):
+            att_list = []
+
+        validated_ids = {c.id for c in contacts}
+        for att in att_list:
+            if att.get("contact_id") in validated_ids:
+                att["status"] = "accepted_oral"
+                att["evidence_type"] = "oral"
+                att["decided_at"] = now.isoformat()
+                att["decided_by"] = "user_confirmed"
+                if body.consent_segment_id:
+                    # Store segment reference in evidence_id (ConsentDetection not yet created inline here)
+                    att["evidence_id"] = body.consent_segment_id
+
+        job.attendees = _json.dumps(att_list)
+
+        # Recompute recording_validity
+        statuses = {a.get("status") for a in att_list}
+        if "refused" in statuses or "withdrawn" in statuses:
+            job.recording_validity = "invalidated"
+        elif all(s in ("accepted_email", "accepted_oral") for s in statuses):
+            job.recording_validity = "valid"
+        elif "pending" in statuses:
+            job.recording_validity = "blocked"
+        else:
+            job.recording_validity = "pending"
 
     db.commit()
     return {

@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     min_speakers: int = 0
     max_speakers: int = 0
     clustering_threshold: float = 0.70
-    speaker_matching_threshold: float = 0.75  # cosine similarity threshold for auto-match
+    speaker_matching_threshold: float = 0.65  # cosine similarity threshold for auto-match
 
     # ── Preparatory Phases ──────────────────────────────────────────────────
     prep_docs_path: str = "/data/prep_docs"
@@ -69,6 +69,16 @@ class Settings(BaseSettings):
     rag_chunk_size: int = 1500         # chars per chunk
     rag_chunk_overlap: int = 200       # overlap between chunks
     rag_top_k: int = 10               # number of chunks to retrieve
+
+    # ── Email (SMTP) ─────────────────────────────────────────────────────────
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = "noreply@scribia.fr"
+    smtp_from_name: str = "ScribIA"
+    smtp_use_tls: bool = True
+    app_base_url: str = "http://localhost:3001"  # URL publique pour les liens dans les emails
 
     # ── App ────────────────────────────────────────────────────────────────────
     app_name: str = "ScribIA"

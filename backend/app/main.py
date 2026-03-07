@@ -188,6 +188,18 @@ def _add_missing_columns():
                     "ALTER TABLE speaker_profiles ADD contact_id VARCHAR(36) NULL"
                 ))
 
+        # ai_documents: invalidated_at, invalidated_reason
+        if "ai_documents" in insp.get_table_names():
+            doc_cols = {c["name"] for c in insp.get_columns("ai_documents")}
+            if "invalidated_at" not in doc_cols:
+                conn.execute(text(
+                    "ALTER TABLE ai_documents ADD invalidated_at DATETIME2 NULL"
+                ))
+            if "invalidated_reason" not in doc_cols:
+                conn.execute(text(
+                    "ALTER TABLE ai_documents ADD invalidated_reason NVARCHAR(MAX) NULL"
+                ))
+
         # speaker_enrollment_segments: make segment_id nullable
         if "speaker_enrollment_segments" in insp.get_table_names():
             ses_col = next(

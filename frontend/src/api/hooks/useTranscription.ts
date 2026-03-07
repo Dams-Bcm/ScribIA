@@ -47,6 +47,26 @@ export function useStartProcessing() {
   });
 }
 
+export function useStartPartialAnalysis() {
+  const qc = useQueryClient();
+  return useMutation<TranscriptionJob, Error, string>({
+    mutationFn: (jobId) => api.post<TranscriptionJob>(`/transcription/${jobId}/partial-analysis`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.list });
+    },
+  });
+}
+
+export function useProceedToFullTranscription() {
+  const qc = useQueryClient();
+  return useMutation<TranscriptionJob, Error, string>({
+    mutationFn: (jobId) => api.post<TranscriptionJob>(`/transcription/${jobId}/proceed`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.list });
+    },
+  });
+}
+
 export function useDeleteJob() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({

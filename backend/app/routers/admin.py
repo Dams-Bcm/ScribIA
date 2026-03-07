@@ -1296,6 +1296,92 @@ def update_rag_settings(
     return {"message": "Paramètres RAG mis à jour"}
 
 
+# ── Email / SMTP Settings ────────────────────────────────────────────────────
+
+EMAIL_SETTINGS_KEYS = {
+    "smtp_host": ("Serveur SMTP", ""),
+    "smtp_port": ("Port SMTP", "587"),
+    "smtp_user": ("Utilisateur SMTP", ""),
+    "smtp_password": ("Mot de passe SMTP", ""),
+    "smtp_from_email": ("Email expéditeur", "noreply@scribia.fr"),
+    "smtp_from_name": ("Nom expéditeur", "ScribIA"),
+    "smtp_use_tls": ("Utiliser TLS", "true"),
+    "app_base_url": ("URL publique de l'application", "http://localhost:3001"),
+}
+
+
+@router.get("/email-settings")
+def get_email_settings(
+    _: User = Depends(require_super_admin),
+):
+    """Retourne la configuration Email/SMTP actuelle."""
+    result = []
+    for key, (label, default) in EMAIL_SETTINGS_KEYS.items():
+        value = str(getattr(settings, key, default))
+        # Mask password
+        if key == "smtp_password" and value:
+            value = "••••••••" if value else ""
+        result.append({"key": key, "label": label, "value": value, "default": default})
+    return {"settings": result}
+
+
+class EmailSettingUpdate(BaseModel):
+    key: str
+    value: str
+
+
+@router.put("/email-settings")
+def update_email_settings(
+    body: list[EmailSettingUpdate],
+    _: User = Depends(require_super_admin),
+):
+    """Met à jour les paramètres Email/SMTP (appliqués au runtime)."""
+    for item in body:
+        if item.key not in EMAIL_SETTINGS_KEYS:
+            continue
+        # Skip masked password (no change)
+        if item.key == "smtp_password" and item.value == "••••••••":
+            continue
+        if item.key == "smtp_port":
+            try:
+                settings.smtp_port = int(item.value)
+            except ValueError:
+                pass
+        elif item.key == "smtp_use_tls":
+            settings.smtp_use_tls = item.value.lower() in ("true", "1", "yes")
+        else:
+            setattr(settings, item.key, item.value)
+    return {"message": "Paramètres email mis à jour"}
+
+
+@router.post("/email-settings/test")
+def test_email_settings(
+    _: User = Depends(require_super_admin),
+):
+    """Envoie un email de test pour vérifier la configuration SMTP."""
+    from app.services.email import _send_email
+
+    if not settings.smtp_host:
+        return {"success": False, "error": "SMTP non configuré (smtp_host vide)"}
+
+    test_html = """
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333;">
+      <h2 style="color: #2563eb;">Test SMTP — ScribIA</h2>
+      <p>Si vous recevez cet email, la configuration SMTP est correcte.</p>
+    </body>
+    </html>
+    """
+    success = _send_email(
+        settings.smtp_from_email,
+        "Test SMTP — ScribIA",
+        test_html,
+    )
+    if success:
+        return {"success": True, "message": f"Email de test envoyé à {settings.smtp_from_email}"}
+    return {"success": False, "error": "Échec de l'envoi — vérifiez les logs du serveur"}
+
+
 # ── Audit logs ────────────────────────────────────────────────────────────────
 
 

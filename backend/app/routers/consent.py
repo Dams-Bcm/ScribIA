@@ -18,6 +18,7 @@ from app.models.consent import ConsentRequest, ConsentDetection
 from app.models.contacts import Contact
 from app.models.speaker import SpeakerProfile
 from app.models.transcription import TranscriptionJob
+from app.models.ai_documents import AIDocument
 from app.models.user import User
 from app.schemas.consent import (
     AttendeeEntry,
@@ -176,7 +177,7 @@ def withdraw_consent_request(
     cr.withdrawn_at = now
     cr.withdrawn_via = "email_link"
 
-    # Update attendees[] and invalidate session
+    # Update attendees[] and invalidate session + documents
     if cr.job_id:
         _update_attendee_status(
             db, cr.job_id, cr.contact_id,
@@ -186,8 +187,22 @@ def withdraw_consent_request(
         job = db.query(TranscriptionJob).filter(TranscriptionJob.id == cr.job_id).first()
         if job:
             job.recording_validity = "invalidated"
+        # Get contact name for invalidation reason
+        contact = db.query(Contact).filter(Contact.id == cr.contact_id).first()
+        contact_name = f"{contact.first_name} {contact.last_name}" if contact else "un participant"
+        _invalidate_documents_for_job(db, cr.job_id, contact_name, now)
 
     db.commit()
+
+    # Send withdrawal confirmation email
+    try:
+        from app.services.email import send_withdrawal_confirmation
+        contact = db.query(Contact).filter(Contact.id == cr.contact_id).first()
+        if contact and contact.email:
+            send_withdrawal_confirmation(contact.email, f"{contact.first_name} {contact.last_name}")
+    except Exception:
+        pass
+
     return ConsentActionResponse(status="withdrawn", message="Votre consentement a ete retire.")
 
 
@@ -354,8 +369,15 @@ def send_consent_request(
     db.commit()
     db.refresh(cr)
 
-    # TODO: send actual email with accept/refuse/withdraw links
-    # For now, just create the ConsentRequest record
+    # Send actual email
+    from app.services.email import send_consent_email
+    org_name = user.tenant.name if user.tenant else "ScribIA"
+    send_consent_email(
+        to_email=contact.email,
+        to_name=contact.name,
+        token=token,
+        organisation=org_name,
+    )
 
     return ConsentRequestResponse.model_validate(cr)
 
@@ -387,7 +409,7 @@ def withdraw_consent_manual(
     cr.withdrawn_by = user.id
     cr.withdrawn_reason = body.reason
 
-    # Update attendees and invalidate
+    # Update attendees and invalidate session + documents
     _update_attendee_status(
         db, body.job_id, body.contact_id,
         status="withdrawn",
@@ -397,10 +419,15 @@ def withdraw_consent_manual(
     if job:
         job.recording_validity = "invalidated"
 
+    # Cascade invalidation to AI documents
+    contact = db.query(Contact).filter(Contact.id == body.contact_id).first()
+    contact_name = f"{contact.first_name} {contact.last_name}" if contact else "un participant"
+    _invalidate_documents_for_job(db, body.job_id, contact_name, now)
+
     db.commit()
     return ConsentActionResponse(
         status="withdrawn",
-        message=f"Consentement retire manuellement pour le contact.",
+        message="Consentement retire manuellement pour le contact.",
     )
 
 
@@ -472,6 +499,18 @@ def _recompute_recording_validity(job: TranscriptionJob, attendees: list[Attende
     else:
         # Mix of accepted_* and pending_oral
         job.recording_validity = "pending"
+
+
+def _invalidate_documents_for_job(db: Session, job_id: str, contact_name: str, withdrawn_at: datetime):
+    """Mark all AIDocuments linked to this job as invalidated."""
+    docs = db.query(AIDocument).filter(
+        AIDocument.source_session_id == job_id,
+        AIDocument.invalidated_at.is_(None),
+    ).all()
+    reason = f"Invalidé suite au retrait du consentement de {contact_name} le {withdrawn_at.strftime('%d/%m/%Y à %H:%M')}."
+    for doc in docs:
+        doc.invalidated_at = withdrawn_at
+        doc.invalidated_reason = reason
 
 
 def _detection_to_response(cd: ConsentDetection) -> ConsentDetectionResponse:

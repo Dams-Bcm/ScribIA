@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search, Mic, Users, ChevronDown, CheckCircle2, XCircle } from "lucide-react";
+import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search, Mic, Users, ChevronDown, CheckCircle2, XCircle, Mail, SendHorizonal } from "lucide-react";
 
 interface AIUsage {
   usage_key: string;
@@ -126,6 +126,39 @@ function useUpdatePyannoteSettings() {
   });
 }
 
+interface EmailSetting {
+  key: string;
+  label: string;
+  value: string;
+  default: string;
+}
+
+interface EmailSettingsResponse {
+  settings: EmailSetting[];
+}
+
+function useEmailSettings() {
+  return useQuery({
+    queryKey: ["email-settings"],
+    queryFn: () => api.get<EmailSettingsResponse>("/admin/email-settings"),
+  });
+}
+
+function useUpdateEmailSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { key: string; value: string }[]) =>
+      api.put("/admin/email-settings", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["email-settings"] }),
+  });
+}
+
+function useTestEmail() {
+  return useMutation({
+    mutationFn: () => api.post<{ success: boolean; message?: string; error?: string }>("/admin/email-settings/test"),
+  });
+}
+
 function useUpdateLongContext() {
   const qc = useQueryClient();
   return useMutation({
@@ -167,10 +200,13 @@ export function AISettingsPage() {
   const { data: ragData } = useRAGSettings();
   const { data: whisperData } = useWhisperSettings();
   const { data: pyannoteData } = usePyannoteSettings();
+  const { data: emailData } = useEmailSettings();
   const updateSettings = useUpdateAISettings();
   const updateRAG = useUpdateRAGSettings();
   const updateWhisper = useUpdateWhisperSettings();
   const updatePyannote = useUpdatePyannoteSettings();
+  const updateEmail = useUpdateEmailSettings();
+  const testEmail = useTestEmail();
   const updateLongContext = useUpdateLongContext();
   const deleteModel = useDeleteModel();
 
@@ -178,6 +214,7 @@ export function AISettingsPage() {
   const [ragOverrides, setRAGOverrides] = useState<Record<string, string>>({});
   const [whisperOverrides, setWhisperOverrides] = useState<Record<string, string>>({});
   const [pyannoteOverrides, setPyannoteOverrides] = useState<Record<string, string>>({});
+  const [emailOverrides, setEmailOverrides] = useState<Record<string, string>>({});
   const [pullName, setPullName] = useState("");
   const [pullState, setPullState] = useState<PullState>({ status: "idle", message: "" });
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -185,6 +222,8 @@ export function AISettingsPage() {
   const [ragSaved, setRAGSaved] = useState(false);
   const [whisperSaved, setWhisperSaved] = useState(false);
   const [pyannoteSaved, setPyannoteSaved] = useState(false);
+  const [emailSaved, setEmailSaved] = useState(false);
+  const [emailTestResult, setEmailTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [longCtxModel, setLongCtxModel] = useState<string | null>(null);
   const [longCtxThreshold, setLongCtxThreshold] = useState<string | null>(null);
   const [mapReduce, setMapReduce] = useState<boolean | null>(null);
@@ -288,6 +327,27 @@ export function AISettingsPage() {
     setPyannoteOverrides({});
     setPyannoteSaved(true);
     setTimeout(() => setPyannoteSaved(false), 2000);
+  }
+
+  const hasEmailChanges = Object.keys(emailOverrides).length > 0;
+
+  async function handleEmailSave() {
+    const body = Object.entries(emailOverrides).map(([key, value]) => ({ key, value }));
+    await updateEmail.mutateAsync(body);
+    setEmailOverrides({});
+    setEmailSaved(true);
+    setEmailTestResult(null);
+    setTimeout(() => setEmailSaved(false), 2000);
+  }
+
+  async function handleEmailTest() {
+    setEmailTestResult(null);
+    try {
+      const res = await testEmail.mutateAsync();
+      setEmailTestResult({ success: res.success, message: res.message || res.error || "" });
+    } catch {
+      setEmailTestResult({ success: false, message: "Erreur lors du test" });
+    }
   }
 
   const hasLongCtxChanges = longCtxModel !== null || longCtxThreshold !== null || mapReduce !== null || mapReduceChunkSize !== null;
@@ -729,6 +789,117 @@ export function AISettingsPage() {
 
               <p className="text-xs text-muted-foreground mt-4">
                 Le changement du seuil de clustering décharge le pipeline — il sera rechargé à la prochaine diarisation.
+              </p>
+            </div>
+          )}
+
+          {/* Email / SMTP Settings */}
+          {emailData && (
+            <div className="bg-background rounded-xl border border-border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  <h2 className="text-lg font-semibold">Email (SMTP)</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleEmailTest}
+                    disabled={testEmail.isPending}
+                  >
+                    {testEmail.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Test…</>
+                    ) : (
+                      <><SendHorizonal className="w-4 h-4 mr-1" /> Tester</>
+                    )}
+                  </Button>
+                  <Button size="sm" onClick={handleEmailSave} disabled={!hasEmailChanges && !emailSaved || updateEmail.isPending}>
+                    {emailSaved ? (
+                      <><Check className="w-4 h-4 mr-1" /> Sauvegardé</>
+                    ) : updateEmail.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Sauvegarde…</>
+                    ) : (
+                      <><Save className="w-4 h-4 mr-1" /> Sauvegarder</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {emailTestResult && (
+                <div className={`mb-4 rounded-lg border p-3 text-sm flex items-center gap-2 ${
+                  emailTestResult.success
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+                    : "border-destructive/30 bg-destructive/5 text-destructive"
+                }`}>
+                  {emailTestResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <XCircle className="w-4 h-4 shrink-0" />
+                  )}
+                  {emailTestResult.message}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {emailData.settings.map((s) => {
+                  const emailDescs: Record<string, string> = {
+                    smtp_host: "Adresse du serveur SMTP (ex: smtp.gmail.com, smtp.office365.com)",
+                    smtp_port: "Port SMTP — 587 pour STARTTLS (recommandé), 465 pour SSL, 25 pour non chiffré",
+                    smtp_user: "Identifiant de connexion SMTP (souvent l'adresse email)",
+                    smtp_password: "Mot de passe ou mot de passe d'application SMTP",
+                    smtp_from_email: "Adresse email qui apparaîtra comme expéditeur",
+                    smtp_from_name: "Nom affiché comme expéditeur dans les clients mail",
+                    smtp_use_tls: "Activer STARTTLS pour chiffrer la connexion (recommandé)",
+                    app_base_url: "URL publique de l'application, utilisée pour les liens dans les emails de consentement",
+                  };
+                  return (
+                    <div key={s.key}>
+                      <div className="flex items-center gap-4">
+                        <div className="w-60 shrink-0">
+                          <Label className="text-sm font-medium">{s.label}</Label>
+                          <p className="text-xs text-muted-foreground">défaut : {s.default || "(vide)"}</p>
+                        </div>
+                        {s.key === "smtp_use_tls" ? (
+                          <Select
+                            value={emailOverrides[s.key] ?? s.value}
+                            onValueChange={(v) => {
+                              setEmailOverrides({ ...emailOverrides, [s.key]: v });
+                              setEmailSaved(false);
+                            }}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="true">Oui (STARTTLS)</SelectItem>
+                              <SelectItem value="false">Non</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            className="flex-1 font-mono text-sm"
+                            type={s.key === "smtp_password" ? "password" : s.key === "smtp_port" ? "number" : "text"}
+                            value={emailOverrides[s.key] ?? s.value}
+                            onChange={(e) => {
+                              setEmailOverrides({ ...emailOverrides, [s.key]: e.target.value });
+                              setEmailSaved(false);
+                            }}
+                            placeholder={s.default || "(vide)"}
+                          />
+                        )}
+                      </div>
+                      {emailDescs[s.key] && (
+                        <p className="text-[11px] text-muted-foreground/70 mt-0.5">{emailDescs[s.key]}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-xs text-muted-foreground mt-4">
+                Configurez le serveur SMTP pour l'envoi des emails de consentement RGPD.
+                Utilisez le bouton <strong>Tester</strong> pour vérifier la configuration (envoie un email à l'adresse expéditeur).
               </p>
             </div>
           )}

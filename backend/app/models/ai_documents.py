@@ -47,6 +47,10 @@ class AIDocument(UUIDMixin, Base):
     result_text    = Column(Text, nullable=True)
     error_message  = Column(Text, nullable=True)
 
+    # Consent invalidation
+    invalidated_at     = Column(DateTime(timezone=True), nullable=True)
+    invalidated_reason = Column(Text, nullable=True)
+
     created_at               = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
     generation_started_at    = Column(DateTime(timezone=True), nullable=True)
     generation_completed_at  = Column(DateTime(timezone=True), nullable=True)

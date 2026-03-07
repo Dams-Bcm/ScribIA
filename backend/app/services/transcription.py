@@ -77,6 +77,24 @@ def convert_to_wav(input_path: Path, output_path: Path) -> Path:
     return output_path
 
 
+def crop_audio(input_path: Path, output_path: Path, duration_seconds: float = 60.0) -> Path:
+    """Crop audio to first N seconds via FFmpeg."""
+    cmd = [
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-i", str(input_path),
+        "-t", str(duration_seconds),
+        "-ar", "16000",
+        "-ac", "1",
+        "-c:a", "pcm_s16le",
+        str(output_path),
+    ]
+    logger.info(f"FFmpeg crop: {input_path} -> {output_path} ({duration_seconds}s)")
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if result.returncode != 0:
+        raise RuntimeError(f"FFmpeg crop error: {result.stderr[:500]}")
+    return output_path
+
+
 def get_audio_duration(audio_path: Path) -> float:
     """Get audio duration in seconds via ffprobe."""
     try:
@@ -264,6 +282,123 @@ def process_transcription_job(job_id: str):
             pass
     finally:
         db.close()
+
+
+def process_partial_analysis(job_id: str):
+    """Partial pipeline: convert → crop to ~60s → transcribe → detect consent.
+
+    Used for imported audio when some attendees are pending_oral.
+    Only transcribes the first ~60 seconds to check for oral consent.
+    """
+    db = SessionLocal()
+    try:
+        job = db.query(TranscriptionJob).filter(TranscriptionJob.id == job_id).first()
+        if not job:
+            logger.error(f"[PARTIAL] Job {job_id} not found")
+            return
+
+        audio_dir = Path(settings.audio_path) / job.tenant_id
+        original_path = audio_dir / job.audio_filename
+
+        if not original_path.exists():
+            _update_job(db, job,
+                        status=TranscriptionJobStatus.ERROR,
+                        error_message=f"Fichier audio introuvable: {job.audio_filename}",
+                        progress=0)
+            return
+
+        # ── Step 1: Crop to ~60s WAV ──────────────────────────────────────
+        _update_job(db, job,
+                    status=TranscriptionJobStatus.CONVERTING,
+                    progress=10,
+                    progress_message="Extraction des 60 premières secondes...")
+
+        partial_wav = audio_dir / f"{Path(job.audio_filename).stem}_partial60.wav"
+
+        try:
+            crop_audio(original_path, partial_wav, duration_seconds=60.0)
+        except Exception as e:
+            _update_job(db, job,
+                        status=TranscriptionJobStatus.ERROR,
+                        error_message=f"Erreur extraction partielle: {e}",
+                        progress=0)
+            return
+
+        # ── Step 2: Transcribe partial ────────────────────────────────────
+        _update_job(db, job,
+                    status=TranscriptionJobStatus.TRANSCRIBING,
+                    progress=40,
+                    progress_message="Analyse partielle en cours (~60s)...")
+
+        try:
+            segments = run_transcription(partial_wav, language=job.language)
+        except Exception as e:
+            _update_job(db, job,
+                        status=TranscriptionJobStatus.ERROR,
+                        error_message=f"Erreur transcription partielle: {e}",
+                        progress=0)
+            return
+        finally:
+            unload_whisper()
+            # Clean up partial WAV
+            if partial_wav.exists():
+                partial_wav.unlink()
+
+        # ── Step 3: Save partial segments ─────────────────────────────────
+        _update_job(db, job,
+                    progress=80,
+                    progress_message="Enregistrement de l'analyse partielle...")
+
+        # Clear any previous partial segments
+        from app.models.transcription import TranscriptionSegment
+        db.query(TranscriptionSegment).filter_by(job_id=job.id).delete()
+
+        for idx, (start, end, text) in enumerate(segments):
+            segment = TranscriptionSegment(
+                job_id=job.id,
+                start_time=start,
+                end_time=end,
+                text=text,
+                order_index=idx,
+            )
+            db.add(segment)
+        db.commit()
+
+        # ── Step 4: Set status to consent_check ───────────────────────────
+        _update_job(db, job,
+                    status=TranscriptionJobStatus.CONSENT_CHECK,
+                    progress=100,
+                    progress_message="Analyse partielle terminée — vérification du consentement oral requise")
+
+        logger.info(f"[PARTIAL] Job {job_id} partial analysis done: {len(segments)} segments")
+
+    except Exception as e:
+        logger.exception(f"[PARTIAL] Job {job_id} failed")
+        try:
+            job = db.query(TranscriptionJob).filter(TranscriptionJob.id == job_id).first()
+            if job:
+                _update_job(db, job,
+                            status=TranscriptionJobStatus.ERROR,
+                            error_message=f"Erreur analyse partielle: {e}",
+                            progress=0)
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
+def run_partial_analysis_in_thread(job_id: str):
+    """Launch partial analysis in a background thread with GPU semaphore."""
+    def _worker():
+        logger.info(f"[GPU] Waiting for semaphore for partial analysis {job_id}...")
+        with _gpu_semaphore:
+            logger.info(f"[GPU] Acquired semaphore for partial analysis {job_id}")
+            process_partial_analysis(job_id)
+        logger.info(f"[GPU] Released semaphore for partial analysis {job_id}")
+
+    thread = threading.Thread(target=_worker, name=f"partial-{job_id}", daemon=True)
+    thread.start()
+    return thread
 
 
 def run_job_in_thread(job_id: str):

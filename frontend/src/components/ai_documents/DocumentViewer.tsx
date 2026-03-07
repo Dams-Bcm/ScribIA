@@ -1,4 +1,4 @@
-import { Loader2, XCircle } from "lucide-react";
+import { Loader2, XCircle, ShieldAlert } from "lucide-react";
 import { useAIDocument, useUpdateAIDocument } from "@/api/hooks/useAIDocuments";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 
@@ -64,6 +64,19 @@ export function DocumentViewer({ docId }: Props) {
         </p>
       </div>
 
+      {doc.invalidated_at && (
+        <div className="flex items-start gap-2 text-sm bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200 rounded-lg p-4">
+          <ShieldAlert className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">Document invalidé</p>
+            <p>{doc.invalidated_reason}</p>
+            <p className="text-xs mt-1 opacity-70">
+              L'export de ce document est bloqué.
+            </p>
+          </div>
+        </div>
+      )}
+
       {doc.status === "pending" && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -89,8 +102,8 @@ export function DocumentViewer({ docId }: Props) {
         <RichTextEditor
           key={dataUpdatedAt}
           initialContent={doc.result_text}
-          onSave={handleSave}
-          onExport={handleExport}
+          onSave={doc.invalidated_at ? undefined : handleSave}
+          onExport={doc.invalidated_at ? undefined : handleExport}
           dictionary={{ targetType: "ai_document", targetId: docId }}
         />
       )}

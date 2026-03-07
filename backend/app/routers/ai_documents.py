@@ -227,7 +227,32 @@ def generate_document(
     """Lance une génération asynchrone. Retourne immédiatement le document en statut 'pending'."""
     tpl = _get_template_or_404(body.template_id, user.tenant_id, db)
 
-    # Snapshot du template
+    # ── Consent guard-fou ─────────────────────────────────────────────────
+    if body.source_session_id:
+        from app.models.transcription import TranscriptionJob
+        session = db.query(TranscriptionJob).filter_by(id=body.source_session_id).first()
+        if session:
+            rv = session.recording_validity
+            if rv == "invalidated":
+                raise HTTPException(403, "Session invalidée (retrait de consentement). Génération bloquée.")
+            if rv == "blocked":
+                raise HTTPException(403, "Session bloquée (aucun consentement détecté). Génération impossible.")
+            if rv == "pending":
+                raise HTTPException(403, "Consentements en attente de validation. Finalisez les consentements avant de générer.")
+
+            # Check individual attendees
+            if session.attendees:
+                try:
+                    attendees = json.loads(session.attendees)
+                    statuses = {a.get("status") for a in attendees}
+                    if "refused" in statuses or "withdrawn" in statuses:
+                        raise HTTPException(403, "Un ou plusieurs participants ont refusé ou retiré leur consentement.")
+                    if "pending" in statuses or "pending_oral" in statuses:
+                        raise HTTPException(403, "Tous les participants doivent avoir consenti avant la génération.")
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+    # Snapshot du template + consent audit trail
     snapshot = {
         "name": tpl.name,
         "document_type": tpl.document_type,
@@ -237,6 +262,23 @@ def generate_document(
         "ollama_model": tpl.ollama_model,
         "temperature": tpl.temperature,
     }
+
+    # Add consent audit trail
+    if body.source_session_id:
+        from app.models.transcription import TranscriptionJob
+        session = db.query(TranscriptionJob).filter_by(id=body.source_session_id).first()
+        if session:
+            consent_audit = {
+                "recording_validity": session.recording_validity,
+                "generated_by": user.id,
+                "generated_by_name": user.display_name,
+            }
+            if session.attendees:
+                try:
+                    consent_audit["attendees"] = json.loads(session.attendees)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            snapshot["consent_audit"] = consent_audit
 
     doc = AIDocument(
         tenant_id=user.tenant_id,
@@ -261,15 +303,14 @@ def generate_document(
 
 @router.get("/documents", response_model=list[AIDocumentListItem])
 def list_documents(
+    include_invalidated: bool = False,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return (
-        db.query(AIDocument)
-        .filter_by(tenant_id=user.tenant_id)
-        .order_by(AIDocument.created_at.desc())
-        .all()
-    )
+    q = db.query(AIDocument).filter_by(tenant_id=user.tenant_id)
+    if not include_invalidated:
+        q = q.filter(AIDocument.invalidated_at.is_(None))
+    return q.order_by(AIDocument.created_at.desc()).all()
 
 
 @router.get("/documents/{doc_id}", response_model=AIDocumentResponse)
@@ -428,6 +469,8 @@ def export_document(
 ):
     """Télécharge le document généré (md, txt ou pdf)."""
     doc = _get_document_or_404(doc_id, user.tenant_id, db)
+    if doc.invalidated_at:
+        raise HTTPException(status_code=403, detail=f"Document invalidé : {doc.invalidated_reason or 'retrait de consentement'}")
     if doc.status != "completed" or not doc.result_text:
         raise HTTPException(status_code=409, detail="Document pas encore disponible")
 

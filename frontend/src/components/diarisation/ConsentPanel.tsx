@@ -9,6 +9,8 @@ import {
   UserPlus,
   Mail,
   Mic,
+  XCircle,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDetectOralConsent, useValidateCollectiveConsent } from "@/api/hooks/useSpeakers";
@@ -344,34 +346,40 @@ export function ConsentPanel({ jobId }: ConsentPanelProps) {
           <div
             className={`rounded-lg px-3 py-2 text-sm ${
               detection.detected
-                ? "bg-green-50 border border-green-200 text-green-800"
+                ? detection.detection_type === "individual_refusal"
+                  ? "bg-red-50 border border-red-200 text-red-800"
+                  : "bg-green-50 border border-green-200 text-green-800"
                 : "bg-amber-50 border border-amber-200 text-amber-800"
             }`}
           >
             {detection.detected ? (
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 font-medium">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Consentement oral détecté
-                  {detection.confidence && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-green-100">
-                      {detection.confidence}
-                    </span>
+              detection.detection_type === "individual_refusal" ? (
+                <RefusalFlow detection={detection} jobId={jobId} />
+              ) : (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Consentement oral détecté
+                    {detection.confidence && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-green-100">
+                        {detection.confidence}
+                      </span>
+                    )}
+                  </div>
+                  {detection.consent_phrase && (
+                    <p className="italic">&laquo; {detection.consent_phrase} &raquo;</p>
+                  )}
+                  {detection.start_time != null && (
+                    <p className="text-xs">
+                      à {Math.floor(detection.start_time / 60)}:
+                      {String(Math.floor(detection.start_time % 60)).padStart(2, "0")}
+                    </p>
+                  )}
+                  {detection.explanation && (
+                    <p className="text-xs opacity-75">{detection.explanation}</p>
                   )}
                 </div>
-                {detection.consent_phrase && (
-                  <p className="italic">&laquo; {detection.consent_phrase} &raquo;</p>
-                )}
-                {detection.start_time != null && (
-                  <p className="text-xs">
-                    à {Math.floor(detection.start_time / 60)}:
-                    {String(Math.floor(detection.start_time % 60)).padStart(2, "0")}
-                  </p>
-                )}
-                {detection.explanation && (
-                  <p className="text-xs opacity-75">{detection.explanation}</p>
-                )}
-              </div>
+              )
             ) : (
               <div className="flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4" />
@@ -383,7 +391,7 @@ export function ConsentPanel({ jobId }: ConsentPanelProps) {
         )}
 
         {/* Contact selector for collective consent */}
-        {showContactSelector && detection?.detected && (
+        {showContactSelector && detection?.detected && detection.detection_type !== "individual_refusal" && (
           <div className="border border-border rounded-lg p-3 space-y-3">
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4" />
@@ -505,6 +513,140 @@ function AttendeeRow({ attendee }: { attendee: AttendeeEntry }) {
       </span>
       <span className="text-muted-foreground">—</span>
       <span className="truncate">{attendee.contact_id}</span>
+    </div>
+  );
+}
+
+function RefusalFlow({
+  detection,
+  jobId,
+}: {
+  detection: OralConsentDetection;
+  jobId: string;
+}) {
+  const [step, setStep] = useState<"detected" | "left_room" | "invalidated">("detected");
+  const [identifiedManually, setIdentifiedManually] = useState(false);
+
+  const speakerName = detection.refusal_speaker_label || detection.refusal_speaker_id;
+  const isIdentifiable = !!speakerName;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5 font-medium">
+        <XCircle className="w-4 h-4" />
+        Refus détecté
+        {detection.confidence && (
+          <span className="text-xs px-1.5 py-0.5 rounded bg-red-100">
+            {detection.confidence}
+          </span>
+        )}
+      </div>
+
+      {detection.consent_phrase && (
+        <p className="italic">&laquo; {detection.consent_phrase} &raquo;</p>
+      )}
+
+      {detection.start_time != null && (
+        <p className="text-xs">
+          à {Math.floor(detection.start_time / 60)}:
+          {String(Math.floor(detection.start_time % 60)).padStart(2, "0")}
+        </p>
+      )}
+
+      {step === "detected" && (
+        <div className="space-y-2 pt-1">
+          {isIdentifiable ? (
+            <>
+              <p className="text-sm font-medium">
+                {speakerName} a refusé l'enregistrement. A-t-il/elle quitté la salle ?
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setStep("left_room")}>
+                  Oui, a quitté la salle
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => setStep("invalidated")}
+                >
+                  Non, est resté(e)
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5">
+                <HelpCircle className="w-4 h-4" />
+                <span className="text-sm">
+                  Le locuteur qui a refusé n'a pas pu être identifié.
+                </span>
+              </div>
+              {!identifiedManually ? (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIdentifiedManually(true)}
+                  >
+                    Identifier manuellement
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setStep("invalidated")}
+                  >
+                    Invalider l'enregistrement
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm">
+                    Réécoutez le passage et identifiez la personne qui a refusé.
+                    A-t-elle quitté la salle après son refus ?
+                  </p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setStep("left_room")}>
+                      Oui, a quitté la salle
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setStep("invalidated")}
+                    >
+                      Non, est resté(e)
+                    </Button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {step === "left_room" && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-green-800 text-sm">
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4" />
+            La personne a quitté la salle. L'enregistrement reste valide pour les autres participants.
+          </div>
+          <p className="text-xs mt-1 opacity-75">
+            Cette personne sera retirée des participants si elle figurait dans la liste.
+          </p>
+        </div>
+      )}
+
+      {step === "invalidated" && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-red-800 text-sm">
+          <div className="flex items-center gap-1.5 font-medium">
+            <XCircle className="w-4 h-4" />
+            Enregistrement invalidé
+          </div>
+          <p className="text-xs mt-1">
+            Une personne a refusé l'enregistrement et est restée dans la salle.
+            Aucun document ne peut être généré à partir de cette session.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

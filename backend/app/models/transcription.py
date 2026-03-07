@@ -14,6 +14,7 @@ class TranscriptionJobStatus(str, enum.Enum):
     DIARIZING = "diarizing"
     TRANSCRIBING = "transcribing"
     ALIGNING = "aligning"
+    CONSENT_CHECK = "consent_check"
     COMPLETED = "completed"
     ERROR = "error"
 

@@ -77,12 +77,16 @@ class EnrollFromSegmentRequest(BaseModel):
 
 class OralConsentDetectionResponse(BaseModel):
     detected: bool
+    detection_type: Optional[str] = None  # "collective_consent" | "individual_refusal" | None
     consent_phrase: Optional[str] = None
     segment_id: Optional[str] = None
     start_time: Optional[float] = None
     end_time: Optional[float] = None
     confidence: Optional[str] = None  # "high" | "medium" | "low"
     explanation: Optional[str] = None
+    # Refusal details
+    refusal_speaker_id: Optional[str] = None   # SPEAKER_XX who refused (if identifiable)
+    refusal_speaker_label: Optional[str] = None  # display name if available
 
 
 class ValidateCollectiveConsentRequest(BaseModel):

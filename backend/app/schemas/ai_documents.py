@@ -77,6 +77,8 @@ class AIDocumentResponse(BaseModel):
     created_at: datetime
     generation_started_at: datetime | None
     generation_completed_at: datetime | None
+    invalidated_at: datetime | None = None
+    invalidated_reason: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -90,5 +92,7 @@ class AIDocumentListItem(BaseModel):
     source_session_id: str | None
     created_at: datetime
     generation_completed_at: datetime | None
+    invalidated_at: datetime | None = None
+    invalidated_reason: str | None = None
 
     model_config = {"from_attributes": True}

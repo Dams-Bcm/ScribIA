@@ -103,6 +103,7 @@ export type TranscriptionJobStatus =
   | "queued"
   | "converting"
   | "transcribing"
+  | "consent_check"
   | "completed"
   | "error";
 
@@ -370,6 +371,8 @@ export interface AIDocument {
   created_at: string;
   generation_started_at: string | null;
   generation_completed_at: string | null;
+  invalidated_at: string | null;
+  invalidated_reason: string | null;
 }
 
 export interface AIDocumentListItem {
@@ -381,6 +384,8 @@ export interface AIDocumentListItem {
   source_session_id: string | null;
   created_at: string;
   generation_completed_at: string | null;
+  invalidated_at: string | null;
+  invalidated_reason: string | null;
 }
 
 export interface GenerateRequest {
@@ -495,12 +500,15 @@ export interface SpeakerProfile {
 
 export interface OralConsentDetection {
   detected: boolean;
+  detection_type: "collective_consent" | "individual_refusal" | null;
   consent_phrase: string | null;
   segment_id: string | null;
   start_time: number | null;
   end_time: number | null;
   confidence: "high" | "medium" | "low" | null;
   explanation: string | null;
+  refusal_speaker_id: string | null;
+  refusal_speaker_label: string | null;
 }
 
 export interface CollectiveConsentResult {

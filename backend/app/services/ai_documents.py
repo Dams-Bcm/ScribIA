@@ -91,19 +91,40 @@ def _extract_transcription_context(session_id: str, db) -> dict:
     if job and job.created_at:
         date_str = job.created_at.strftime("%d/%m/%Y")
 
-    # Participants depuis la diarisation (display_name ou profil)
+    # Participants — prefer attendees[] (consent-based) over diarisation speakers
     participants_list = []
-    speakers = db.query(DiarisationSpeaker).filter_by(job_id=session_id).all()
-    for spk in speakers:
-        name = spk.display_name or spk.speaker_id
-        fonction = ""
-        if spk.profile:
-            name = spk.profile.display_name or name
-            fonction = spk.profile.fonction or ""
-        entry = name
-        if fonction:
-            entry += f" ({fonction})"
-        participants_list.append(entry)
+
+    if job and job.attendees:
+        try:
+            import json as _json
+            from app.models.contacts import Contact
+            attendees = _json.loads(job.attendees)
+            for att in attendees:
+                att_status = att.get("status", "")
+                if att_status.startswith("accepted_") or att_status == "pending_oral":
+                    contact = db.query(Contact).filter_by(id=att["contact_id"]).first()
+                    if contact:
+                        entry = f"{contact.first_name} {contact.last_name}"
+                        if contact.role:
+                            entry += f" ({contact.role})"
+                        participants_list.append(entry)
+        except (ValueError, TypeError, KeyError):
+            pass
+
+    # Fallback to diarisation speakers if no attendees
+    if not participants_list:
+        speakers = db.query(DiarisationSpeaker).filter_by(job_id=session_id).all()
+        for spk in speakers:
+            name = spk.display_name or spk.speaker_id
+            fonction = ""
+            if spk.profile:
+                name = spk.profile.display_name or name
+                fonction = spk.profile.fonction or ""
+            entry = name
+            if fonction:
+                entry += f" ({fonction})"
+            participants_list.append(entry)
+
     participants = ", ".join(participants_list) if participants_list else ""
 
     return {"text": text, "duree": duree, "date": date_str, "participants": participants}
