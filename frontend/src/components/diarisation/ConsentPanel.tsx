@@ -321,7 +321,7 @@ export function ConsentPanel({ jobId, hideOralDetection }: ConsentPanelProps) {
       </div>
 
       {/* ── Section 2: Oral consent detection ───────────────────────────── */}
-      {!hideOralDetection && <div className="border-t border-border pt-3 space-y-3">
+      {!hideOralDetection && attendees.some((a) => a.status === "pending_oral") && <div className="border-t border-border pt-3 space-y-3">
         <div className="flex items-center gap-2">
           <Mic className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium">Consentement oral</span>
@@ -514,7 +514,7 @@ function AttendeeRow({ attendee }: { attendee: AttendeeEntry }) {
         <span className="text-xs">{info.label}</span>
       </span>
       <span className="text-muted-foreground">—</span>
-      <span className="truncate">{attendee.contact_id}</span>
+      <span className="truncate">{attendee.contact_name || attendee.contact_id}</span>
     </div>
   );
 }

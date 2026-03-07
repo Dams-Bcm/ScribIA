@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class AttendeeEntry(BaseModel):
     """Un participant dans le JSON attendees[] d'un TranscriptionJob."""
     contact_id: str
+    contact_name: str | None = None        # enriched at read time, not stored
     status: str = "pending"
     # "pending" | "pending_oral" | "accepted_email" | "accepted_oral" | "refused" | "withdrawn"
     evidence_type: str | None = None       # "email" | "oral"

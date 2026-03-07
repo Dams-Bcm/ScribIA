@@ -232,6 +232,7 @@ export type AttendeeStatus =
 
 export interface AttendeeEntry {
   contact_id: string;
+  contact_name: string | null;
   status: AttendeeStatus;
   evidence_type: string | null;
   evidence_id: string | null;

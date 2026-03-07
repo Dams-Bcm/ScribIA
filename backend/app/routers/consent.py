@@ -289,6 +289,7 @@ def get_attendees(
     """Get current attendees and consent status for a job."""
     job = _get_job(db, job_id, user.tenant_id)
     attendees = _parse_attendees(job.attendees)
+    _enrich_attendee_names(db, attendees)
 
     email_count = sum(1 for a in attendees if a.status == "accepted_email")
     oral_count = sum(1 for a in attendees if a.status == "pending_oral")
@@ -465,6 +466,17 @@ def _parse_attendees(raw: str | None) -> list[AttendeeEntry]:
         return [AttendeeEntry(**item) for item in data]
     except (json.JSONDecodeError, TypeError):
         return []
+
+
+def _enrich_attendee_names(db: Session, attendees: list[AttendeeEntry]):
+    """Resolve contact names for attendees."""
+    if not attendees:
+        return
+    contact_ids = [a.contact_id for a in attendees]
+    contacts = db.query(Contact).filter(Contact.id.in_(contact_ids)).all()
+    name_map = {c.id: f"{c.first_name} {c.last_name}".strip() or c.email or c.id for c in contacts}
+    for a in attendees:
+        a.contact_name = name_map.get(a.contact_id, a.contact_id)
 
 
 def _update_attendee_status(db: Session, job_id: str, contact_id: str, **fields):
