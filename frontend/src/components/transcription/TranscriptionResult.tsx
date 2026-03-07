@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Copy, Download, Check, Play, Pause, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApplyDictionaryButton } from "@/components/dictionary/ApplyDictionaryButton";
+import { useAuth } from "@/stores/auth";
 import type { TranscriptionSegment } from "@/api/types";
 
 interface TranscriptionResultProps {
@@ -19,6 +20,7 @@ function formatTime(seconds: number): string {
 }
 
 export function TranscriptionResult({ segments, jobId, title }: TranscriptionResultProps) {
+  const { hasModule } = useAuth();
   const [copied, setCopied] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [playingSegId, setPlayingSegId] = useState<string | null>(null);
@@ -115,11 +117,13 @@ export function TranscriptionResult({ segments, jobId, title }: TranscriptionRes
           <Download className="w-4 h-4" />
           VTT
         </Button>
-        <ApplyDictionaryButton
-          targetType="transcription"
-          targetId={jobId}
-          previewText={fullText}
-        />
+        {hasModule("dictionary") && (
+          <ApplyDictionaryButton
+            targetType="transcription"
+            targetId={jobId}
+            previewText={fullText}
+          />
+        )}
       </div>
 
       {/* Lecteur audio (masqué, contrôlé par les boutons segments) */}

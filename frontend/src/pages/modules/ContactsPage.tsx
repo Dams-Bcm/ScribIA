@@ -118,7 +118,7 @@ function AddContactForm({ groupId, onDone }: { groupId: string; onDone: () => vo
 // ── Consent / Enrollment badges ─────────────────────────────────────────────
 
 function ConsentBadge({ status, type }: { status: string | null; type: string | null }) {
-  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  if (!status) return null;
   const map: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
     accepted: { label: "Accepté", cls: "bg-green-100 text-green-700", icon: <ShieldCheck className="w-3 h-3" /> },
     declined: { label: "Refusé", cls: "bg-red-100 text-red-700", icon: <ShieldX className="w-3 h-3" /> },
@@ -135,7 +135,7 @@ function ConsentBadge({ status, type }: { status: string | null; type: string | 
 }
 
 function EnrollmentBadge({ status }: { status: string | null }) {
-  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  if (!status) return null;
   const map: Record<string, { label: string; cls: string }> = {
     enrolled: { label: "Enrollé", cls: "bg-purple-100 text-purple-700" },
     pending_online: { label: "En attente", cls: "bg-yellow-100 text-yellow-700" },
@@ -227,9 +227,9 @@ function GroupDetail({ groupId, onBack }: { groupId: string; onBack: () => void 
               {group.contacts.map((c) => (
                 <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                   <td className="px-4 py-3 font-medium">{c.name}</td>
-                  <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{c.email ?? "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{c.phone ?? "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{c.role ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{c.email ?? ""}</td>
+                  <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{c.phone ?? ""}</td>
+                  <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{c.role ?? ""}</td>
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <div className="flex items-center gap-1.5">
                       <ConsentBadge status={c.consent_status} type={c.consent_type} />

@@ -27,7 +27,7 @@ function formatTime(seconds: number): string {
 }
 
 export function DiarisationResult({ segments, speakers, jobId, title, onRenameSpeaker }: DiarisationResultProps) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, hasModule } = useAuth();
   const deleteSegments = useDeleteSegments();
   const mergeSegments = useMergeSegments();
   const [copied, setCopied] = useState(false);
@@ -231,11 +231,13 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
           <Download className="w-4 h-4" />
           VTT
         </Button>
-        <ApplyDictionaryButton
-          targetType="transcription"
-          targetId={jobId}
-          previewText={segments.map((s) => s.text).join("\n")}
-        />
+        {hasModule("dictionary") && (
+          <ApplyDictionaryButton
+            targetType="transcription"
+            targetId={jobId}
+            previewText={segments.map((s) => s.text).join("\n")}
+          />
+        )}
         {isAdmin && (
           <Button
             variant={mode === "enroll" ? "default" : "outline"}

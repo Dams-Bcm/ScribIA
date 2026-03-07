@@ -1,6 +1,7 @@
 import { Loader2, XCircle, ShieldAlert } from "lucide-react";
 import { useAIDocument, useUpdateAIDocument } from "@/api/hooks/useAIDocuments";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
+import { useAuth } from "@/stores/auth";
 
 interface Props {
   docId: string;
@@ -21,6 +22,7 @@ function downloadBlob(url: string, filename: string) {
 }
 
 export function DocumentViewer({ docId }: Props) {
+  const { hasModule } = useAuth();
   const { data: doc, isLoading, dataUpdatedAt } = useAIDocument(docId);
   const updateDoc = useUpdateAIDocument();
 
@@ -104,7 +106,7 @@ export function DocumentViewer({ docId }: Props) {
           initialContent={doc.result_text}
           onSave={doc.invalidated_at ? undefined : handleSave}
           onExport={doc.invalidated_at ? undefined : handleExport}
-          dictionary={{ targetType: "ai_document", targetId: docId }}
+          dictionary={hasModule("dictionary") ? { targetType: "ai_document", targetId: docId } : undefined}
         />
       )}
     </div>
