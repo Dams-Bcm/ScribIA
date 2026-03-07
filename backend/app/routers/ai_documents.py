@@ -27,7 +27,7 @@ from app.schemas.ai_documents import (
     TemplateUpdate,
 )
 from app.models.transcription import TranscriptionJob
-from app.services.ai_documents import enqueue_generation, seed_default_templates
+from app.services.ai_documents import enqueue_generation
 from app.services.event_bus import event_bus
 
 logger = logging.getLogger(__name__)
@@ -62,8 +62,7 @@ def list_templates(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Liste les templates du tenant (avec seeding des défauts si vide)."""
-    seed_default_templates(user.tenant_id, db)
+    """Liste les templates du tenant."""
     return (
         db.query(AIDocumentTemplate)
         .filter_by(tenant_id=user.tenant_id)
