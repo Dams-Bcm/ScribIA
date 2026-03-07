@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Megaphone, Plus, Pencil, Trash2, Power, PowerOff, Globe, Building2, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -250,10 +251,9 @@ export function AnnouncementsPage() {
                           key={t.id}
                           className="flex items-center gap-2 px-3 py-2 hover:bg-accent cursor-pointer border-b border-border last:border-0"
                         >
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={form.tenant_ids.includes(t.id)}
-                            onChange={() => toggleTenant(t.id)}
+                            onCheckedChange={() => toggleTenant(t.id)}
                           />
                           <span className="text-sm">{t.name}</span>
                           <span className="text-xs text-muted-foreground ml-auto">{t.slug}</span>

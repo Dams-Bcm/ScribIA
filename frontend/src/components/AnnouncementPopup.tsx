@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Megaphone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useActiveAnnouncement } from "@/api/hooks/useAnnouncements";
 
 export function AnnouncementPopup() {
@@ -45,10 +46,9 @@ export function AnnouncementPopup() {
 
         <div className="flex items-center justify-between px-5 py-4 border-t border-border">
           <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={dontShow}
-              onChange={(e) => setDontShow(e.target.checked)}
+              onCheckedChange={(checked) => setDontShow(!!checked)}
             />
             <span className="text-xs text-muted-foreground">Ne plus afficher</span>
           </label>

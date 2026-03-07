@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X, UserCheck, Loader2, Mic } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useContactsForEnrollment, useEnrollContactFromDiarisation } from "@/api/hooks/useSpeakers";
 import { ApiError } from "@/api/client";
 import type { DiarisationSpeaker } from "@/api/types";
@@ -97,11 +98,10 @@ export function EnrollSpeakerModal({
 
         {/* Compute embedding checkbox */}
         <label className="flex items-start gap-3 cursor-pointer group mb-4">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={computeEmbedding}
-            onChange={(e) => setComputeEmbedding(e.target.checked)}
-            className="mt-0.5 rounded border-input"
+            onCheckedChange={(checked) => setComputeEmbedding(!!checked)}
+            className="mt-0.5"
           />
           <div>
             <div className="flex items-center gap-1.5 text-sm font-medium group-hover:text-primary transition-colors">

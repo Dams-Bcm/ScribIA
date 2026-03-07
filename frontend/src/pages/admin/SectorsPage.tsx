@@ -6,6 +6,7 @@ import { AVAILABLE_MODULES } from "../../api/types";
 import type { SectorSuggestions } from "../../api/types";
 import { FolderCog, Plus, Trash2, X, Loader2, Sparkles, Save, Check, FileText, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -241,11 +242,9 @@ export function SectorsPage() {
                       const enabled = (selected.default_modules || []).includes(mod.key);
                       return (
                         <label key={mod.key} className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={enabled}
-                            onChange={() => toggleModule(mod.key)}
-                            className="w-4 h-4 rounded border-input"
+                            onCheckedChange={() => toggleModule(mod.key)}
                           />
                           <span className="text-sm">{mod.label}</span>
                         </label>
@@ -391,18 +390,16 @@ export function SectorsPage() {
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {AVAILABLE_MODULES.map((mod) => (
                     <label key={mod.key} className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={form.default_modules.includes(mod.key)}
-                        onChange={(e) =>
+                        onCheckedChange={(checked) =>
                           setForm({
                             ...form,
-                            default_modules: e.target.checked
+                            default_modules: checked
                               ? [...form.default_modules, mod.key]
                               : form.default_modules.filter((m) => m !== mod.key),
                           })
                         }
-                        className="w-4 h-4 rounded border-input"
                       />
                       <span className="text-sm">{mod.label}</span>
                     </label>

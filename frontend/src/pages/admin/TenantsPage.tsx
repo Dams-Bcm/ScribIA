@@ -13,6 +13,7 @@ import { AVAILABLE_MODULES, type Tenant, type ProvisionResult } from "../../api/
 import { useSectors } from "../../api/hooks/useSectors";
 import { Building2, Plus, Trash2, X, CheckCircle2, Sparkles, Database, Loader2, Save } from "lucide-react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export function TenantsPage() {
   const { data: tenants = [], isLoading } = useTenants();
@@ -162,11 +163,9 @@ export function TenantsPage() {
                   const enabled = selected.modules.find((m) => m.module_key === mod.key)?.enabled ?? false;
                   return (
                     <label key={mod.key} className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={enabled}
-                        onChange={() => toggleModule(selected.id, mod.key, enabled)}
-                        className="w-4 h-4 rounded border-input"
+                        onCheckedChange={() => toggleModule(selected.id, mod.key, enabled)}
                       />
                       <span className="text-sm">{mod.label}</span>
                     </label>
@@ -383,18 +382,16 @@ export function TenantsPage() {
                     <div className="space-y-2">
                       {AVAILABLE_MODULES.map((mod) => (
                         <label key={mod.key} className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={form.modules.includes(mod.key)}
-                            onChange={(e) => {
+                            onCheckedChange={(checked) => {
                               setForm({
                                 ...form,
-                                modules: e.target.checked
+                                modules: checked
                                   ? [...form.modules, mod.key]
                                   : form.modules.filter((m) => m !== mod.key),
                               });
                             }}
-                            className="w-4 h-4 rounded border-input"
                           />
                           <span className="text-sm">{mod.label}</span>
                         </label>

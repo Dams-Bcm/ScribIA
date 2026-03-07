@@ -13,6 +13,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useDetectOralConsent, useValidateCollectiveConsent } from "@/api/hooks/useSpeakers";
 import { useContactGroups } from "@/api/hooks/useContacts";
 import { useAttendees, useSetAttendees } from "@/api/hooks/useConsent";
@@ -284,11 +285,9 @@ export function ConsentPanel({ jobId, hideOralDetection }: ConsentPanelProps) {
                       key={c.id}
                       className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer text-sm"
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selectedAttendeeIds.has(c.id)}
-                        onChange={() => toggleAttendee(c.id)}
-                        className="rounded"
+                        onCheckedChange={() => toggleAttendee(c.id)}
                       />
                       <span>{c.name}</span>
                       {c.role && (
@@ -453,11 +452,9 @@ export function ConsentPanel({ jobId, hideOralDetection }: ConsentPanelProps) {
                       key={c.id}
                       className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer text-sm"
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selectedContactIds.has(c.id)}
-                        onChange={() => toggleContact(c.id)}
-                        className="rounded"
+                        onCheckedChange={() => toggleContact(c.id)}
                       />
                       <span>{c.name}</span>
                       {c.role && (

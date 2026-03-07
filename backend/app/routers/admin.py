@@ -764,24 +764,6 @@ _SECTOR_SEEDS: dict[str, dict] = {
                 ],
             },
         ],
-        "document_templates": [
-            {
-                "name": "Convocation AG",
-                "document_type": "custom",
-                "description": "Convocation à l'assemblée générale de copropriété (délai légal 21 jours)",
-                "system_prompt": "Tu es un assistant juridique spécialisé en droit de la copropriété. Rédige des convocations formelles, précises et conformes à la loi du 10 juillet 1965 et au décret du 17 mars 1967.",
-                "user_prompt_template": "Rédige une convocation à l'assemblée générale pour la copropriété suivante.\n\nTitre : {titre}\nDate de réunion : {date}\nOrganisation : {organisation}\n\nPoints d'ordre du jour collectés auprès des participants :\n{documents}\n\nLa convocation doit mentionner :\n- Lieu, date et heure de la réunion\n- L'ordre du jour complet et structuré\n- La possibilité de voter par correspondance\n- Les modalités de consultation des pièces\n- Le délai légal de convocation (21 jours minimum)\n\nStyle : formel, juridique.",
-                "temperature": 0.2,
-            },
-            {
-                "name": "PV d'AG",
-                "document_type": "pv",
-                "description": "Procès-verbal d'assemblée générale de copropriété",
-                "system_prompt": "Tu es un assistant juridique spécialisé en droit de la copropriété. Rédige des procès-verbaux d'AG conformes aux exigences légales : structure formelle, résolutions clairement identifiées, résultats de vote mentionnés.",
-                "user_prompt_template": "Rédige le procès-verbal de l'assemblée générale à partir de la transcription et des informations ci-dessous.\n\nTitre : {titre}\nDate : {date}\nOrganisation : {organisation}\n\nTranscription de la réunion :\n{transcription}\n\nInformations collectées en amont :\n{documents}\n\nStructure attendue du PV :\n1. En-tête (immeuble, date, heure d'ouverture/clôture)\n2. Présences et pouvoirs (présents, représentés, absents)\n3. Résolutions : pour chaque point de l'ordre du jour → intitulé, débat résumé, résultat du vote (pour/contre/abstention), résolution adoptée ou rejetée\n4. Questions diverses\n5. Clôture de séance\n6. Mentions légales (notification dans le mois, contestation sous 2 mois)\n\nStyle : juridique, neutre, factuel.",
-                "temperature": 0.2,
-            },
-        ],
     },
     "collectivite": {
         "procedure_templates": [
@@ -807,16 +789,6 @@ _SECTOR_SEEDS: dict[str, dict] = {
                         ],
                     },
                 ],
-            },
-        ],
-        "document_templates": [
-            {
-                "name": "Compte-rendu de séance",
-                "document_type": "summary",
-                "description": "Compte-rendu de séance d'un organe délibérant",
-                "system_prompt": "Tu es un assistant spécialisé en rédaction administrative pour les collectivités territoriales. Rédige des comptes-rendus clairs, neutres et structurés.",
-                "user_prompt_template": "Rédige le compte-rendu de la séance à partir de la transcription.\n\nTitre : {titre}\nDate : {date}\nOrganisation : {organisation}\n\nTranscription :\n{transcription}\n\nInformations collectées :\n{documents}\n\nStructure : présences, points abordés, décisions prises, prochaines étapes.",
-                "temperature": 0.3,
             },
         ],
     },
@@ -855,16 +827,6 @@ _SECTOR_SEEDS: dict[str, dict] = {
                 ],
             },
         ],
-        "document_templates": [
-            {
-                "name": "Compte-rendu ESS",
-                "document_type": "summary",
-                "description": "Compte-rendu de réunion d'équipe de suivi de scolarisation",
-                "system_prompt": "Tu es un assistant spécialisé en éducation inclusive et accompagnement des élèves à besoins particuliers. Rédige des comptes-rendus bienveillants, précis et centrés sur l'élève.",
-                "user_prompt_template": "Rédige le compte-rendu de la réunion ESS à partir de la transcription et des informations collectées.\n\nTitre : {titre}\nDate : {date}\nOrganisation : {organisation}\n\nTranscription :\n{transcription}\n\nInformations collectées auprès des participants :\n{documents}\n\nStructure : participants présents, bilan de la période, points abordés, décisions et aménagements retenus, objectifs pour la prochaine période, prochaine échéance.",
-                "temperature": 0.3,
-            },
-        ],
     },
     "chantier": {
         "procedure_templates": [
@@ -891,16 +853,6 @@ _SECTOR_SEEDS: dict[str, dict] = {
                         ],
                     },
                 ],
-            },
-        ],
-        "document_templates": [
-            {
-                "name": "Compte-rendu de chantier",
-                "document_type": "summary",
-                "description": "Compte-rendu de réunion de chantier",
-                "system_prompt": "Tu es un assistant spécialisé en gestion de chantier. Rédige des comptes-rendus précis, factuels et structurés pour le suivi de travaux.",
-                "user_prompt_template": "Rédige le compte-rendu de la réunion de chantier à partir de la transcription.\n\nTitre : {titre}\nDate : {date}\nOrganisation : {organisation}\n\nTranscription :\n{transcription}\n\nInformations collectées auprès des intervenants :\n{documents}\n\nStructure : intervenants présents, avancement par lot, réserves et points bloquants, décisions prises, actions à mener avant la prochaine réunion, date de la prochaine réunion.",
-                "temperature": 0.2,
             },
         ],
     },
@@ -930,16 +882,6 @@ _SECTOR_SEEDS: dict[str, dict] = {
                 ],
             },
         ],
-        "document_templates": [
-            {
-                "name": "Compte-rendu de réunion pluridisciplinaire",
-                "document_type": "summary",
-                "description": "Compte-rendu de réunion d'équipe médico-sociale",
-                "system_prompt": "Tu es un assistant spécialisé en rédaction médico-sociale. Rédige des comptes-rendus professionnels, bienveillants et respectueux de la confidentialité.",
-                "user_prompt_template": "Rédige le compte-rendu de la réunion pluridisciplinaire à partir de la transcription.\n\nTitre : {titre}\nDate : {date}\nOrganisation : {organisation}\n\nTranscription :\n{transcription}\n\nInformations collectées :\n{documents}\n\nStructure : participants, situation présentée, échanges synthétisés, décisions et orientations retenues, prochaines étapes.",
-                "temperature": 0.3,
-            },
-        ],
     },
 }
 
@@ -950,11 +892,7 @@ def provision_tenant(
     db: Session = Depends(get_db),
     _: User = Depends(require_super_admin),
 ):
-    """Provisionne les templates de procédures et de documents IA pour un tenant selon son secteur.
-
-    1. Copie les templates de procédure sectoriels (DB) vers le tenant
-    2. Copie les templates de documents IA depuis les seeds hardcodées (fallback)
-    """
+    """Provisionne les templates de procédures pour un tenant selon son secteur."""
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Organisation introuvable")
@@ -962,50 +900,9 @@ def provision_tenant(
         raise HTTPException(status_code=400, detail="Ce tenant n'a pas de secteur défini")
 
     created_proc_templates = []
-    created_doc_templates = []
     seed = _SECTOR_SEEDS.get(tenant.sector, {})
 
-    # 1. Templates de documents IA : copier depuis les templates sectoriels en DB
-    sector_doc_templates = (
-        db.query(AIDocumentTemplate)
-        .filter(AIDocumentTemplate.sector == tenant.sector, AIDocumentTemplate.tenant_id.is_(None))
-        .all()
-    )
-
-    if sector_doc_templates:
-        for sdt in sector_doc_templates:
-            doc_tmpl = AIDocumentTemplate(
-                tenant_id=tenant_id,
-                name=sdt.name,
-                description=sdt.description,
-                document_type=sdt.document_type,
-                system_prompt=sdt.system_prompt,
-                user_prompt_template=sdt.user_prompt_template,
-                map_system_prompt=sdt.map_system_prompt,
-                temperature=sdt.temperature,
-            )
-            db.add(doc_tmpl)
-            db.flush()
-            created_doc_templates.append({"id": doc_tmpl.id, "name": doc_tmpl.name})
-    else:
-        # Fallback : utiliser les seeds hardcodées
-        for dt in seed.get("document_templates", []):
-            doc_tmpl = AIDocumentTemplate(
-                tenant_id=tenant_id,
-                name=dt["name"],
-                description=dt.get("description"),
-                document_type=dt.get("document_type", "custom"),
-                system_prompt=dt["system_prompt"],
-                user_prompt_template=dt["user_prompt_template"],
-                temperature=dt.get("temperature", 0.3),
-            )
-            db.add(doc_tmpl)
-            db.flush()
-            created_doc_templates.append({"id": doc_tmpl.id, "name": doc_tmpl.name})
-
-    first_doc_id = created_doc_templates[0]["id"] if created_doc_templates else None
-
-    # 2. Templates de procédure : copier depuis les templates sectoriels en DB
+    # Templates de procédure : copier depuis les templates sectoriels en DB
     sector_templates = (
         db.query(ProcedureTemplate)
         .options(joinedload(ProcedureTemplate.roles))
@@ -1020,7 +917,6 @@ def provision_tenant(
                 tenant_id=tenant_id,
                 name=st.name,
                 description=st.description,
-                document_template_id=first_doc_id,
             )
             db.add(proc_tmpl)
             db.flush()
@@ -1050,7 +946,6 @@ def provision_tenant(
                 tenant_id=tenant_id,
                 name=pt["name"],
                 description=pt.get("description"),
-                document_template_id=first_doc_id,
             )
             db.add(proc_tmpl)
             db.flush()
@@ -1069,7 +964,6 @@ def provision_tenant(
     return {
         "sector": tenant.sector,
         "procedure_templates": created_proc_templates,
-        "document_templates": created_doc_templates,
     }
 
 

@@ -11,6 +11,7 @@ import {
   ToggleRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   useDictionaryRules,
@@ -270,18 +271,16 @@ export function DictionaryPage() {
                 </datalist>
               </div>
               <label className="flex items-center gap-2 text-sm cursor-pointer mt-auto pb-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={form.is_case_sensitive}
-                  onChange={(e) => setForm({ ...form, is_case_sensitive: e.target.checked })}
+                  onCheckedChange={(checked) => setForm({ ...form, is_case_sensitive: !!checked })}
                 />
                 Sensible a la casse
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer mt-auto pb-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={form.is_whole_word}
-                  onChange={(e) => setForm({ ...form, is_whole_word: e.target.checked })}
+                  onCheckedChange={(checked) => setForm({ ...form, is_whole_word: !!checked })}
                 />
                 Mot entier uniquement
               </label>
