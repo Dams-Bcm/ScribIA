@@ -712,6 +712,7 @@ export interface Contact {
   id: string;
   group_id: string;
   name: string;
+  first_name: string | null;
   email: string | null;
   phone: string | null;
   role: string | null;
@@ -741,6 +742,7 @@ export interface ContactGroupUpdate {
 
 export interface ContactCreate {
   name: string;
+  first_name?: string | null;
   email?: string | null;
   phone?: string | null;
   role?: string | null;

@@ -64,6 +64,7 @@ function EnrollmentBadge({ status }: { status: string | null }) {
 function InlineAddRow({ groupId, onClose }: { groupId: string; onClose: () => void }) {
   const add = useAddContact();
   const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("");
@@ -89,11 +90,12 @@ function InlineAddRow({ groupId, onClose }: { groupId: string; onClose: () => vo
     const body: ContactCreate & { groupId: string } = {
       groupId,
       name,
+      first_name: firstName || null,
       email: email || null,
       phone: phone || null,
       role: role || null,
     };
-    add.mutate(body, { onSuccess: () => { setName(""); setEmail(""); setPhone(""); setRole(""); setErrors({}); } });
+    add.mutate(body, { onSuccess: () => { setName(""); setFirstName(""); setEmail(""); setPhone(""); setRole(""); setErrors({}); } });
   }
 
   return (
@@ -107,6 +109,14 @@ function InlineAddRow({ groupId, onClose }: { groupId: string; onClose: () => vo
           autoFocus
         />
         {errors.name && <p className="text-[11px] text-destructive mt-0.5">{errors.name}</p>}
+      </div>
+      <div className="flex-[1.5] min-w-0">
+        <input
+          className="w-full px-2.5 py-1.5 border border-input rounded-md text-sm bg-background"
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          placeholder="Prénom"
+        />
       </div>
       <div className="flex-[2] min-w-0">
         <input
@@ -177,6 +187,7 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
     return group.contacts.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
+        c.first_name?.toLowerCase().includes(q) ||
         c.email?.toLowerCase().includes(q) ||
         c.role?.toLowerCase().includes(q),
     );
@@ -258,6 +269,7 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
             <thead>
               <tr className="border-b border-border bg-muted/50 sticky top-0 z-[1]">
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide">Nom</th>
+                <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide">Prénom</th>
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Email</th>
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden md:table-cell">Téléphone</th>
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Rôle</th>
@@ -270,6 +282,7 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
               {filtered.map((c) => (
                 <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30 group/row">
                   <td className="px-4 py-2.5 font-medium">{c.name}</td>
+                  <td className="px-4 py-2.5">{c.first_name ?? ""}</td>
                   <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{c.email ?? ""}</td>
                   <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{c.phone ?? ""}</td>
                   <td className="px-4 py-2.5 text-muted-foreground hidden lg:table-cell">{c.role ?? ""}</td>
@@ -327,7 +340,7 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
               ))}
               {filtered.length === 0 && search && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     Aucun contact trouvé pour « {search} »
                   </td>
                 </tr>

@@ -233,6 +233,14 @@ def _add_missing_columns():
                     "ALTER TABLE ai_document_templates ADD sector VARCHAR(50) NULL"
                 ))
 
+        # contacts: first_name
+        if "contacts" in insp.get_table_names():
+            contact_cols = {c["name"] for c in insp.get_columns("contacts")}
+            if "first_name" not in contact_cols:
+                conn.execute(text(
+                    "ALTER TABLE contacts ADD first_name NVARCHAR(255) NULL"
+                ))
+
         conn.commit()
 
 

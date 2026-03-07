@@ -1,0 +1,506 @@
+================================================================================
+  CHANTIER ARCHITECTURE PRODUCTION — ScribIA v2
+  Date : 2026-03-07
+================================================================================
+
+ETAT ACTUEL (RESUME)
+--------------------
+- 5 conteneurs Docker : frontend (Nginx), backend (FastAPI), db (MSSQL),
+  ollama, chroma (vector DB)
+- BunkerWeb (WAF) en place — TLS/headers/rate-limit geres
+- Backend stateful (modeles ML en memoire, threads, queue.Queue interne)
+- Fichiers sur disque local (volumes Docker)
+- Pas de Redis, pas de broker, pas de worker separe
+- DB sans backup automatique ni HA
+- LLM isole (Ollama conteneur) — OK
+- ChromaDB pour RAG — OK
+
+
+================================================================================
+1. COUCHE D'ENTREE UNIQUE (Reverse Proxy / WAF)
+================================================================================
+
+ACTUEL :
+  ✅ BunkerWeb en place (WAF basé sur Nginx)
+     - Terminaison TLS / Let's Encrypt
+     - Headers de securite (HSTS, CSP, X-Frame-Options, etc.)
+     - Rate limiting integre
+     - Protection DDoS / bot mitigation
+     - ModSecurity / OWASP CRS
+
+RESTE A FAIRE :
+  [ ] Verifier que BunkerWeb est le SEUL point d'entree expose (80/443)
+      → Retirer les ports: des autres services dans docker-compose
+  [ ] Supprimer l'IP en dur dans nginx.conf → routage via BunkerWeb
+  [ ] Health check endpoint (/health) cote backend pour monitoring
+  [ ] Configurer les regles rate-limit specifiques :
+      - /api/auth/* : 20 req/min
+      - /api/* general : 100 req/min
+      - /api/transcription/upload : limit upload size
+
+FICHIERS CONCERNES :
+  - docker-compose.yml (verifier exposition ports)
+  - frontend/nginx.conf (simplifier si BunkerWeb gere le routing)
+  - Config BunkerWeb (regles custom)
+
+PRIORITE : 🟡 Moyenne (base en place, affiner les regles)
+
+
+================================================================================
+2. FRONT SEPARE DU BACK
+================================================================================
+
+ACTUEL :
+  ✅ Deja separes en conteneurs distincts (frontend Nginx, backend FastAPI)
+
+A FAIRE :
+  [ ] Frontend en static hosting derriere CDN (Cloudflare Pages ou S3+CloudFront)
+      OU conteneur dedie derriere Traefik (actuel, acceptable)
+  [ ] Retirer le proxy_pass /api/ du Nginx frontend
+      → Traefik route /api/* vers backend directement
+  [ ] CORS configure proprement cote backend (origins specifiques, pas *)
+  [ ] Cache headers pour assets statiques (JS/CSS: immutable, 1 an)
+
+FICHIERS CONCERNES :
+  - frontend/nginx.conf
+  - backend/app/main.py (CORS middleware)
+  - docker-compose.yml (labels Traefik)
+
+PRIORITE : 🟡 Moyenne (fonctionne deja, optimisation)
+
+
+================================================================================
+3. BACKEND STATELESS
+================================================================================
+
+ACTUEL :
+  State en memoire dans le backend :
+  - _whisper_model (modele ML ~1-3 Go RAM)
+  - _diarization_pipeline (modele pyannote ~500 Mo)
+  - _gpu_semaphore (threading.Semaphore(1))
+  - _job_queue (queue.Queue pour AI docs)
+  - _cancelled_jobs (set thread-safe)
+  - _tenant_db_cache (dict cache tenant)
+  - EventBus (dict abonnes SSE)
+
+A FAIRE :
+  Phase 1 — Redis pour etat partage :
+  [ ] Ajouter Redis (conteneur docker-compose)
+  [ ] Cache tenant DB mode → Redis (TTL 5 min)
+  [ ] Sessions/tokens de rate limiting → Redis
+  [ ] EventBus SSE → Redis Pub/Sub (multi-instance)
+  [ ] Cancelled jobs set → Redis
+
+  Phase 2 — Extraire les modeles ML :
+  [ ] Whisper + pyannote dans un service worker dedie (voir point 6)
+  [ ] Backend API ne garde aucun modele en memoire
+  [ ] GPU semaphore → lock distribue Redis ou gestion par queue
+
+  Phase 3 — Fichiers temporaires :
+  [ ] Uploads audio temporaires → Object Storage (voir point 10)
+  [ ] Le backend ne stocke plus rien sur disque local
+
+FICHIERS CONCERNES :
+  - docker-compose.yml (service redis)
+  - backend/requirements.txt (redis, aioredis)
+  - backend/app/services/transcription.py (extraire state)
+  - backend/app/services/diarisation.py (extraire state)
+  - backend/app/services/ai_documents.py (extraire queue)
+  - backend/app/services/event_bus.py (Redis Pub/Sub)
+  - backend/app/services/database.py (cache → Redis)
+
+PRIORITE : 🔴 Critique (bloquant pour scaling horizontal)
+
+
+================================================================================
+4. BASE DE DONNEES SUR SERVEUR DEDIE
+================================================================================
+
+ACTUEL :
+  - MSSQL 2022 dans conteneur Docker
+  - Volume mssql_data (local)
+  - Pas de backup automatique
+  - Migrations via ALTER TABLE en Python au startup
+
+A FAIRE :
+  Phase 1 — Securisation :
+  [ ] Sauvegardes automatiques quotidiennes (MSSQL Agent ou script cron)
+  [ ] Externaliser backups (S3/MinIO ou serveur distant)
+  [ ] Monitoring espace disque + connexions
+  [ ] Chiffrement TDE (Transparent Data Encryption)
+
+  Phase 2 — Serveur dedie :
+  [ ] DB sur VM/serveur dedie (pas dans docker-compose applicatif)
+  [ ] Acces reseau prive uniquement (pas expose sur Internet)
+  [ ] Firewall : seul le backend peut se connecter
+  [ ] Credentials dans secrets manager (pas .env)
+
+  Phase 3 — Haute disponibilite :
+  [ ] MSSQL Always On ou replica lecture
+  [ ] Ou migration vers PostgreSQL (plus adapte containerise)
+      → Bonus : pgvector natif (remplacerait ChromaDB)
+
+  Phase 4 — Migrations propres :
+  [ ] Remplacer _add_missing_columns() par Alembic complet
+  [ ] Versionner toutes les migrations
+  [ ] CI qui valide les migrations avant deploy
+
+FICHIERS CONCERNES :
+  - docker-compose.yml (externaliser service db)
+  - backend/app/main.py (retirer _add_missing_columns)
+  - alembic/ (compléter les migrations)
+  - Scripts backup (nouveau)
+
+PRIORITE : 🔴 Critique (perte de donnees possible)
+
+
+================================================================================
+5. REDIS SEPARE
+================================================================================
+
+ACTUEL :
+  ❌ Redis absent du projet
+
+A FAIRE :
+  [ ] Ajouter service Redis dans docker-compose
+      image: redis:7-alpine
+      volume persistant redis_data
+      reseau prive uniquement
+  [ ] Configurer requirepass (mot de passe)
+  [ ] Pas d'exposition port sur host (reseau Docker only)
+  [ ] Healthcheck: redis-cli ping
+
+  Usages prevus :
+  - Cache tenant DB routing (TTL 5 min)
+  - Rate limiting par IP/user
+  - Pub/Sub SSE events (multi-instance)
+  - Lock distribue GPU (si multi-worker)
+  - Cache resultats LLM frequents (optionnel)
+  - Sessions ephemerales si besoin
+
+FICHIERS CONCERNES :
+  - docker-compose.yml
+  - backend/requirements.txt (redis>=5.0)
+  - backend/app/core/redis.py (nouveau — client Redis singleton)
+
+PRIORITE : 🟡 Moyenne (necessaire avant scaling, pas urgent si mono-instance)
+
+
+================================================================================
+6. WORKERS SEPARES DE L'API
+================================================================================
+
+ACTUEL :
+  Tout dans le meme conteneur backend :
+  - Transcription Whisper → thread daemon
+  - Diarisation pyannote → thread daemon
+  - Generation documents IA → queue.Queue + thread
+  - Partial analysis → thread daemon
+  - GPU semaphore global (1 job a la fois)
+
+A FAIRE :
+  Phase 1 — Extraire le worker GPU :
+  [ ] Nouveau service "worker" dans docker-compose
+      - Meme codebase, entrypoint different (worker mode)
+      - Acces GPU (runtime: nvidia)
+      - Charge Whisper + pyannote une seule fois
+  [ ] L'API publie les jobs dans une queue (Redis/RabbitMQ)
+  [ ] Le worker consomme et traite
+  [ ] Progress via Redis Pub/Sub → SSE
+
+  Phase 2 — Worker AI documents :
+  [ ] Extraire la generation de documents dans un worker leger (pas besoin GPU)
+  [ ] Queue separee pour docs AI vs transcription
+
+  Phase 3 — Scheduler :
+  [ ] Service scheduler pour taches periodiques :
+      - Nettoyage fichiers temporaires
+      - Verification politiques retention RGPD
+      - Purge tokens expires
+
+  Architecture cible :
+  ┌──────────┐     ┌──────────┐     ┌──────────────┐
+  │ Traefik  │────▶│ API      │────▶│ Redis/Queue   │
+  │ :443     │     │ (stateless)    │ (broker)      │
+  └──────────┘     └──────────┘     └───────┬───────┘
+                                            │
+                          ┌─────────────────┼─────────────────┐
+                          ▼                 ▼                 ▼
+                   ┌──────────┐     ┌──────────┐     ┌──────────┐
+                   │ Worker   │     │ Worker   │     │ Scheduler│
+                   │ GPU      │     │ AI Docs  │     │ (cron)   │
+                   │ (Whisper │     │ (Ollama) │     └──────────┘
+                   │  pyannote)│     └──────────┘
+                   └──────────┘
+
+FICHIERS CONCERNES :
+  - docker-compose.yml (services worker-gpu, worker-ai, scheduler)
+  - backend/app/worker.py (nouveau — entrypoint worker)
+  - backend/app/services/transcription.py (refactor → job producer)
+  - backend/app/services/diarisation.py (refactor → job producer)
+  - backend/app/services/ai_documents.py (refactor → job producer)
+
+PRIORITE : 🔴 Critique (resilience, scaling, pas de perte de jobs)
+
+
+================================================================================
+7. QUEUE / BROKER
+================================================================================
+
+ACTUEL :
+  ❌ queue.Queue Python interne (perdue au restart)
+
+A FAIRE :
+  Option A — Redis + BullMQ-like (recommande pour ce projet) :
+  [ ] Utiliser arq (async Redis queue pour Python) ou rq (Redis Queue)
+      - Leger, pas de broker supplementaire
+      - Redis deja necessaire (point 5)
+      - Suffisant pour le volume ScribIA
+
+  Option B — RabbitMQ + Celery :
+  [ ] Plus robuste pour gros volumes
+  [ ] Overhead supplementaire (conteneur RabbitMQ)
+  [ ] Mieux si besoin de routing complexe
+
+  RECOMMANDATION : Option A (arq ou rq avec Redis)
+  - Simplicite : 1 seule dependance (Redis)
+  - Suffisant pour les volumes actuels
+  - Migration facile vers Celery si besoin plus tard
+
+  [ ] Queues a creer :
+      - transcription (priorite haute, GPU)
+      - diarisation (priorite haute, GPU)
+      - ai_documents (priorite normale, CPU+LLM)
+      - email (priorite basse)
+      - cleanup (priorite basse, periodique)
+
+FICHIERS CONCERNES :
+  - backend/requirements.txt (arq ou rq)
+  - backend/app/core/queue.py (nouveau — abstraction queue)
+  - backend/app/services/*.py (publier dans queue au lieu de thread)
+
+PRIORITE : 🔴 Critique (couplé au point 6)
+
+
+================================================================================
+8. LLM ISOLE DU BACKEND PRINCIPAL
+================================================================================
+
+ACTUEL :
+  ✅ Ollama est deja un conteneur separe
+  ⚠️ Appels HTTP directs depuis les services backend (requests.post)
+  ⚠️ Pas d'abstraction provider (Ollama only)
+
+A FAIRE :
+  Phase 1 — Couche d'abstraction LLM :
+  [ ] Creer backend/app/services/llm_gateway.py
+      - Interface unique : generate(model, prompt, options) → response
+      - Gere : retry, timeout, fallback modele, logging tokens
+  [ ] Tous les services passent par le gateway (plus d'appels directs)
+
+  Phase 2 — Multi-provider :
+  [ ] Support OpenAI API (pour Azure OpenAI, Mistral API, etc.)
+  [ ] Config par tenant : quel provider, quel modele
+  [ ] Fallback : Ollama local → API cloud si timeout
+
+  Phase 3 — Tracking couts :
+  [ ] Log tokens in/out par requete
+  [ ] Dashboard couts par tenant
+  [ ] Quotas par tenant (optionnel)
+
+FICHIERS CONCERNES :
+  - backend/app/services/llm_gateway.py (nouveau)
+  - backend/app/services/ai_documents.py (utiliser gateway)
+  - backend/app/services/consent_detection.py (utiliser gateway)
+  - backend/app/services/ai_workflows.py (utiliser gateway)
+  - backend/app/services/ai_convocations.py (utiliser gateway)
+
+PRIORITE : 🟡 Moyenne (fonctionne avec Ollama, mais rigide)
+
+
+================================================================================
+9. RESEAU PRIVE ENTRE SERVICES
+================================================================================
+
+ACTUEL :
+  - Docker bridge network par defaut
+  - TOUS les services exposent des ports sur le host :
+    frontend:3001, backend:8001, ollama:11435, db:1434, chroma:8100
+
+A FAIRE :
+  [ ] Creer un reseau Docker dedie : scribia-internal
+  [ ] Seul Traefik expose 80/443 sur le host
+  [ ] Retirer les ports: de tous les autres services
+      (communication inter-services par DNS Docker uniquement)
+  [ ] Si acces admin DB necessaire → tunnel SSH ou VPN
+
+  docker-compose.yml cible :
+  ┌─────────────────────────────────────────────────┐
+  │ Reseau prive scribia-internal                   │
+  │                                                 │
+  │  ┌────────┐  ┌───────┐  ┌──────┐  ┌────────┐  │
+  │  │backend │  │ollama │  │  db  │  │ chroma │  │
+  │  │ :8000  │  │:11434 │  │:1433 │  │ :8000  │  │
+  │  └────────┘  └───────┘  └──────┘  └────────┘  │
+  │  ┌────────┐  ┌───────┐                         │
+  │  │worker  │  │ redis │                         │
+  │  │ (GPU)  │  │:6379  │                         │
+  │  └────────┘  └───────┘                         │
+  └──────────────────┬──────────────────────────────┘
+                     │ (prive)
+              ┌──────┴──────┐
+              │   Traefik   │ ← seul expose 80/443
+              └─────────────┘
+
+FICHIERS CONCERNES :
+  - docker-compose.yml (networks, retirer ports)
+
+PRIORITE : 🔴 Critique (securite — DB exposee actuellement)
+
+
+================================================================================
+10. OBJECT STORAGE POUR LES FICHIERS
+================================================================================
+
+ACTUEL :
+  - Volumes Docker locaux :
+    /data/audio/{tenant_id}/ (uploads WAV)
+    /data/prep_docs/ (documents preparatoires)
+    /data/ai_docs/ (documents generes)
+  - Fichiers references par nom dans la DB
+
+A FAIRE :
+  Phase 1 — MinIO (S3-compatible, self-hosted) :
+  [ ] Ajouter MinIO dans docker-compose
+  [ ] Buckets : scribia-audio, scribia-docs, scribia-ai-docs
+  [ ] Politique par tenant (prefix tenant_id/)
+  [ ] Backend utilise boto3 (client S3) pour upload/download
+
+  Phase 2 — Abstraction storage :
+  [ ] Creer backend/app/services/storage.py
+      - Interface : upload(bucket, key, data), download(), delete(), presigned_url()
+      - Implementation MinIO/S3
+  [ ] Migrer tous les open()/Path() vers storage service
+  [ ] Presigned URLs pour telechargement direct (pas proxy backend)
+
+  Phase 3 — Cloud (optionnel) :
+  [ ] Migration vers S3 ou Azure Blob si passage cloud
+  [ ] Meme interface, juste config endpoint
+
+FICHIERS CONCERNES :
+  - docker-compose.yml (service minio)
+  - backend/requirements.txt (boto3)
+  - backend/app/services/storage.py (nouveau)
+  - backend/app/services/transcription.py (utiliser storage)
+  - backend/app/routers/ai_documents.py (utiliser storage)
+  - backend/app/routers/preparatory.py (utiliser storage)
+
+PRIORITE : 🟡 Haute (bloquant multi-instance, backup fichiers)
+
+
+================================================================================
+11. VECTOR DB SEPAREE (RAG)
+================================================================================
+
+ACTUEL :
+  ✅ ChromaDB en conteneur separe
+  ✅ Collection par tenant
+  ✅ Embeddings via Ollama (nomic-embed-text)
+  ✅ Volume persistant
+
+A FAIRE :
+  Court terme (garder ChromaDB) :
+  [ ] Backup volume chroma_data (script cron)
+  [ ] Healthcheck dans docker-compose
+  [ ] Monitoring utilisation memoire
+
+  Moyen terme (si scaling necessaire) :
+  [ ] Evaluer migration vers PostgreSQL + pgvector
+      Avantages : une seule DB, transactions ACID, backup unifie
+      Inconvenient : performance pure inferieure a Qdrant/ChromaDB
+  [ ] Ou migration vers Qdrant (plus performant, API REST)
+
+  RECOMMANDATION : Garder ChromaDB pour l'instant, migrer vers
+  pgvector si passage a PostgreSQL (point 4 Phase 3).
+
+PRIORITE : 🟢 Basse (fonctionne bien actuellement)
+
+
+================================================================================
+PLAN DE MIGRATION PAR SPRINTS
+================================================================================
+
+SPRINT 1 — Securite & fondations (2-3 semaines)
+  [S1.1] ✅ BunkerWeb WAF deja en place (point 1) — affiner regles
+  [S1.2] Reseau prive Docker (point 9)
+  [S1.3] Redis (point 5)
+  [S1.4] Backup DB automatique (point 4 phase 1)
+  [S1.5] Healthchecks tous services
+
+SPRINT 2 — Decouplage workers (3-4 semaines)
+  [S2.1] Queue Redis (arq/rq) (point 7)
+  [S2.2] Worker GPU separe (point 6 phase 1)
+  [S2.3] Worker AI docs separe (point 6 phase 2)
+  [S2.4] Backend stateless — migrer state vers Redis (point 3 phase 1)
+  [S2.5] EventBus SSE → Redis Pub/Sub (point 3)
+
+SPRINT 3 — Storage & abstraction (2-3 semaines)
+  [S3.1] MinIO (point 10 phase 1)
+  [S3.2] Abstraction storage service (point 10 phase 2)
+  [S3.3] LLM gateway (point 8 phase 1)
+  [S3.4] Migration fichiers existants vers MinIO
+
+SPRINT 4 — Robustesse & scaling (2-3 semaines)
+  [S4.1] DB sur serveur dedie (point 4 phase 2)
+  [S4.2] Alembic migrations completes (point 4 phase 4)
+  [S4.3] Monitoring centralise (Prometheus + Grafana)
+  [S4.4] Logs centralises (Loki ou ELK)
+  [S4.5] CI/CD pipeline (build, test, deploy)
+
+SPRINT 5 — Optimisation (optionnel)
+  [S5.1] Multi-provider LLM (point 8 phase 2)
+  [S5.2] CDN pour assets frontend (point 2)
+  [S5.3] Migration PostgreSQL + pgvector (points 4+11)
+  [S5.4] Scheduler service (point 6 phase 3)
+  [S5.5] Quotas et tracking tokens LLM (point 8 phase 3)
+
+
+================================================================================
+ARCHITECTURE CIBLE
+================================================================================
+
+                    ┌─────────────┐
+                    │ Cloudflare  │  WAF / CDN / DDoS
+                    └──────┬──────┘
+                           │ 443
+                    ┌──────┴──────┐
+                    │  Traefik    │  TLS, rate-limit, routing
+                    └──────┬──────┘
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+       ┌──────┴──┐  ┌─────┴────┐  ┌───┴────┐
+       │Frontend │  │  API x2  │  │ MinIO  │
+       │ (Nginx) │  │(stateless)│  │  (S3)  │
+       └─────────┘  └─────┬────┘  └────────┘
+                          │
+                    ┌─────┴─────┐
+                    │   Redis   │  cache, queue, pub/sub
+                    └─────┬─────┘
+                          │
+            ┌─────────────┼─────────────┐
+            │             │             │
+     ┌──────┴────┐ ┌─────┴─────┐ ┌────┴──────┐
+     │Worker GPU │ │Worker Docs│ │ Scheduler │
+     │(Whisper,  │ │(Ollama,   │ │ (cron)    │
+     │ pyannote) │ │ generation│ └───────────┘
+     └───────────┘ └───────────┘
+
+              ┌──────────┐  ┌──────────┐
+              │  MSSQL   │  │ ChromaDB │
+              │ (dedié)  │  │ (vector) │
+              └──────────┘  └──────────┘
+
+         Tout en reseau prive sauf Traefik :443
+
+================================================================================

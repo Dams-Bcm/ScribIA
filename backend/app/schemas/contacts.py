@@ -20,6 +20,7 @@ class ContactResponse(BaseModel):
     id: str
     group_id: str
     name: str
+    first_name: str | None = None
     email: str | None
     phone: str | None
     role: str | None
@@ -53,6 +54,7 @@ class ContactGroupDetailResponse(ContactGroupResponse):
 
 class ContactCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
+    first_name: str | None = None
     email: str | None = None
     phone: str | None = None
     role: str | None = None
@@ -61,6 +63,7 @@ class ContactCreate(BaseModel):
 
 class ContactUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
+    first_name: str | None = None
     email: str | None = None
     phone: str | None = None
     role: str | None = None

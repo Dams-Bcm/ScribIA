@@ -1,12 +1,21 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../../api/client";
 import { useSectors, useCreateSector, useUpdateSector, useDeleteSector, useGenerateSuggestions } from "../../api/hooks/useSectors";
 import { AVAILABLE_MODULES } from "../../api/types";
 import type { SectorSuggestions } from "../../api/types";
-import { FolderCog, Plus, Trash2, X, Loader2, Sparkles, Save, Check } from "lucide-react";
+import { FolderCog, Plus, Trash2, X, Loader2, Sparkles, Save, Check, FileText, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 export function SectorsPage() {
   const { data: sectors = [], isLoading } = useSectors();
@@ -239,6 +248,9 @@ export function SectorsPage() {
                 </div>
               </div>
 
+              {/* Document templates */}
+              <SectorDocTemplateManager sector={selected.key} />
+
               {/* Suggestions */}
               <div className="bg-background rounded-xl border border-border p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -459,6 +471,281 @@ function SuggestionList({
           + Ajouter
         </button>
       </div>
+    </div>
+  );
+}
+
+
+// ── Sector AI document templates ─────────────────────────────────────────────
+
+interface SectorDocTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  document_type: string;
+  system_prompt: string;
+  user_prompt_template: string;
+  map_system_prompt: string | null;
+  temperature: number;
+  sector: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+const DOC_TYPES = [
+  { value: "pv", label: "Proces-verbal" },
+  { value: "deliberation", label: "Deliberation" },
+  { value: "summary", label: "Compte-rendu" },
+  { value: "agenda", label: "Ordre du jour" },
+  { value: "custom", label: "Personnalise" },
+];
+
+function useSectorDocTemplates(sector: string) {
+  return useQuery({
+    queryKey: ["sector-doc-templates", sector],
+    queryFn: () => api.get<SectorDocTemplate[]>(`/admin/sectors/${sector}/document-templates`),
+    enabled: !!sector,
+  });
+}
+
+function useCreateSectorDocTemplate(sector: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<SectorDocTemplate>(`/admin/sectors/${sector}/document-templates`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sector-doc-templates", sector] }),
+  });
+}
+
+function useUpdateSectorDocTemplate(sector: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: Record<string, unknown> & { id: string }) =>
+      api.patch<SectorDocTemplate>(`/admin/sectors/document-templates/${id}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sector-doc-templates", sector] }),
+  });
+}
+
+function useDeleteSectorDocTemplate(sector: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/admin/sectors/document-templates/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sector-doc-templates", sector] }),
+  });
+}
+
+function SectorDocTemplateManager({ sector }: { sector: string }) {
+  const { data: templates = [], isLoading } = useSectorDocTemplates(sector);
+  const createTemplate = useCreateSectorDocTemplate(sector);
+  const updateTemplate = useUpdateSectorDocTemplate(sector);
+  const deleteTemplate = useDeleteSectorDocTemplate(sector);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const emptyForm = {
+    name: "", description: "", document_type: "custom",
+    system_prompt: "", user_prompt_template: "", map_system_prompt: "", temperature: 0.3,
+  };
+  const [form, setForm] = useState(emptyForm);
+
+  function openCreate() {
+    setForm(emptyForm);
+    setEditId(null);
+    setCreateOpen(true);
+  }
+
+  function openEdit(tpl: SectorDocTemplate) {
+    setForm({
+      name: tpl.name,
+      description: tpl.description ?? "",
+      document_type: tpl.document_type,
+      system_prompt: tpl.system_prompt,
+      user_prompt_template: tpl.user_prompt_template,
+      map_system_prompt: tpl.map_system_prompt ?? "",
+      temperature: tpl.temperature,
+    });
+    setEditId(tpl.id);
+    setCreateOpen(true);
+  }
+
+  async function handleSave() {
+    if (!form.name.trim() || !form.system_prompt.trim() || !form.user_prompt_template.trim()) return;
+    const payload = {
+      name: form.name.trim(),
+      description: form.description.trim() || null,
+      document_type: form.document_type,
+      system_prompt: form.system_prompt.trim(),
+      user_prompt_template: form.user_prompt_template.trim(),
+      map_system_prompt: form.map_system_prompt.trim() || null,
+      temperature: form.temperature,
+    };
+    if (editId) {
+      await updateTemplate.mutateAsync({ id: editId, ...payload });
+    } else {
+      await createTemplate.mutateAsync(payload);
+    }
+    setCreateOpen(false);
+    setForm(emptyForm);
+    setEditId(null);
+  }
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>;
+  }
+
+  return (
+    <div className="bg-background rounded-xl border border-border p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-base font-semibold">Templates de documents IA</h3>
+          <p className="text-xs text-muted-foreground">
+            Templates copies lors du provisionnement d'un tenant de ce secteur
+          </p>
+        </div>
+        <Button size="sm" onClick={openCreate}>
+          <Plus className="w-3.5 h-3.5 mr-1" /> Nouveau template
+        </Button>
+      </div>
+
+      {templates.length === 0 ? (
+        <div className="text-center py-6 text-muted-foreground">
+          <FileText className="w-6 h-6 mx-auto mb-2 opacity-40" />
+          <p className="text-sm">Aucun template. Les seeds par defaut seront utilisees au provisionnement.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {templates.map((tpl) => (
+            <div key={tpl.id} className="border border-border rounded-lg">
+              <div className="flex items-center gap-3 px-4 py-3">
+                <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{tpl.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {DOC_TYPES.find((d) => d.value === tpl.document_type)?.label ?? tpl.document_type}
+                    {tpl.description && ` · ${tpl.description}`}
+                  </p>
+                </div>
+                <Badge variant={tpl.is_active ? "outline" : "secondary"} className="text-xs">
+                  {tpl.is_active ? "Actif" : "Inactif"}
+                </Badge>
+                <Button variant="ghost" size="icon" onClick={() => setExpandedId(expandedId === tpl.id ? null : tpl.id)}>
+                  {expandedId === tpl.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => openEdit(tpl)}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  variant="ghost" size="icon"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => deleteTemplate.mutate(tpl.id)}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              {expandedId === tpl.id && (
+                <div className="border-t border-border px-4 py-3 space-y-2">
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground">System prompt</p>
+                    <p className="text-xs whitespace-pre-wrap bg-muted rounded p-2 mt-1 max-h-32 overflow-y-auto">{tpl.system_prompt}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground">User prompt template</p>
+                    <p className="text-xs whitespace-pre-wrap bg-muted rounded p-2 mt-1 max-h-32 overflow-y-auto">{tpl.user_prompt_template}</p>
+                  </div>
+                  {tpl.map_system_prompt && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground">Map system prompt (map-reduce)</p>
+                      <p className="text-xs whitespace-pre-wrap bg-muted rounded p-2 mt-1 max-h-32 overflow-y-auto">{tpl.map_system_prompt}</p>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">Temperature : {tpl.temperature}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create / Edit dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editId ? "Modifier le template" : "Nouveau template de document IA"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Nom *</Label>
+                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex : Compte-rendu AG" />
+              </div>
+              <div className="space-y-1">
+                <Label>Type de document</Label>
+                <Select value={form.document_type} onValueChange={(v) => setForm({ ...form, document_type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DOC_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Description</Label>
+              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Description optionnelle" />
+            </div>
+            <div className="space-y-1">
+              <Label>System prompt *</Label>
+              <Textarea
+                value={form.system_prompt}
+                onChange={(e) => setForm({ ...form, system_prompt: e.target.value })}
+                rows={4} className="font-mono text-xs"
+                placeholder="Tu es un assistant specialise en..."
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>User prompt template *</Label>
+              <Textarea
+                value={form.user_prompt_template}
+                onChange={(e) => setForm({ ...form, user_prompt_template: e.target.value })}
+                rows={6} className="font-mono text-xs"
+                placeholder={"Redige le compte-rendu...\n\nPlaceholders : {titre} {date} {organisation} {transcription} {documents} {participants} {duree}"}
+              />
+              <p className="text-xs text-muted-foreground">
+                Placeholders : {"{titre}"} {"{date}"} {"{organisation}"} {"{transcription}"} {"{documents}"} {"{participants}"} {"{duree}"}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label>Map system prompt <span className="text-muted-foreground font-normal">(optionnel, pour map-reduce)</span></Label>
+              <Textarea
+                value={form.map_system_prompt}
+                onChange={(e) => setForm({ ...form, map_system_prompt: e.target.value })}
+                rows={3} className="font-mono text-xs"
+                placeholder="Prompt systeme pour la passe map (textes longs)..."
+              />
+            </div>
+            <div className="space-y-1 w-32">
+              <Label>Temperature</Label>
+              <Input
+                type="number" step={0.1} min={0} max={2}
+                value={form.temperature}
+                onChange={(e) => setForm({ ...form, temperature: parseFloat(e.target.value) || 0.3 })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Annuler</Button>
+            <Button
+              onClick={handleSave}
+              disabled={!form.name.trim() || !form.system_prompt.trim() || !form.user_prompt_template.trim() || createTemplate.isPending || updateTemplate.isPending}
+            >
+              {(createTemplate.isPending || updateTemplate.isPending) ? "Sauvegarde…" : editId ? "Enregistrer" : "Creer le template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -25,6 +25,7 @@ class Contact(UUIDMixin, TimestampMixin, Base):
     tenant_id     = Column(String(36), ForeignKey("tenants.id"), nullable=False)
     group_id      = Column(String(36), ForeignKey("contact_groups.id", ondelete="CASCADE"), nullable=False)
     name          = Column(String(255), nullable=False)
+    first_name    = Column(String(255), nullable=True)
     email         = Column(String(255), nullable=True)
     phone         = Column(String(50), nullable=True)
     role          = Column(String(100), nullable=True)  # e.g. "Copropriétaire", "Conseil syndical"
