@@ -330,8 +330,8 @@ def _call_ollama(model: str, system_prompt: str, user_prompt: str, temperature: 
         "options": {
             "temperature": temperature,
             "num_predict": num_predict,
-            "repeat_penalty": 1.5,     # pénalise les répétitions
-            "repeat_last_n": 512,      # fenêtre de détection des répétitions (défaut: 64)
+            "repeat_penalty": 1.2,     # pénalise les répétitions (>1.3 perturbe qwen)
+            "repeat_last_n": 256,      # fenêtre de détection des répétitions (défaut: 64)
         },
     }
     url = f"{settings.ollama_url}/api/generate"
