@@ -192,8 +192,12 @@ def _build_prompt(
 
 # ── Map-Reduce pour longs contextes ──────────────────────────────────────────
 
-def _split_transcription(text: str, chunk_size: int) -> list[str]:
-    """Découpe la transcription en chunks respectant les sauts de ligne."""
+def _split_transcription(text: str, chunk_size: int, overlap_lines: int = 3) -> list[str]:
+    """Découpe la transcription en chunks respectant les sauts de ligne.
+
+    Ajoute un chevauchement de `overlap_lines` lignes entre chaque chunk
+    pour préserver le contexte aux frontières.
+    """
     chunks = []
     lines = text.split("\n")
     current_chunk: list[str] = []
@@ -203,8 +207,10 @@ def _split_transcription(text: str, chunk_size: int) -> list[str]:
         line_len = len(line) + 1  # +1 for \n
         if current_len + line_len > chunk_size and current_chunk:
             chunks.append("\n".join(current_chunk))
-            current_chunk = []
-            current_len = 0
+            # Garder les dernières lignes comme overlap pour le chunk suivant
+            overlap = current_chunk[-overlap_lines:] if overlap_lines > 0 else []
+            current_chunk = list(overlap)
+            current_len = sum(len(l) + 1 for l in current_chunk)
         current_chunk.append(line)
         current_len += line_len
 
@@ -235,10 +241,17 @@ def _map_reduce_generate(
 
     # ── Passe 1 : résumer chaque chunk ──
     map_system = (
-        "Tu es un assistant spécialisé dans la prise de notes de réunion. "
-        "Tu dois résumer fidèlement l'extrait de transcription fourni. "
-        "Conserve les noms des intervenants, les décisions prises, les sujets abordés "
-        "et les actions à suivre. Sois précis et structuré."
+        "Tu es un assistant spécialisé dans l'analyse de transcriptions de réunions. "
+        "On te donne un extrait d'une transcription découpée en plusieurs parties. "
+        "Tu dois produire un résumé DÉTAILLÉ et FIDÈLE de cet extrait. "
+        "RÈGLES IMPORTANTES :\n"
+        "- Conserve TOUS les noms des intervenants mentionnés\n"
+        "- Note TOUTES les décisions prises, même mineures\n"
+        "- Liste les actions à suivre avec les responsables si mentionnés\n"
+        "- Conserve les chiffres, dates, montants exacts\n"
+        "- Garde les citations importantes entre guillemets\n"
+        "- Écris en prose structurée, PAS en template vide\n"
+        "- Ne génère JAMAIS de placeholders comme [nom] ou [date] — utilise les vraies infos du texte"
     )
 
     summaries = []
@@ -251,17 +264,17 @@ def _map_reduce_generate(
         logger.info(f"[AI] Map-Reduce passe 1: chunk {i+1}/{len(chunks)} ({len(chunk)} chars)")
 
         map_prompt = (
-            f"Voici l'extrait {i+1}/{len(chunks)} d'une transcription de réunion.\n\n"
-            f"EXTRAIT :\n{chunk}\n\n"
-            "Résume cet extrait en conservant tous les éléments importants : "
-            "intervenants, sujets, décisions, actions."
+            f"Voici la partie {i+1} sur {len(chunks)} d'une transcription de réunion.\n\n"
+            f"EXTRAIT DE TRANSCRIPTION :\n{chunk}\n\n"
+            "Produis un résumé détaillé de cet extrait. "
+            "Inclus tous les éléments factuels : qui a dit quoi, quelles décisions, quelles actions."
         )
 
         parts = []
-        for text in _call_ollama(model, map_system, map_prompt, temperature):
+        for text in _call_ollama(model, map_system, map_prompt, temperature, num_predict=2048):
             parts.append(text)
         summary = "".join(parts)
-        summaries.append(f"--- Partie {i+1}/{len(chunks)} ---\n{summary}")
+        summaries.append(f"=== Partie {i+1}/{len(chunks)} ===\n{summary}")
         logger.info(f"[AI] Map-Reduce chunk {i+1}: résumé de {len(summary)} chars")
 
     # ── Passe 2 : synthèse finale ──
@@ -274,14 +287,27 @@ def _map_reduce_generate(
     combined_summaries = "\n\n".join(summaries)
     logger.info(f"[AI] Map-Reduce passe 2: {len(combined_summaries)} chars de résumés combinés")
 
-    # Remplacer la transcription par les résumés dans le user prompt
+    # Construire un prompt reduce dédié qui explique clairement le contexte
+    reduce_system = (
+        f"{system_prompt}\n\n"
+        "CONTEXTE IMPORTANT : La transcription originale était trop longue pour être traitée en une fois. "
+        "Elle a été découpée en plusieurs parties, chacune résumée individuellement. "
+        "Tu reçois maintenant ces résumés partiels. Tu dois les utiliser pour rédiger le document final "
+        "comme si tu avais lu la transcription complète. "
+        "RÈGLES :\n"
+        "- Utilise UNIQUEMENT les informations présentes dans les résumés\n"
+        "- Ne génère JAMAIS de placeholders comme [nom], [date], ... — si une info manque, omets-la\n"
+        "- Rédige un document COMPLET et FINALISÉ, prêt à l'emploi"
+    )
+
+    # Remplacer {transcription} par les résumés avec un label clair
     reduce_user = user_prompt_template
     builtin = {
         "titre":         context.get("title", ""),
         "date":          context.get("date", ""),
         "organisation":  context.get("organisation", ""),
         "points":        context.get("agenda", ""),
-        "transcription": combined_summaries,
+        "transcription": f"(Résumés des {len(chunks)} parties de la transcription)\n\n{combined_summaries}",
         "documents":     context.get("documents_text", ""),
         "duree":         context.get("duree", ""),
     }
@@ -291,14 +317,14 @@ def _map_reduce_generate(
     logger.info(f"[AI] Map-Reduce passe 2: user prompt final {len(reduce_user)} chars")
 
     parts = []
-    for text in _call_ollama(model, system_prompt, reduce_user, temperature):
+    for text in _call_ollama(model, reduce_system, reduce_user, temperature, num_predict=8192):
         parts.append(text)
     return "".join(parts)
 
 
 # ── Appel Ollama ──────────────────────────────────────────────────────────────
 
-def _call_ollama(model: str, system_prompt: str, user_prompt: str, temperature: float) -> Generator[str, None, None]:
+def _call_ollama(model: str, system_prompt: str, user_prompt: str, temperature: float, num_predict: int = 4096) -> Generator[str, None, None]:
     """Appelle Ollama en streaming et yield les chunks de texte."""
     payload = {
         "model": model,
@@ -308,7 +334,7 @@ def _call_ollama(model: str, system_prompt: str, user_prompt: str, temperature: 
         "keep_alive": 0,  # décharge le modèle de la VRAM immédiatement après génération
         "options": {
             "temperature": temperature,
-            "num_predict": 4096,       # limite la génération pour éviter les boucles
+            "num_predict": num_predict,
             "repeat_penalty": 1.3,     # pénalise les répétitions
         },
     }
