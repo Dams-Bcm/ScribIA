@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search, Mic, Users, ChevronDown } from "lucide-react";
+import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search, Mic, Users, ChevronDown, CheckCircle2, XCircle } from "lucide-react";
 
 interface AIUsage {
   usage_key: string;
