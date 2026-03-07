@@ -519,7 +519,7 @@ function AttendeeRow({ attendee }: { attendee: AttendeeEntry }) {
 
 function RefusalFlow({
   detection,
-  jobId,
+  jobId: _jobId,
 }: {
   detection: OralConsentDetection;
   jobId: string;
