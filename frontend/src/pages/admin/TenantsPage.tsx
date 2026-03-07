@@ -288,17 +288,6 @@ export function TenantsPage() {
                       ))}
                     </div>
                   )}
-                  {provisionResult.document_templates.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Templates de documents IA</p>
-                      {provisionResult.document_templates.map((t) => (
-                        <div key={t.id} className="flex items-center gap-2 text-sm py-1">
-                          <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
-                          {t.name}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
                 <button
                   onClick={() => setProvisionResult(null)}
