@@ -36,7 +36,7 @@ export function TranscriptionDiarisationPage() {
         );
         setUploadProgress(null);
         qc.invalidateQueries({ queryKey: ["diarisation"] });
-        await startProcessing.mutateAsync(result.id);
+        // Don't auto-start: show job view for attendee selection first
         setSelectedJobId(result.id);
       } catch (err) {
         setUploadProgress(null);

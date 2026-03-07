@@ -1,11 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Loader2, Users } from "lucide-react";
+import { ArrowLeft, Loader2, Users, ShieldCheck, Play } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { api } from "@/api/client";
-import { useDiarisationJob, useRenameSpeaker } from "@/api/hooks/useDiarisation";
+import {
+  useDiarisationJob,
+  useRenameSpeaker,
+  useStartDiarisationProcessing,
+} from "@/api/hooks/useDiarisation";
+import { useAttendees } from "@/api/hooks/useConsent";
 import type { DiarisationSSEEvent } from "@/api/types";
 import { DiarisationResult } from "./DiarisationResult";
+import { ConsentPanel } from "./ConsentPanel";
 
 interface DiarisationJobViewProps {
   jobId: string;
@@ -15,6 +21,7 @@ interface DiarisationJobViewProps {
 export function DiarisationJobView({ jobId, onBack }: DiarisationJobViewProps) {
   const { data: job, refetch } = useDiarisationJob(jobId);
   const renameSpeaker = useRenameSpeaker();
+  const startProcessing = useStartDiarisationProcessing();
   const qc = useQueryClient();
 
   const [progress, setProgress] = useState(job?.progress ?? 0);
@@ -22,7 +29,9 @@ export function DiarisationJobView({ jobId, onBack }: DiarisationJobViewProps) {
   const [liveStatus, setLiveStatus] = useState(job?.status ?? "queued");
   const sseRef = useRef<AbortController | null>(null);
 
-  const isProcessing = ["queued", "converting", "diarizing", "transcribing", "aligning"].includes(liveStatus);
+  const { data: attendeesData } = useAttendees(jobId);
+  const isProcessing = ["queued", "converting", "diarizing", "transcribing", "aligning"].includes(liveStatus) && (job?.progress ?? 0) > 0;
+  const isWaitingForAttendees = liveStatus === "queued" && (job?.progress ?? 0) === 0;
 
   // Connect to SSE when job is processing
   useEffect(() => {
@@ -91,6 +100,87 @@ export function DiarisationJobView({ jobId, onBack }: DiarisationJobViewProps) {
         </div>
         {job?.original_filename && (
           <p className="text-sm text-muted-foreground mb-4">{job.original_filename}</p>
+        )}
+
+        {isWaitingForAttendees && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 dark:bg-blue-950 dark:border-blue-800">
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="w-5 h-5 text-blue-600" />
+                <h3 className="font-semibold text-blue-800 dark:text-blue-200">
+                  Sélection des participants
+                </h3>
+              </div>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                Avant de lancer la transcription, renseignez les participants présents lors de cet enregistrement
+                pour vérifier leur consentement RGPD.
+              </p>
+            </div>
+
+            <ConsentPanel jobId={jobId} />
+
+            <div className="flex gap-3">
+              {(() => {
+                const attendees = attendeesData?.attendees ?? [];
+                const hasPendingOral = attendees.some((a) => a.status === "pending_oral");
+                const hasRefused = attendees.some((a) => a.status === "refused" || a.status === "withdrawn");
+                const allAccepted = attendees.length > 0 && attendees.every((a) =>
+                  a.status === "accepted_email" || a.status === "accepted_oral"
+                );
+
+                if (hasRefused) {
+                  return (
+                    <p className="text-sm text-red-600">
+                      Un ou plusieurs participants ont refusé. La transcription est bloquée.
+                    </p>
+                  );
+                }
+
+                if (allAccepted) {
+                  return (
+                    <Button
+                      onClick={async () => {
+                        await startProcessing.mutateAsync(jobId);
+                        refetch();
+                      }}
+                      disabled={startProcessing.isPending}
+                    >
+                      {startProcessing.isPending ? (
+                        <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Lancement…</>
+                      ) : (
+                        <><Play className="w-4 h-4 mr-1" /> Lancer la transcription + diarisation</>
+                      )}
+                    </Button>
+                  );
+                }
+
+                if (hasPendingOral) {
+                  return (
+                    <Button
+                      onClick={async () => {
+                        await startProcessing.mutateAsync(jobId);
+                        refetch();
+                      }}
+                      disabled={startProcessing.isPending}
+                    >
+                      {startProcessing.isPending ? (
+                        <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Lancement…</>
+                      ) : (
+                        <><ShieldCheck className="w-4 h-4 mr-1" /> Lancer la transcription + diarisation (consentement oral à vérifier)</>
+                      )}
+                    </Button>
+                  );
+                }
+
+                // No attendees yet — must add at least one
+                return (
+                  <p className="text-sm text-muted-foreground">
+                    Ajoutez au moins un participant pour pouvoir lancer la transcription.
+                  </p>
+                );
+              })()}
+            </div>
+          </div>
         )}
 
         {isProcessing && (
