@@ -11,6 +11,7 @@ import {
   RotateCcw,
   Search,
   X,
+  UserMinus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -23,6 +24,7 @@ import {
   useUpdateContactGroup,
   useAddContact,
   useAddContactToGroup,
+  useRemoveContactFromGroup,
   useUpdateContact,
   useDeleteContact,
   useResetEnrollment,
@@ -322,6 +324,7 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
   const isAllView = groupId === "__all__";
   const { data: group, isLoading } = useContactGroup(groupId);
   const deleteContact = useDeleteContact();
+  const removeFromGroup = useRemoveContactFromGroup();
   const updateGroup = useUpdateContactGroup();
   const resetEnrollment = useResetEnrollment();
   const sendConsent = useSendConsentRequest();
@@ -560,8 +563,8 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100">
+                  <td className="px-4 py-2.5 text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover/row:opacity-100">
                       <button
                         onClick={() => setEditingId(c.id)}
                         className="text-muted-foreground hover:text-primary transition-colors"
@@ -569,18 +572,35 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
+                      {!isAllView && (
+                        <button
+                          onClick={() => {
+                            confirm({
+                              title: `Retirer ${c.first_name ?? ""} ${c.name} de ce groupe ?`,
+                              description: "Le contact ne sera pas supprimé.",
+                              confirmLabel: "Retirer",
+                              onConfirm: () => removeFromGroup.mutate({ contactId: c.id, groupId }),
+                            });
+                          }}
+                          className="text-muted-foreground hover:text-orange-500 transition-colors"
+                          title="Retirer du groupe"
+                        >
+                          <UserMinus className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           const targetGroupId = isAllView ? c.group_ids[0] : groupId;
                           if (!targetGroupId) return;
                           confirm({
-                            title: `Supprimer ${c.name} ?`,
+                            title: `Supprimer définitivement ${c.first_name ?? ""} ${c.name} ?`,
+                            description: "Le contact sera supprimé de tous les groupes.",
                             confirmLabel: "Supprimer",
                             onConfirm: () => deleteContact.mutate({ groupId: targetGroupId, contactId: c.id }),
                           });
                         }}
                         className="text-muted-foreground hover:text-destructive transition-colors"
-                        title="Supprimer"
+                        title="Supprimer le contact"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -678,10 +698,6 @@ export function ContactsPage() {
         <div className="grid grid-cols-[260px_1fr] gap-4" style={{ minHeight: "500px" }}>
           {/* ── Sidebar ─────────────────────────────── */}
           <div className="bg-background rounded-xl border border-border p-3 flex flex-col gap-1 overflow-y-auto">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-3 py-2">
-              Groupes
-            </div>
-
             {/* Virtual "Tous" group */}
             <div
               onClick={() => setSelectedGroupId("__all__")}
@@ -697,9 +713,31 @@ export function ContactsPage() {
               </span>
             </div>
 
+            {/* Default group */}
+            {groups!.filter((g) => g.is_default).map((g) => (
+              <div
+                key={g.id}
+                onClick={() => setSelectedGroupId(g.id)}
+                className={`flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                  effectiveGroupId === g.id
+                    ? "bg-accent border border-accent-foreground/10"
+                    : "hover:bg-muted/50 border border-transparent"
+                }`}
+              >
+                <span className="text-sm font-semibold truncate">{g.name}</span>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                  {g.contact_count}
+                </span>
+              </div>
+            ))}
+
             <div className="border-t border-border my-1" />
 
-            {groups!.map((g) => (
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-3 py-2">
+              Groupes
+            </div>
+
+            {groups!.filter((g) => !g.is_default).map((g) => (
               <div
                 key={g.id}
                 onClick={() => setSelectedGroupId(g.id)}

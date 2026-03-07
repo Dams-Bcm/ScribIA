@@ -706,6 +706,7 @@ export interface ContactGroup {
   description: string | null;
   metadata: Record<string, unknown> | null;
   contact_count: number;
+  is_default: boolean;
   created_at: string;
   updated_at: string;
 }

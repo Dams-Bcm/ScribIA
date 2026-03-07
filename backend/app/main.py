@@ -60,6 +60,8 @@ async def lifespan(app: FastAPI):
     _seed_sectors()
     print("[LIFESPAN] sync_tenant_modules...", flush=True)
     _sync_tenant_modules()
+    print("[LIFESPAN] ensure_default_contact_groups...", flush=True)
+    _ensure_default_contact_groups()
     print("[LIFESPAN] load_dedicated_db_cache...", flush=True)
     _load_dedicated_db_cache()
     print("[LIFESPAN] load_system_settings...", flush=True)
@@ -278,7 +280,38 @@ def _add_missing_columns():
                 """))
                 conn.execute(text("ALTER TABLE contacts DROP COLUMN group_id"))
 
+        # Add is_default column to contact_groups if missing
+        if "contact_groups" in tables:
+            cg_cols = {c["name"] for c in insp.get_columns("contact_groups")}
+            if "is_default" not in cg_cols:
+                conn.execute(text(
+                    "ALTER TABLE contact_groups ADD is_default BIT NOT NULL DEFAULT 0"
+                ))
+
         conn.commit()
+
+
+def _ensure_default_contact_groups():
+    """Ensure every tenant with the contacts module has a default group."""
+    from app.database import SessionLocal
+    from app.models.contacts import ContactGroup
+    db = SessionLocal()
+    try:
+        # Find tenants with contacts module enabled but no default group
+        tenants_with_module = (
+            db.query(TenantModule.tenant_id)
+            .filter(TenantModule.module_key == "contacts", TenantModule.enabled == True)
+            .all()
+        )
+        for (tid,) in tenants_with_module:
+            existing = db.query(ContactGroup).filter(
+                ContactGroup.tenant_id == tid, ContactGroup.is_default == True
+            ).first()
+            if not existing:
+                db.add(ContactGroup(tenant_id=tid, name="Défaut", is_default=True))
+        db.commit()
+    finally:
+        db.close()
 
 
 def _seed_super_admin():

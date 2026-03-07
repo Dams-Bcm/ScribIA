@@ -49,6 +49,7 @@ def _to_group_response(g: ContactGroup) -> ContactGroupResponse:
         description=g.description,
         metadata=_parse_json(g.metadata_),
         contact_count=len(g.contacts) if g.contacts else 0,
+        is_default=g.is_default,
         created_at=g.created_at,
         updated_at=g.updated_at,
     )
@@ -138,7 +139,7 @@ def list_groups(
         db.query(ContactGroup)
         .options(joinedload(ContactGroup.contacts))
         .filter(ContactGroup.tenant_id == user.tenant_id)
-        .order_by(ContactGroup.name)
+        .order_by(ContactGroup.is_default.desc(), ContactGroup.name)
         .all()
     )
     return [_to_group_response(g) for g in groups]
@@ -212,6 +213,8 @@ def delete_group(
     db: Session = Depends(get_db),
 ):
     g = _get_group(db, group_id, user.tenant_id)
+    if g.is_default:
+        raise HTTPException(status_code=400, detail="Impossible de supprimer le groupe par défaut")
     # Clean junction table before deleting group (MSSQL NO ACTION)
     db.execute(contact_group_members.delete().where(contact_group_members.c.group_id == group_id))
     db.delete(g)

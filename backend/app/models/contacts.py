@@ -1,6 +1,6 @@
 """Models for the Contacts module — generic contact groups and contacts."""
 
-from sqlalchemy import Column, String, Text, ForeignKey, Integer, Table
+from sqlalchemy import Column, String, Text, ForeignKey, Integer, Table, Boolean
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base, UUIDMixin, TimestampMixin
@@ -23,6 +23,7 @@ class ContactGroup(UUIDMixin, TimestampMixin, Base):
     name        = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     metadata_   = Column("metadata", Text, nullable=True)  # JSON — sector-specific (total_tantiemes, etc.)
+    is_default  = Column(Boolean, nullable=False, server_default="0")
 
     contacts = relationship(
         "Contact",

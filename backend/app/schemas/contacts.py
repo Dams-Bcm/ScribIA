@@ -40,6 +40,7 @@ class ContactGroupResponse(BaseModel):
     description: str | None
     metadata: dict | None
     contact_count: int = 0
+    is_default: bool = False
     created_at: datetime
     updated_at: datetime
 
