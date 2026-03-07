@@ -43,7 +43,7 @@ export function TranscriptionDiarisationPage() {
         setUploadError(err instanceof Error ? err.message : "Une erreur est survenue");
       }
     },
-    [qc, startProcessing],
+    [qc],
   );
 
   const handleProcess = useCallback(
