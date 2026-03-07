@@ -12,12 +12,14 @@ import { UploadArea } from "@/components/transcription/UploadArea";
 import { AudioRecorder } from "@/components/transcription/AudioRecorder";
 import { JobList } from "@/components/transcription/JobList";
 import { TranscriptionJobView } from "@/components/transcription/TranscriptionJobView";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export function DicteePage() {
   const qc = useQueryClient();
   const { data: jobs = [], isLoading } = useTranscriptionJobs();
   const startProcessing = useStartProcessing();
   const deleteJob = useDeleteJob();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -59,15 +61,22 @@ export function DicteePage() {
   );
 
   const handleDelete = useCallback(
-    async (jobId: string) => {
-      try {
-        await deleteJob.mutateAsync(jobId);
-        if (selectedJobId === jobId) setSelectedJobId(null);
-      } catch {
-        // error handled
-      }
+    (jobId: string) => {
+      confirm({
+        title: "Supprimer cette transcription ?",
+        description: "Cette action est irréversible.",
+        confirmLabel: "Supprimer",
+        onConfirm: async () => {
+          try {
+            await deleteJob.mutateAsync(jobId);
+            if (selectedJobId === jobId) setSelectedJobId(null);
+          } catch {
+            // error handled
+          }
+        },
+      });
     },
-    [deleteJob, selectedJobId],
+    [deleteJob, selectedJobId, confirm],
   );
 
   // ── Detail view ─────────────────────────────────────────────────────
@@ -171,6 +180,7 @@ export function DicteePage() {
           />
         )}
       </div>
+      {confirmDialog}
     </div>
   );
 }

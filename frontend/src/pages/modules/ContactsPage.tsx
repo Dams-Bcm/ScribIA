@@ -813,31 +813,13 @@ export function ContactsPage() {
               </span>
             </div>
 
-            {/* Default group */}
-            {groups!.filter((g) => g.is_default).map((g) => (
-              <div
-                key={g.id}
-                onClick={() => setSelectedGroupId(g.id)}
-                className={`flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
-                  effectiveGroupId === g.id
-                    ? "bg-accent border border-accent-foreground/10"
-                    : "hover:bg-muted/50 border border-transparent"
-                }`}
-              >
-                <span className="text-sm font-semibold truncate">{g.name}</span>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                  {g.contact_count}
-                </span>
-              </div>
-            ))}
-
             <div className="border-t border-border my-1" />
 
             <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-3 py-2">
               Groupes
             </div>
 
-            {groups!.filter((g) => !g.is_default).map((g) => (
+            {groups!.map((g) => (
               <div
                 key={g.id}
                 onClick={() => setSelectedGroupId(g.id)}
@@ -852,6 +834,7 @@ export function ContactsPage() {
                   <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                     {g.contact_count}
                   </span>
+                  {!g.is_default && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -866,6 +849,7 @@ export function ContactsPage() {
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
+                  )}
                 </div>
               </div>
             ))}
