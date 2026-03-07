@@ -236,17 +236,29 @@ def auto_detect_after_transcription(job_id: str, db: Session):
     # If collective consent detected, update pending_oral attendees → accepted_oral
     if result.get("detected") and result.get("detection_type") == "collective_consent":
         try:
-            attendees = json.loads(job.attendees) if job.attendees else []
+            from app.schemas.consent import AttendeeEntry
+            raw_attendees = json.loads(job.attendees) if job.attendees else []
+            attendees = [AttendeeEntry(**item) for item in raw_attendees]
             updated = False
             for att in attendees:
-                if att.get("status") == "pending_oral":
-                    att["status"] = "accepted_oral"
+                if att.status == "pending_oral":
+                    att.status = "accepted_oral"
+                    att.evidence_type = "oral_auto"
                     updated = True
             if updated:
-                job.attendees = json.dumps(attendees)
-                logger.info(f"[CONSENT] Updated pending_oral attendees to accepted_oral for job {job_id}")
-        except (json.JSONDecodeError, TypeError):
-            logger.warning(f"[CONSENT] Could not parse attendees JSON for job {job_id}")
+                job.attendees = json.dumps([a.model_dump() for a in attendees])
+                # Recompute recording_validity
+                statuses = {a.status for a in attendees}
+                if "refused" in statuses or "withdrawn" in statuses:
+                    job.recording_validity = "invalidated"
+                elif all(s in ("accepted_email", "accepted_oral") for s in statuses):
+                    job.recording_validity = "valid"
+                else:
+                    job.recording_validity = "pending"
+                logger.info(f"[CONSENT] Updated pending_oral attendees to accepted_oral for job {job_id}, "
+                            f"recording_validity={job.recording_validity}")
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning(f"[CONSENT] Could not parse attendees JSON for job {job_id}: {e}")
 
     db.commit()
 
