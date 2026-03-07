@@ -3,6 +3,7 @@ import {
   useTenants,
   useCreateTenant,
   useDeleteTenant,
+  useUpdateTenant,
   useUpdateTenantModules,
   useProvisionTenant,
   useProvisionDedicatedDb,
@@ -10,12 +11,13 @@ import {
 } from "../../api/hooks/useTenants";
 import { AVAILABLE_MODULES, type Tenant, type ProvisionResult } from "../../api/types";
 import { useSectors } from "../../api/hooks/useSectors";
-import { Building2, Plus, Trash2, X, CheckCircle2, Sparkles, Database, Loader2 } from "lucide-react";
+import { Building2, Plus, Trash2, X, CheckCircle2, Sparkles, Database, Loader2, Save } from "lucide-react";
 
 export function TenantsPage() {
   const { data: tenants = [], isLoading } = useTenants();
   const createTenant = useCreateTenant();
   const deleteTenant = useDeleteTenant();
+  const updateTenant = useUpdateTenant();
   const updateModules = useUpdateTenantModules();
   const provisionTenant = useProvisionTenant();
   const provisionDb = useProvisionDedicatedDb();
@@ -165,6 +167,9 @@ export function TenantsPage() {
                   );
                 })}
               </div>
+
+              {/* Prompt Whisper */}
+              <WhisperPromptEditor tenant={selected} onSave={(prompt) => updateTenant.mutate({ id: selected.id, data: { whisper_initial_prompt: prompt } })} saving={updateTenant.isPending} />
 
               {/* Base de données dédiée */}
               <div className="mt-6 pt-6 border-t border-border">
@@ -400,6 +405,45 @@ export function TenantsPage() {
             )}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function WhisperPromptEditor({ tenant, onSave, saving }: { tenant: Tenant; onSave: (prompt: string) => void; saving: boolean }) {
+  const [draft, setDraft] = useState(tenant.whisper_initial_prompt ?? "");
+  const [prevId, setPrevId] = useState(tenant.id);
+
+  // Reset draft when switching tenants
+  if (tenant.id !== prevId) {
+    setPrevId(tenant.id);
+    setDraft(tenant.whisper_initial_prompt ?? "");
+  }
+
+  const hasChanges = draft !== (tenant.whisper_initial_prompt ?? "");
+
+  return (
+    <div className="mt-6 pt-6 border-t border-border">
+      <h3 className="text-sm font-semibold mb-1">Vocabulaire Whisper</h3>
+      <p className="text-xs text-muted-foreground mb-3">
+        Noms propres, acronymes et termes métier pour améliorer la transcription.
+      </p>
+      <textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        rows={3}
+        className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+        placeholder="Ex : Jean Dupont, CHSCT, conseil syndical, ravalement de façade…"
+      />
+      {hasChanges && (
+        <button
+          onClick={() => onSave(draft)}
+          disabled={saving}
+          className="mt-2 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+        >
+          <Save className="w-3.5 h-3.5" />
+          {saving ? "Enregistrement…" : "Enregistrer"}
+        </button>
       )}
     </div>
   );

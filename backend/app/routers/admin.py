@@ -114,6 +114,8 @@ def update_tenant(
         tenant.is_large = body.is_large
     if body.is_active is not None:
         tenant.is_active = body.is_active
+    if body.whisper_initial_prompt is not None:
+        tenant.whisper_initial_prompt = body.whisper_initial_prompt or None
 
     db.commit()
     db.refresh(tenant)

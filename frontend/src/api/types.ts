@@ -60,6 +60,7 @@ export interface Tenant {
   is_active: boolean;
   db_mode: "shared" | "dedicated";
   dedicated_db_name: string | null;
+  whisper_initial_prompt: string | null;
   modules: TenantModule[];
 }
 
@@ -86,6 +87,7 @@ export interface TenantUpdate {
   parent_id?: string | null;
   is_large?: boolean;
   is_active?: boolean;
+  whisper_initial_prompt?: string | null;
 }
 
 // ── Modules ──────────────────────────────────────────────────────────────────

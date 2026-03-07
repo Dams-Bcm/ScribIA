@@ -3,51 +3,51 @@ import { useAuth } from "../stores/auth";
 import { ModuleGuard } from "../components/ModuleGuard";
 import { Mic, FileText, FolderOpen, Scale, Sparkles } from "lucide-react";
 
+const modules = [
+  {
+    key: "transcription",
+    label: "Transcription simple",
+    description: "Convertissez vos fichiers audio en texte",
+    icon: Mic,
+    color: "bg-blue-50 text-blue-600",
+    to: "/transcription",
+  },
+  {
+    key: "transcription_diarisation",
+    label: "Transcription + Diarisation",
+    description: "Transcription avec identification des intervenants",
+    icon: FileText,
+    color: "bg-purple-50 text-purple-600",
+    to: "/transcription-diarisation",
+  },
+  {
+    key: "preparatory_phases",
+    label: "Phase(s) préparatoire(s)",
+    description: "Préparation de documents avant convocation",
+    icon: FolderOpen,
+    color: "bg-orange-50 text-orange-600",
+    to: "/phases-preparatoires",
+  },
+  {
+    key: "legal_compliance",
+    label: "Conformité légale",
+    description: "Vérification et suivi de conformité",
+    icon: Scale,
+    color: "bg-amber-50 text-amber-600",
+    to: "/conformite",
+  },
+  {
+    key: "ai_documents",
+    label: "Génération de documents IA",
+    description: "Résumés, procès-verbaux et documents générés par IA",
+    icon: Sparkles,
+    color: "bg-emerald-50 text-emerald-600",
+    to: "/documents-ia",
+  },
+];
+
 export function DashboardPage() {
   const { user } = useAuth();
-
-  const modules = [
-    {
-      key: "transcription",
-      label: "Transcription simple",
-      description: "Convertissez vos fichiers audio en texte",
-      icon: Mic,
-      color: "bg-blue-50 text-blue-600",
-      to: "/transcription",
-    },
-    {
-      key: "transcription_diarisation",
-      label: "Transcription + Diarisation",
-      description: "Transcription avec identification des intervenants",
-      icon: FileText,
-      color: "bg-purple-50 text-purple-600",
-      to: "/transcription-diarisation",
-    },
-    {
-      key: "preparatory_phases",
-      label: "Phase(s) préparatoire(s)",
-      description: "Préparation de documents avant convocation",
-      icon: FolderOpen,
-      color: "bg-orange-50 text-orange-600",
-      to: "/phases-preparatoires",
-    },
-    {
-      key: "legal_compliance",
-      label: "Conformité légale",
-      description: "Vérification et suivi de conformité",
-      icon: Scale,
-      color: "bg-amber-50 text-amber-600",
-      to: "/conformite",
-    },
-    {
-      key: "ai_documents",
-      label: "Génération de documents IA",
-      description: "Résumés, procès-verbaux et documents générés par IA",
-      icon: Sparkles,
-      color: "bg-emerald-50 text-emerald-600",
-      to: "/documents-ia",
-    },
-  ];
 
   return (
     <div>

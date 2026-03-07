@@ -125,6 +125,10 @@ def _add_missing_columns():
             conn.execute(text(
                 "ALTER TABLE tenants ADD dedicated_db_name VARCHAR(100) NULL"
             ))
+        if "whisper_initial_prompt" not in tenant_cols:
+            conn.execute(text(
+                "ALTER TABLE tenants ADD whisper_initial_prompt NVARCHAR(MAX) NULL"
+            ))
 
         # procedure_templates: sector + make tenant_id nullable
         pt_cols = {c["name"] for c in insp.get_columns("procedure_templates")}

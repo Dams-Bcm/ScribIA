@@ -23,7 +23,7 @@ import {
   Moon,
   Sun,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { cn } from "../lib/utils";
 import { AnnouncementPopup } from "./AnnouncementPopup";
 
@@ -64,7 +64,7 @@ export function Layout() {
 
   const currentTheme = THEMES.find((t) => t.key === theme)!;
 
-  const navItems: NavItem[] = [
+  const navItems: NavItem[] = useMemo(() => [
     // ── Général ──
     { to: "/", label: "Tableau de bord", icon: LayoutDashboard, visible: true, section: "Général" },
 
@@ -90,10 +90,10 @@ export function Layout() {
 
     // ── Compte ──
     { to: "/privacy", label: "Confidentialité", icon: Lock, visible: true, section: "Compte" },
-  ];
+  ], [hasModule, isSuperAdmin]);
 
-  const visibleItems = navItems.filter((item) => item.visible);
-  const sections = [...new Set(visibleItems.map((i) => i.section))];
+  const visibleItems = useMemo(() => navItems.filter((item) => item.visible), [navItems]);
+  const sections = useMemo(() => [...new Set(visibleItems.map((i) => i.section))], [visibleItems]);
 
   return (
     <div className="min-h-screen bg-muted/30">

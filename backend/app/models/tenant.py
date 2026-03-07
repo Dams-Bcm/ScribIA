@@ -32,6 +32,7 @@ class Tenant(UUIDMixin, TimestampMixin, Base):
     is_active   = Column(Boolean, nullable=False, default=True)
     db_mode     = Column(String(20), nullable=False, default="shared")   # 'shared' | 'dedicated'
     dedicated_db_name = Column(String(100), nullable=True)               # e.g. 'scribia_tenant_abc123'
+    whisper_initial_prompt = Column(Text, nullable=True)                  # vocabulaire métier pour Whisper
 
     # Relationships
     parent           = relationship("Tenant", remote_side="Tenant.id", backref="children")

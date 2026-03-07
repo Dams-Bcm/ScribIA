@@ -20,6 +20,7 @@ class TenantUpdate(BaseModel):
     parent_id: Optional[str] = None
     is_large: Optional[bool] = None
     is_active: Optional[bool] = None
+    whisper_initial_prompt: Optional[str] = None
 
 
 class TenantModuleUpdate(BaseModel):
@@ -45,6 +46,7 @@ class TenantResponse(BaseModel):
     is_active: bool
     db_mode: str = "shared"
     dedicated_db_name: Optional[str] = None
+    whisper_initial_prompt: Optional[str] = None
     modules: list[ModuleResponse] = []
 
     model_config = {"from_attributes": True}

@@ -21,7 +21,7 @@ from app.models.transcription import (
 )
 from app.services.event_bus import event_bus
 from app.services.transcription import (
-    _gpu_semaphore, _update_job,
+    _gpu_semaphore, _update_job, _get_tenant_prompt,
     convert_to_wav, get_audio_duration,
     get_whisper_model, unload_whisper, run_transcription,
 )
@@ -667,9 +667,10 @@ def process_diarisation_job(job_id: str):
                     progress=40,
                     progress_message="Transcription en cours...")
 
+        tenant_prompt = _get_tenant_prompt(db, job.tenant_id)
         try:
             segments, words = run_transcription(
-                wav_path, language=job.language, word_timestamps=True)
+                wav_path, language=job.language, word_timestamps=True, initial_prompt=tenant_prompt)
         except Exception as e:
             _update_job(db, job,
                         status=TranscriptionJobStatus.ERROR,

@@ -14,6 +14,7 @@ from typing import Optional
 
 from app.config import settings
 from app.database import SessionLocal
+from app.models.tenant import Tenant
 from app.models.transcription import TranscriptionJob, TranscriptionJobStatus, TranscriptionSegment
 from app.services.event_bus import event_bus
 
@@ -128,9 +129,15 @@ def get_audio_duration(audio_path: Path) -> float:
         return 0.0
 
 
+def _get_tenant_prompt(db, tenant_id: str) -> str | None:
+    """Return tenant-specific Whisper initial prompt, or None."""
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    return tenant.whisper_initial_prompt if tenant else None
+
+
 # ── Transcription runner ─────────────────────────────────────────────────────
 
-def run_transcription(audio_path: Path, language: str = "fr", word_timestamps: bool = False):
+def run_transcription(audio_path: Path, language: str = "fr", word_timestamps: bool = False, initial_prompt: str | None = None):
     """Run faster-whisper on an audio file.
 
     Returns list of (start, end, text).
@@ -156,8 +163,10 @@ def run_transcription(audio_path: Path, language: str = "fr", word_timestamps: b
         temperature=temperature,
         condition_on_previous_text=settings.whisper_condition_on_previous_text,
     )
-    if settings.whisper_initial_prompt:
-        kwargs["initial_prompt"] = settings.whisper_initial_prompt
+    # Tenant prompt takes priority, then global config
+    prompt = initial_prompt or settings.whisper_initial_prompt
+    if prompt:
+        kwargs["initial_prompt"] = prompt
 
     segments_gen, info = model.transcribe(str(audio_path), **kwargs)
 
@@ -254,8 +263,9 @@ def process_transcription_job(job_id: str):
                     progress=30,
                     progress_message="Transcription en cours...")
 
+        tenant_prompt = _get_tenant_prompt(db, job.tenant_id)
         try:
-            segments = run_transcription(wav_path, language=job.language)
+            segments = run_transcription(wav_path, language=job.language, initial_prompt=tenant_prompt)
         except Exception as e:
             _update_job(db, job,
                         status=TranscriptionJobStatus.ERROR,
@@ -377,8 +387,9 @@ def process_partial_analysis(job_id: str):
                     progress=40,
                     progress_message="Analyse partielle en cours (~60s)...")
 
+        tenant_prompt = _get_tenant_prompt(db, job.tenant_id)
         try:
-            segments = run_transcription(partial_wav, language=job.language)
+            segments = run_transcription(partial_wav, language=job.language, initial_prompt=tenant_prompt)
         except Exception as e:
             _update_job(db, job,
                         status=TranscriptionJobStatus.ERROR,
