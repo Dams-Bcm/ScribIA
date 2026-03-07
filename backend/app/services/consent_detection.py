@@ -48,6 +48,7 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
     from app.services.ai_config import get_model_for_usage
 
     model = get_model_for_usage("consent_detection")
+    logger.info(f"[CONSENT] Using model '{model}' for job {job.id}")
 
     system_prompt = (
         "Tu es un assistant d'analyse de transcriptions de reunions.\n"
