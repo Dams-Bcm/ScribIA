@@ -81,9 +81,25 @@ function AddContactForm({ groupId, onDone }: { groupId: string; onDone: () => vo
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("");
+  const [errors, setErrors] = useState<{ name?: string; email?: string }>({});
+
+  function validate() {
+    const errs: { name?: string; email?: string } = {};
+    if (!name.trim()) {
+      errs.name = "Le nom est requis";
+    } else if (name.trim().length < 2) {
+      errs.name = "Le nom doit contenir au moins 2 caractères";
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errs.email = "Format d'email invalide";
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!validate()) return;
     const body: ContactCreate & { groupId: string } = {
       groupId,
       name,
@@ -91,20 +107,26 @@ function AddContactForm({ groupId, onDone }: { groupId: string; onDone: () => vo
       phone: phone || null,
       role: role || null,
     };
-    add.mutate(body, { onSuccess: () => { setName(""); setEmail(""); setPhone(""); setRole(""); } });
+    add.mutate(body, { onSuccess: () => { setName(""); setEmail(""); setPhone(""); setRole(""); setErrors({}); } });
   }
 
   return (
     <form onSubmit={handleSubmit} className="bg-muted/50 rounded-lg p-4 space-y-3">
       <h4 className="text-sm font-semibold">Ajouter un contact</h4>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <input className="px-3 py-2 border border-input rounded-lg text-sm" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom *" required />
-        <input className="px-3 py-2 border border-input rounded-lg text-sm" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" />
+        <div>
+          <input className={`w-full px-3 py-2 border rounded-lg text-sm ${errors.name ? "border-destructive" : "border-input"}`} value={name} onChange={(e) => { setName(e.target.value); if (errors.name) setErrors((p) => ({ ...p, name: undefined })); }} placeholder="Nom *" />
+          {errors.name && <p className="text-xs text-destructive mt-1">{errors.name}</p>}
+        </div>
+        <div>
+          <input className={`w-full px-3 py-2 border rounded-lg text-sm ${errors.email ? "border-destructive" : "border-input"}`} value={email} onChange={(e) => { setEmail(e.target.value); if (errors.email) setErrors((p) => ({ ...p, email: undefined })); }} placeholder="Email" />
+          {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
+        </div>
         <input className="px-3 py-2 border border-input rounded-lg text-sm" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Téléphone" />
         <input className="px-3 py-2 border border-input rounded-lg text-sm" value={role} onChange={(e) => setRole(e.target.value)} placeholder="Rôle (ex : Copropriétaire)" />
       </div>
       <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={!name.trim() || add.isPending}>
+        <Button type="submit" size="sm" disabled={add.isPending}>
           {add.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Ajouter"}
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={onDone}>

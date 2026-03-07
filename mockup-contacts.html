@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Contacts ScribIA v2</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #1a2138;
+    --bg-card: rgba(36, 48, 77, 0.7);
+    --bg-card-solid: #24304d;
+    --bg-input: rgba(22, 30, 52, 0.6);
+    --fg: #e4e9f2;
+    --fg-muted: #8f9bb3;
+    --border: rgba(101, 117, 148, 0.25);
+    --primary: #7659ff;
+    --primary-hover: #6043e0;
+    --destructive: #ff3d71;
+    --green: #4ade80;
+    --green-bg: rgba(16, 185, 129, 0.15);
+    --yellow: #fbbf24;
+    --yellow-bg: rgba(245, 158, 11, 0.15);
+    --purple: #a78bfa;
+    --purple-bg: rgba(147, 51, 234, 0.15);
+    --red-bg: rgba(239, 68, 68, 0.15);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #1a2138 0%, #151a30 50%, #0d1117 100%);
+    background-attachment: fixed;
+    color: var(--fg);
+    min-height: 100vh;
+    padding: 32px 40px;
+  }
+
+  /* ── Layout ─────────────────────────────────────── */
+  .page { max-width: 1200px; margin: 0 auto; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .page-header h1 { font-size: 1.5rem; font-weight: 700; }
+  .page-header p { font-size: 0.875rem; color: var(--fg-muted); margin-top: 2px; }
+
+  /* ── Master-detail layout ───────────────────────── */
+  .master-detail {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+    min-height: 500px;
+  }
+
+  /* ── Sidebar (group list) ───────────────────────── */
+  .sidebar {
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sidebar-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fg-muted);
+    padding: 8px 12px 4px;
+  }
+  .group-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1px solid transparent;
+  }
+  .group-item:hover { background: rgba(118, 89, 255, 0.08); }
+  .group-item.active {
+    background: rgba(118, 89, 255, 0.15);
+    border-color: rgba(118, 89, 255, 0.3);
+  }
+  .group-item .name { font-size: 0.875rem; font-weight: 500; }
+  .group-item .count {
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+    background: rgba(101, 117, 148, 0.2);
+    padding: 2px 8px;
+    border-radius: 99px;
+  }
+  .group-item .actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .group-item:hover .actions { opacity: 1; }
+  .sidebar-add {
+    margin-top: 4px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px dashed var(--border);
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .sidebar-add:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(118, 89, 255, 0.05);
+  }
+
+  /* ── Detail panel ───────────────────────────────── */
+  .detail {
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+  }
+  .detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-header h2 { font-size: 1.1rem; font-weight: 600; }
+  .detail-header .meta { font-size: 0.8rem; color: var(--fg-muted); margin-top: 2px; }
+  .detail-actions { display: flex; gap: 8px; }
+
+  /* ── Search + inline add ────────────────────────── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-box {
+    flex: 1;
+    position: relative;
+  }
+  .search-box input {
+    width: 100%;
+    padding: 8px 12px 8px 36px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--fg);
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-box input:focus { border-color: var(--primary); }
+  .search-box .icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--fg-muted);
+    font-size: 0.85rem;
+  }
+
+  /* ── Inline add row ─────────────────────────────── */
+  .inline-add {
+    display: grid;
+    grid-template-columns: 1.5fr 2fr 1fr 1fr auto;
+    gap: 8px;
+    padding: 10px 20px;
+    background: rgba(118, 89, 255, 0.05);
+    border-bottom: 1px solid var(--border);
+    align-items: start;
+  }
+  .inline-add input {
+    padding: 7px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg);
+    font-size: 0.8rem;
+    outline: none;
+  }
+  .inline-add input:focus { border-color: var(--primary); }
+  .inline-add input.error { border-color: var(--destructive); }
+  .field-error { font-size: 0.7rem; color: var(--destructive); margin-top: 2px; }
+
+  /* ── Table ──────────────────────────────────────── */
+  .contact-table {
+    flex: 1;
+    overflow-y: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  thead th {
+    text-align: left;
+    padding: 10px 16px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    position: sticky;
+    top: 0;
+    background: var(--bg-card-solid);
+    z-index: 1;
+  }
+  tbody tr {
+    border-top: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: rgba(118, 89, 255, 0.05); }
+  td { padding: 10px 16px; vertical-align: middle; }
+  td.name { font-weight: 500; }
+  td.muted { color: var(--fg-muted); }
+
+  /* ── Badges ─────────────────────────────────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .badge-green { background: var(--green-bg); color: var(--green); }
+  .badge-yellow { background: var(--yellow-bg); color: var(--yellow); }
+  .badge-purple { background: var(--purple-bg); color: var(--purple); }
+  .badge-red { background: var(--red-bg); color: var(--destructive); }
+  .badge-empty {}
+
+  /* ── Buttons ────────────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--fg); }
+  .btn-outline:hover { background: rgba(101, 117, 148, 0.15); }
+  .btn-ghost { background: transparent; color: var(--fg-muted); padding: 6px; }
+  .btn-ghost:hover { color: var(--fg); background: rgba(101, 117, 148, 0.15); border-radius: 6px; }
+  .btn-ghost.danger:hover { color: var(--destructive); }
+  .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
+  .btn-icon { padding: 6px; }
+
+  /* ── Action icons in table ──────────────────────── */
+  .row-actions {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  tr:hover .row-actions { opacity: 1; }
+
+  /* ── Stats bar ──────────────────────────────────── */
+  .stats-bar {
+    display: flex;
+    gap: 24px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+  }
+  .stat-item strong { color: var(--fg); font-weight: 600; }
+
+  /* ── Responsive ─────────────────────────────────── */
+  @media (max-width: 768px) {
+    .master-detail { grid-template-columns: 1fr; }
+    .sidebar { flex-direction: row; overflow-x: auto; gap: 8px; padding: 8px; }
+    .sidebar-title { display: none; }
+    .group-item { flex-shrink: 0; }
+    .inline-add { grid-template-columns: 1fr 1fr; }
+    td.hide-mobile, th.hide-mobile { display: none; }
+  }
+
+  /* ── Annotations ────────────────────────────────── */
+  .annotation {
+    position: relative;
+    outline: 2px dashed rgba(118, 89, 255, 0.5);
+    outline-offset: 4px;
+  }
+  .annotation::after {
+    content: attr(data-note);
+    position: absolute;
+    top: -22px;
+    right: 0;
+    font-size: 0.65rem;
+    background: var(--primary);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 10;
+  }
+  .note {
+    margin-top: 32px;
+    padding: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .note h3 { font-size: 1rem; font-weight: 600; margin-bottom: 12px; }
+  .note ul { padding-left: 20px; font-size: 0.85rem; color: var(--fg-muted); line-height: 1.8; }
+  .note li strong { color: var(--fg); }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ── Page Header ──────────────────────────────── -->
+  <div class="page-header">
+    <div>
+      <h1>Contacts</h1>
+      <p>Gerez vos groupes et contacts</p>
+    </div>
+  </div>
+
+  <!-- ── Master-Detail Layout ─────────────────────── -->
+  <div class="master-detail">
+
+    <!-- ── Sidebar: Groups ──────────────────────── -->
+    <div class="sidebar" data-note="Sidebar groupes - toujours visible">
+      <div class="sidebar-title">Groupes</div>
+
+      <div class="group-item">
+        <div>
+          <div class="name">Commission urbanisme</div>
+        </div>
+        <span class="count">5</span>
+      </div>
+
+      <div class="group-item active">
+        <div>
+          <div class="name">Agents Administratifs</div>
+        </div>
+        <span class="count">10</span>
+      </div>
+
+      <div class="group-item">
+        <div>
+          <div class="name">Conseil Municipal</div>
+        </div>
+        <span class="count">23</span>
+      </div>
+
+      <div class="group-item">
+        <div>
+          <div class="name">Direction Generale</div>
+        </div>
+        <span class="count">4</span>
+      </div>
+
+      <div class="sidebar-add">+ Nouveau groupe</div>
+    </div>
+
+    <!-- ── Detail: Contact list ─────────────────── -->
+    <div class="detail">
+
+      <!-- Header -->
+      <div class="detail-header">
+        <div>
+          <h2>Agents Administratifs</h2>
+          <div class="meta">10 contacts &middot; 7 consentements &middot; 5 enrolles</div>
+        </div>
+        <div class="detail-actions">
+          <button class="btn btn-outline btn-sm" title="Envoyer consentement aux contacts sans consentement">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>
+            Envoyer consentement
+          </button>
+          <button class="btn btn-primary btn-sm" id="toggleAdd">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+            Ajouter
+          </button>
+        </div>
+      </div>
+
+      <!-- Search bar -->
+      <div class="toolbar">
+        <div class="search-box">
+          <span class="icon">&#128269;</span>
+          <input type="text" placeholder="Rechercher un contact...">
+        </div>
+      </div>
+
+      <!-- Inline add row (shown/hidden) -->
+      <div class="inline-add" id="addRow" style="display: none;">
+        <div>
+          <input placeholder="Nom *" autofocus>
+          <!-- <div class="field-error">Le nom est requis</div> -->
+        </div>
+        <div>
+          <input placeholder="Email" type="email">
+          <!-- <div class="field-error">Format d'email invalide</div> -->
+        </div>
+        <input placeholder="Telephone">
+        <input placeholder="Role">
+        <div style="display:flex; gap:4px; align-items: start; padding-top: 2px;">
+          <button class="btn btn-primary btn-sm">Ajouter</button>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('addRow').style.display='none'">&#10005;</button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="contact-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th>Email</th>
+              <th class="hide-mobile">Telephone</th>
+              <th class="hide-mobile">Role</th>
+              <th>Consentement</th>
+              <th class="hide-mobile">Enrollment</th>
+              <th style="width:60px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="name">Cedric</td>
+              <td class="muted"></td>
+              <td class="muted hide-mobile"></td>
+              <td class="muted hide-mobile"></td>
+              <td><span class="badge badge-green">&#10003; Accepte (oral)</span></td>
+              <td class="hide-mobile"></td>
+              <td>
+                <div class="row-actions">
+                  <button class="btn-ghost btn-icon" title="Envoyer consentement"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4z"/></svg></button>
+                  <button class="btn-ghost btn-icon danger" title="Supprimer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="name">Damien</td>
+              <td class="muted">dc40@hotmail.com</td>
+              <td class="muted hide-mobile">06 12 34 56 78</td>
+              <td class="muted hide-mobile">Directeur</td>
+              <td><span class="badge badge-green">&#10003; Accepte</span></td>
+              <td class="hide-mobile"><span class="badge badge-purple">Enrolle</span></td>
+              <td>
+                <div class="row-actions">
+                  <button class="btn-ghost btn-icon danger" title="Supprimer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="name">Elodie</td>
+              <td class="muted">elodie@mairie.fr</td>
+              <td class="muted hide-mobile"></td>
+              <td class="muted hide-mobile">Secretaire</td>
+              <td><span class="badge badge-green">&#10003; Accepte (oral)</span></td>
+              <td class="hide-mobile"></td>
+              <td>
+                <div class="row-actions">
+                  <button class="btn-ghost btn-icon danger" title="Supprimer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="name">Gaelle</td>
+              <td class="muted">gaelle@mairie.fr</td>
+              <td class="muted hide-mobile"></td>
+              <td class="muted hide-mobile"></td>
+              <td><span class="badge badge-yellow">&#9993; Envoye</span></td>
+              <td class="hide-mobile"><span class="badge badge-yellow">En attente</span></td>
+              <td>
+                <div class="row-actions">
+                  <button class="btn-ghost btn-icon danger" title="Supprimer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="name">Rayan</td>
+              <td class="muted"></td>
+              <td class="muted hide-mobile">07 98 76 54 32</td>
+              <td class="muted hide-mobile"></td>
+              <td></td>
+              <td class="hide-mobile"></td>
+              <td>
+                <div class="row-actions">
+                  <button class="btn-ghost btn-icon" title="Envoyer consentement"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4z"/></svg></button>
+                  <button class="btn-ghost btn-icon danger" title="Supprimer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="name">Sylvain</td>
+              <td class="muted">sylvain@mairie.fr</td>
+              <td class="muted hide-mobile"></td>
+              <td class="muted hide-mobile">DGS</td>
+              <td><span class="badge badge-green">&#10003; Accepte (oral)</span></td>
+              <td class="hide-mobile"><span class="badge badge-purple">Enrolle</span></td>
+              <td>
+                <div class="row-actions">
+                  <button class="btn-ghost btn-icon danger" title="Supprimer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="name">Sylvie</td>
+              <td class="muted">sylvie@mairie.fr</td>
+              <td class="muted hide-mobile">06 11 22 33 44</td>
+              <td class="muted hide-mobile">Comptable</td>
+              <td><span class="badge badge-red">&#10007; Refuse</span></td>
+              <td class="hide-mobile"></td>
+              <td>
+                <div class="row-actions">
+                  <button class="btn-ghost btn-icon danger" title="Supprimer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="name">terter</td>
+              <td class="muted"></td>
+              <td class="muted hide-mobile"></td>
+              <td class="muted hide-mobile"></td>
+              <td></td>
+              <td class="hide-mobile"></td>
+              <td>
+                <div class="row-actions">
+                  <button class="btn-ghost btn-icon danger" title="Supprimer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Stats bar -->
+      <div class="stats-bar">
+        <span><strong>10</strong> contacts</span>
+        <span><strong>7</strong> consentements</span>
+        <span><strong>5</strong> enrolles</span>
+        <span><strong>1</strong> refuse</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Notes d'amelioration ─────────────────────── -->
+  <div class="note">
+    <h3>Ameliorations par rapport a la version actuelle</h3>
+    <ul>
+      <li><strong>Layout master-detail</strong> : les groupes restent visibles dans une sidebar a gauche, pas besoin de revenir en arriere pour changer de groupe.</li>
+      <li><strong>Barre de recherche</strong> : filtre rapide dans le groupe actif (nom, email, role).</li>
+      <li><strong>Ajout inline</strong> : le formulaire d'ajout s'affiche en haut du tableau au lieu d'un bloc separe. Reste visible pour enchainer les ajouts.</li>
+      <li><strong>Stats en pied de tableau</strong> : resume rapide (nb contacts, consentements, enrolles, refuses).</li>
+      <li><strong>Actions au survol</strong> : les boutons supprimer/envoyer n'apparaissent qu'au hover, plus propre.</li>
+      <li><strong>Sidebar responsive</strong> : sur mobile, les groupes passent en bande horizontale scrollable.</li>
+      <li><strong>Ajout de groupe</strong> : bouton "+ Nouveau groupe" integre dans la sidebar (pas un bouton isole en haut a droite).</li>
+      <li><strong>Meta-info dans le header detail</strong> : "10 contacts - 7 consentements - 5 enrolles" pour avoir un apercu sans scanner tout le tableau.</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+  document.getElementById('toggleAdd').addEventListener('click', () => {
+    const row = document.getElementById('addRow');
+    row.style.display = row.style.display === 'none' ? 'grid' : 'none';
+    if (row.style.display === 'grid') row.querySelector('input').focus();
+  });
+
+  // Simulate group click
+  document.querySelectorAll('.group-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.group-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
