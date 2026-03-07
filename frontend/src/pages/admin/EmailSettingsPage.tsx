@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Save, Loader2, Check, SendHorizonal, CheckCircle2, XCircle, Mail } from "lucide-react";
+import { Save, Loader2, Check, SendHorizonal, CheckCircle2, XCircle } from "lucide-react";
 
 interface EmailSetting {
   key: string;
