@@ -84,6 +84,49 @@ def _get_group(db: Session, group_id: str, tenant_id: str) -> ContactGroup:
     return g
 
 
+# ── All contacts (virtual "Tous" group) ───────────────────────────────────────
+
+@router.get("/all", response_model=ContactGroupDetailResponse)
+def list_all_contacts(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return all contacts across all groups for this tenant."""
+    groups = (
+        db.query(ContactGroup)
+        .options(joinedload(ContactGroup.contacts))
+        .filter(ContactGroup.tenant_id == user.tenant_id)
+        .all()
+    )
+    all_contacts: list[Contact] = []
+    for g in groups:
+        all_contacts.extend(g.contacts or [])
+
+    contact_ids = [c.id for c in all_contacts]
+    profile_map: dict[str, SpeakerProfile] = {}
+    if contact_ids:
+        profiles = db.query(SpeakerProfile).filter(
+            SpeakerProfile.contact_id.in_(contact_ids),
+            SpeakerProfile.tenant_id == user.tenant_id,
+        ).all()
+        for p in profiles:
+            profile_map[p.contact_id] = p
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    total = len(all_contacts)
+    return ContactGroupDetailResponse(
+        id="__all__",
+        name="Tous",
+        description=None,
+        metadata=None,
+        contact_count=total,
+        created_at=now,
+        updated_at=now,
+        contacts=[_to_contact_response(c, profile_map.get(c.id)) for c in all_contacts],
+    )
+
+
 # ── Groups ────────────────────────────────────────────────────────────────────
 
 @router.get("/groups", response_model=list[ContactGroupResponse])

@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   useContactGroups,
   useContactGroup,
@@ -172,6 +173,7 @@ function StatsBar({ contacts }: { contacts: Contact[] }) {
 // ── Detail panel ─────────────────────────────────────────────────────────────
 
 function GroupDetailPanel({ groupId }: { groupId: string }) {
+  const isAllView = groupId === "__all__";
   const { data: group, isLoading } = useContactGroup(groupId);
   const deleteContact = useDeleteContact();
   const resetEnrollment = useResetEnrollment();
@@ -179,6 +181,7 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState("");
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const filtered = useMemo(() => {
     if (!group) return [];
@@ -217,7 +220,7 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {group.contacts.some((c) => !c.consent_status && c.email) && (
+          {!isAllView && group.contacts.some((c) => !c.consent_status && c.email) && (
             <Button
               size="sm"
               variant="outline"
@@ -236,9 +239,11 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
               <Send className="w-3.5 h-3.5" /> Consentement
             </Button>
           )}
-          <Button size="sm" className="h-7 text-xs" onClick={() => setShowAdd(true)}>
-            <UserPlus className="w-3.5 h-3.5" /> Ajouter
-          </Button>
+          {!isAllView && (
+            <Button size="sm" className="h-7 text-xs" onClick={() => setShowAdd(true)}>
+              <UserPlus className="w-3.5 h-3.5" /> Ajouter
+            </Button>
+          )}
         </div>
       </div>
 
@@ -256,7 +261,7 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
       </div>
 
       {/* Inline add */}
-      {showAdd && <InlineAddRow groupId={groupId} onClose={() => setShowAdd(false)} />}
+      {showAdd && !isAllView && <InlineAddRow groupId={groupId} onClose={() => setShowAdd(false)} />}
 
       {/* Table */}
       <div className="flex-1 overflow-y-auto min-h-0">
@@ -315,8 +320,11 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
                       {c.enrollment_status && c.speaker_profile_id && (
                         <button
                           onClick={() => {
-                            if (!confirm(`Réinitialiser l'enrollment de ${c.name} ?`)) return;
-                            resetEnrollment.mutate(c.speaker_profile_id!);
+                            confirm({
+                              title: `Réinitialiser l'enrollment de ${c.name} ?`,
+                              confirmLabel: "Réinitialiser",
+                              onConfirm: () => resetEnrollment.mutate(c.speaker_profile_id!),
+                            });
                           }}
                           className="text-muted-foreground hover:text-orange-600 transition-colors opacity-0 group-hover/row:opacity-100"
                           title="Réinitialiser l'enrollment"
@@ -328,13 +336,15 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
                     </div>
                   </td>
                   <td className="px-4 py-2.5">
-                    <button
-                      onClick={() => deleteContact.mutate({ groupId, contactId: c.id })}
-                      className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover/row:opacity-100"
-                      title="Supprimer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {!isAllView && (
+                      <button
+                        onClick={() => deleteContact.mutate({ groupId, contactId: c.id })}
+                        className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover/row:opacity-100"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -352,6 +362,7 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
 
       {/* Stats */}
       {group.contacts.length > 0 && <StatsBar contacts={group.contacts} />}
+      {confirmDialog}
     </div>
   );
 }
@@ -404,9 +415,11 @@ export function ContactsPage() {
   const deleteGroup = useDeleteContactGroup();
   const [showCreate, setShowCreate] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
-  // Auto-select first group
-  const effectiveGroupId = selectedGroupId ?? (groups && groups.length > 0 ? groups[0]!.id : null);
+  // Auto-select "Tous" by default
+  const effectiveGroupId = selectedGroupId ?? (groups && groups.length > 0 ? "__all__" : null);
+  const totalContacts = groups?.reduce((sum, g) => sum + g.contact_count, 0) ?? 0;
 
   // No groups: empty state
   if (!isLoading && (!groups || groups.length === 0) && !showCreate) {
@@ -460,6 +473,23 @@ export function ContactsPage() {
               Groupes
             </div>
 
+            {/* Virtual "Tous" group */}
+            <div
+              onClick={() => setSelectedGroupId("__all__")}
+              className={`flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                effectiveGroupId === "__all__"
+                  ? "bg-accent border border-accent-foreground/10"
+                  : "hover:bg-muted/50 border border-transparent"
+              }`}
+            >
+              <span className="text-sm font-semibold truncate">Tous</span>
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                {totalContacts}
+              </span>
+            </div>
+
+            <div className="border-t border-border my-1" />
+
             {groups!.map((g) => (
               <div
                 key={g.id}
@@ -478,8 +508,11 @@ export function ContactsPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!confirm(`Supprimer le groupe "${g.name}" ?`)) return;
-                      deleteGroup.mutate(g.id);
+                      confirm({
+                        title: `Supprimer le groupe "${g.name}" ?`,
+                        confirmLabel: "Supprimer",
+                        onConfirm: () => deleteGroup.mutate(g.id),
+                      });
                     }}
                     className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover/item:opacity-100 p-0.5"
                     title="Supprimer le groupe"
@@ -513,6 +546,7 @@ export function ContactsPage() {
           )}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

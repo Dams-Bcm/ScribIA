@@ -8,6 +8,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search, Mic, Users, ChevronDown, CheckCircle2, XCircle } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface AIUsage {
   usage_key: string;
@@ -174,6 +175,7 @@ export function AISettingsPage() {
   const updatePyannote = useUpdatePyannoteSettings();
   const updateLongContext = useUpdateLongContext();
   const deleteModel = useDeleteModel();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [overrides, setOverrides] = useState<Record<string, string | null>>({});
   const [ragOverrides, setRAGOverrides] = useState<Record<string, string>>({});
@@ -847,7 +849,7 @@ export function AISettingsPage() {
                       )}
                     </div>
                     <button
-                      onClick={() => { if (confirm(`Supprimer le modèle ${m} ?`)) deleteModel.mutate(m); }}
+                      onClick={() => confirm({ title: `Supprimer le modèle ${m} ?`, confirmLabel: "Supprimer", onConfirm: () => deleteModel.mutate(m) })}
                       className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -859,6 +861,7 @@ export function AISettingsPage() {
           </div>
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }

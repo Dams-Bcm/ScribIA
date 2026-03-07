@@ -11,6 +11,7 @@ import {
   ToggleRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   useDictionaryRules,
   useDictionaryCategories,
@@ -32,6 +33,7 @@ export function DictionaryPage() {
   const [showImport, setShowImport] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const { data: rules = [], isLoading } = useDictionaryRules(selectedCategory);
   const { data: categories = [] } = useDictionaryCategories();
   const createRule = useCreateRule();
@@ -90,9 +92,12 @@ export function DictionaryPage() {
     await updateRule.mutateAsync({ id: rule.id, data: { is_enabled: !rule.is_enabled } });
   }
 
-  async function handleDelete(rule: SubstitutionRule) {
-    if (!confirm(`Supprimer la regle "${rule.original}" -> "${rule.replacement}" ?`)) return;
-    await deleteRule.mutateAsync(rule.id);
+  function handleDelete(rule: SubstitutionRule) {
+    confirm({
+      title: `Supprimer la règle "${rule.original}" → "${rule.replacement}" ?`,
+      confirmLabel: "Supprimer",
+      onConfirm: () => deleteRule.mutate(rule.id),
+    });
   }
 
   async function handlePreview() {
@@ -384,6 +389,7 @@ export function DictionaryPage() {
         )}
       </div>
 
+      {confirmDialog}
       {/* Stats */}
       {filteredRules.length > 0 && (
         <p className="text-xs text-muted-foreground mt-2">

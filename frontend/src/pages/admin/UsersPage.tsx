@@ -4,6 +4,7 @@ import { api, ApiError } from "../../api/client";
 import { useTenants } from "../../api/hooks/useTenants";
 import type { User } from "../../api/types";
 import { Users, Plus, Trash2, X } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export function UsersPage() {
   const { data: users = [], isLoading } = useQuery<User[]>({
@@ -23,6 +24,7 @@ export function UsersPage() {
     tenant_id: "",
   });
   const [error, setError] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const createUser = useMutation({
     mutationFn: (data: typeof form) => api.post("/admin/users", data),
@@ -43,9 +45,11 @@ export function UsersPage() {
   });
 
   function handleDelete(id: string) {
-    if (confirm("Supprimer cet utilisateur ?")) {
-      deleteUser.mutate(id);
-    }
+    confirm({
+      title: "Supprimer cet utilisateur ?",
+      confirmLabel: "Supprimer",
+      onConfirm: () => deleteUser.mutate(id),
+    });
   }
 
   const getTenantName = (tid: string) => tenants.find((t) => t.id === tid)?.name ?? tid;
@@ -120,6 +124,7 @@ export function UsersPage() {
       </div>
 
       {/* Create modal */}
+      {confirmDialog}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-background rounded-xl border border-border p-6 w-full max-w-md shadow-lg">

@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { SectorTemplateManager } from "./WorkflowsPage";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export function SectorsPage() {
   const { data: sectors = [], isLoading } = useSectors();
@@ -25,6 +26,7 @@ export function SectorsPage() {
   const deleteSector = useDeleteSector();
   const generateSuggestions = useGenerateSuggestions();
 
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ key: "", label: "", description: "", default_modules: [] as string[] });
@@ -54,10 +56,14 @@ export function SectorsPage() {
   }
 
   function handleDelete(id: string) {
-    if (confirm("Supprimer ce secteur ?")) {
-      deleteSector.mutate(id);
-      if (selectedId === id) setSelectedId(null);
-    }
+    confirm({
+      title: "Supprimer ce secteur ?",
+      confirmLabel: "Supprimer",
+      onConfirm: () => {
+        deleteSector.mutate(id);
+        if (selectedId === id) setSelectedId(null);
+      },
+    });
   }
 
   function toggleModule(moduleKey: string) {
@@ -337,6 +343,7 @@ export function SectorsPage() {
         </div>
       </div>
 
+      {confirmDialog}
       {/* Create modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

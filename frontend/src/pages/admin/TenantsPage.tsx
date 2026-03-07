@@ -12,6 +12,7 @@ import {
 import { AVAILABLE_MODULES, type Tenant, type ProvisionResult } from "../../api/types";
 import { useSectors } from "../../api/hooks/useSectors";
 import { Building2, Plus, Trash2, X, CheckCircle2, Sparkles, Database, Loader2, Save } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export function TenantsPage() {
   const { data: tenants = [], isLoading } = useTenants();
@@ -24,6 +25,7 @@ export function TenantsPage() {
   const deprovisionDb = useDeprovisionDedicatedDb();
 
   const { data: sectors = [] } = useSectors();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -66,10 +68,14 @@ export function TenantsPage() {
   }
 
   function handleDelete(id: string) {
-    if (confirm("Supprimer ce tenant et toutes ses données ?")) {
-      deleteTenant.mutate(id);
-      if (selectedId === id) setSelectedId(null);
-    }
+    confirm({
+      title: "Supprimer ce tenant et toutes ses données ?",
+      confirmLabel: "Supprimer",
+      onConfirm: () => {
+        deleteTenant.mutate(id);
+        if (selectedId === id) setSelectedId(null);
+      },
+    });
   }
 
   function toggleModule(tenantId: string, moduleKey: string, currentlyEnabled: boolean) {
@@ -194,9 +200,13 @@ export function TenantsPage() {
                 {selected.db_mode === "shared" ? (
                   <button
                     onClick={() => {
-                      if (confirm(`Migrer "${selected.name}" vers une BDD dédiée ?\n\nCela va :\n- Créer une nouvelle base de données\n- Migrer toutes les données existantes\n- Rediriger automatiquement les requêtes`)) {
-                        provisionDb.mutate(selected.id);
-                      }
+                      confirm({
+                        title: `Migrer "${selected.name}" vers une BDD dédiée ?`,
+                        description: "Cela va créer une nouvelle base de données, migrer toutes les données existantes et rediriger automatiquement les requêtes.",
+                        confirmLabel: "Migrer",
+                        variant: "default",
+                        onConfirm: () => provisionDb.mutate(selected.id),
+                      });
                     }}
                     disabled={provisionDb.isPending}
                     className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-blue-200 text-blue-700 bg-blue-50 text-sm hover:bg-blue-100 transition-colors disabled:opacity-50 dark:border-blue-800 dark:text-blue-400 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
@@ -210,9 +220,13 @@ export function TenantsPage() {
                 ) : (
                   <button
                     onClick={() => {
-                      if (confirm(`Rapatrier "${selected.name}" vers la BDD partagée ?\n\nCela va migrer toutes les données vers la base commune.`)) {
-                        deprovisionDb.mutate(selected.id);
-                      }
+                      confirm({
+                        title: `Rapatrier "${selected.name}" vers la BDD partagée ?`,
+                        description: "Cela va migrer toutes les données vers la base commune.",
+                        confirmLabel: "Rapatrier",
+                        variant: "default",
+                        onConfirm: () => deprovisionDb.mutate(selected.id),
+                      });
                     }}
                     disabled={deprovisionDb.isPending}
                     className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-sm hover:bg-accent transition-colors disabled:opacity-50"
@@ -244,6 +258,7 @@ export function TenantsPage() {
       </div>
 
       {/* Create / Provision modal */}
+      {confirmDialog}
       {(showCreate || provisionResult) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-background rounded-xl border border-border p-6 w-full max-w-md shadow-lg max-h-[90vh] overflow-y-auto">

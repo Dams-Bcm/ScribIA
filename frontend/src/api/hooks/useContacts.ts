@@ -27,7 +27,10 @@ export function useContactGroups() {
 export function useContactGroup(id: string | null) {
   return useQuery({
     queryKey: KEYS.group(id!),
-    queryFn: () => api.get<ContactGroupDetail>(`/contacts/groups/${id}`),
+    queryFn: () =>
+      id === "__all__"
+        ? api.get<ContactGroupDetail>("/contacts/all")
+        : api.get<ContactGroupDetail>(`/contacts/groups/${id}`),
     enabled: !!id,
   });
 }
