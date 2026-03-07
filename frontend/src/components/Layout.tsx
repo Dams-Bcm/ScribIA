@@ -20,6 +20,7 @@ import {
   Search,
   BookOpen,
   Megaphone,
+  Mail,
   Moon,
   Sun,
 } from "lucide-react";
@@ -80,11 +81,12 @@ export function Layout() {
     { to: "/dictionnaire", label: "Dictionnaire", icon: BookOpen, visible: hasModule("dictionary"), section: "Modules" },
 
     // ── Administration ──
+    { to: "/admin/sectors", label: "Secteurs", icon: FolderCog, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/tenants", label: "Tenants", icon: Building2, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/users", label: "Utilisateurs", icon: Users, visible: isSuperAdmin, section: "Administration" },
-    { to: "/admin/sectors", label: "Secteurs", icon: FolderCog, visible: isSuperAdmin, section: "Administration" },
-    { to: "/admin/workflows", label: "Workflows", icon: Settings2, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/ai-settings", label: "Gestion IA", icon: Sparkles, visible: isSuperAdmin, section: "Administration" },
+    { to: "/admin/email-settings", label: "Email (SMTP)", icon: Mail, visible: isSuperAdmin, section: "Administration" },
+    { to: "/admin/workflows", label: "Workflows", icon: Settings2, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/announcements", label: "Communications", icon: Megaphone, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/audit-logs", label: "Journal d'audit", icon: Shield, visible: isSuperAdmin, section: "Administration" },
 

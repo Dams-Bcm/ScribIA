@@ -772,6 +772,13 @@ def process_diarisation_job(job_id: str):
         logger.info(f"Diarisation job {job_id} completed: {len(aligned)} segments, "
                     f"{len(unique_speakers)} speakers")
 
+        # Auto-detect oral consent if pending_oral attendees
+        try:
+            from app.services.consent_detection import auto_detect_after_transcription
+            auto_detect_after_transcription(job_id, db)
+        except Exception as exc:
+            logger.warning(f"[CONSENT] Auto-detection failed for job {job_id}: {exc}")
+
     except Exception as e:
         logger.exception(f"Diarisation job {job_id} failed unexpectedly")
         try:

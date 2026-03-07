@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Loader2, Users, ShieldCheck, Play } from "lucide-react";
+import { ArrowLeft, Loader2, Users, ShieldCheck, Play, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { api } from "@/api/client";
@@ -205,6 +205,10 @@ export function DiarisationJobView({ jobId, onBack }: DiarisationJobViewProps) {
           </div>
         )}
 
+        {liveStatus === "completed" && job?.consent_detection_result && (
+          <AutoDetectionBanner resultJson={job.consent_detection_result} />
+        )}
+
         {liveStatus === "completed" && job?.segments && job?.speakers && (
           <DiarisationResult
             segments={job.segments}
@@ -217,4 +221,58 @@ export function DiarisationJobView({ jobId, onBack }: DiarisationJobViewProps) {
       </div>
     </div>
   );
+}
+
+function AutoDetectionBanner({ resultJson }: { resultJson: string }) {
+  try {
+    const result = JSON.parse(resultJson);
+    if (result.detected) {
+      return (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 dark:bg-green-950 dark:border-green-800">
+          <div className="flex items-center gap-2 mb-1">
+            <CheckCircle2 className="w-5 h-5 text-green-600" />
+            <h3 className="font-semibold text-green-800 dark:text-green-200">
+              Consentement oral détecté automatiquement
+            </h3>
+            {result.confidence && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-800">
+                {result.confidence}
+              </span>
+            )}
+          </div>
+          {result.consent_phrase && (
+            <p className="text-sm text-green-700 dark:text-green-300 italic">
+              &laquo; {result.consent_phrase} &raquo;
+            </p>
+          )}
+          {result.start_time != null && (
+            <p className="text-xs text-green-600 mt-1">
+              à {Math.floor(result.start_time / 60)}:{String(Math.floor(result.start_time % 60)).padStart(2, "0")}
+            </p>
+          )}
+          {result.explanation && (
+            <p className="text-xs text-green-600 mt-1 opacity-75">{result.explanation}</p>
+          )}
+          <p className="text-xs text-green-600 mt-2">
+            Confirmez le consentement dans le panneau RGPD ci-dessous pour valider.
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 dark:bg-amber-950 dark:border-amber-800">
+        <div className="flex items-center gap-2 mb-1">
+          <AlertTriangle className="w-5 h-5 text-amber-600" />
+          <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+            Aucun consentement oral détecté
+          </h3>
+        </div>
+        <p className="text-sm text-amber-700 dark:text-amber-300">
+          {result.explanation || "Aucune phrase de consentement détectée dans la transcription."}
+        </p>
+      </div>
+    );
+  } catch {
+    return null;
+  }
 }

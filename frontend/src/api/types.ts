@@ -132,6 +132,7 @@ export interface TranscriptionJob {
 
 export interface TranscriptionJobDetail extends TranscriptionJob {
   segments: TranscriptionSegment[];
+  consent_detection_result?: string | null;
 }
 
 export interface TranscriptionUploadResponse {
@@ -202,6 +203,7 @@ export interface DiarisationJob {
 export interface DiarisationJobDetail extends DiarisationJob {
   segments: DiarisationSegment[];
   speakers: DiarisationSpeaker[];
+  consent_detection_result?: string | null;
 }
 
 export interface DiarisationUploadResponse {

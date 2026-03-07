@@ -702,7 +702,7 @@ def enroll_from_segment(
 # ── Oral consent detection via LLM ──────────────────────────────────────────
 
 @router.post("/{job_id}/detect-oral-consent")
-def detect_oral_consent(
+def detect_oral_consent_endpoint(
     job_id: str,
     user: User = Depends(get_current_user),
     _mod: bool = Depends(require_module("transcription_diarisation")),
@@ -714,6 +714,7 @@ def detect_oral_consent(
     Returns the detected phrase, the segment, and a confidence level.
     """
     from app.schemas.diarisation import OralConsentDetectionResponse
+    from app.services.consent_detection import detect_oral_consent
 
     job = (
         db.query(TranscriptionJob)
@@ -726,158 +727,30 @@ def detect_oral_consent(
     )
     if not job:
         raise HTTPException(404, "Job introuvable")
-    if job.status != TranscriptionJobStatus.COMPLETED:
+    if job.status not in (TranscriptionJobStatus.COMPLETED, TranscriptionJobStatus.CONSENT_CHECK):
         raise HTTPException(400, "La transcription n'est pas terminee")
 
-    segments = (
-        db.query(TranscriptionSegment)
-        .filter(TranscriptionSegment.job_id == job_id)
-        .order_by(TranscriptionSegment.order_index)
-        .all()
-    )
-    if not segments:
+    result = detect_oral_consent(db, job)
+    if result is None:
         return OralConsentDetectionResponse(detected=False)
-
-    # Build transcript text for LLM analysis (first ~50 segments should be enough)
-    analysis_segments = segments[:50]
-    transcript_lines = []
-    for seg in analysis_segments:
-        label = seg.speaker_label or seg.speaker_id or ""
-        prefix = f"[{label}] " if label else ""
-        transcript_lines.append(f"[{seg.start_time:.1f}-{seg.end_time:.1f}] {prefix}{seg.text}")
-    transcript_text = "\n".join(transcript_lines)
-
-    # Call LLM
-    import requests as http_requests
-    from app.config import settings as app_settings
-    from app.services.ai_config import get_model_for_usage
-
-    model = get_model_for_usage("consent_detection")
-
-    system_prompt = (
-        "Tu es un assistant d'analyse de transcriptions de reunions.\n"
-        "Tu dois analyser la transcription pour detecter :\n"
-        "1. Un CONSENTEMENT collectif a l'enregistrement (ex: 'cette reunion va etre enregistree', "
-        "'nous enregistrons cette seance', 'vous acceptez l'enregistrement', 'pas d'objection').\n"
-        "2. Un REFUS individuel d'etre enregistre (ex: 'je refuse d'etre enregistre', "
-        "'non je ne suis pas d'accord', 'je m'oppose a l'enregistrement').\n\n"
-        "IMPORTANT : Cherche d'abord le consentement, puis verifie s'il y a un refus apres.\n"
-        "Si un consentement ET un refus sont detectes, retourne le REFUS (plus critique).\n\n"
-        "Reponds UNIQUEMENT en JSON valide avec cette structure :\n"
-        "{\n"
-        '  "detected": true/false,\n'
-        '  "type": "collective_consent" ou "individual_refusal" ou null,\n'
-        '  "phrase": "la phrase exacte trouvee ou null",\n'
-        '  "segment_time": "start_time-end_time ou null",\n'
-        '  "speaker_id": "le SPEAKER_XX qui a prononce la phrase ou null",\n'
-        '  "confidence": "high/medium/low",\n'
-        '  "explanation": "courte explication"\n'
-        "}\n\n"
-        "Si aucune phrase de consentement ni de refus n'est trouvee :\n"
-        '{"detected": false, "type": null, "phrase": null, "segment_time": null, '
-        '"speaker_id": null, "confidence": null, '
-        '"explanation": "Aucune phrase de consentement ou de refus detectee."}'
-    )
-
-    user_prompt = f"Analyse cette transcription :\n\n{transcript_text}"
-
-    try:
-        resp = http_requests.post(
-            f"{app_settings.ollama_url}/api/generate",
-            json={
-                "model": model,
-                "system": system_prompt,
-                "prompt": user_prompt,
-                "stream": False,
-                "keep_alive": 0,
-                "options": {"temperature": 0.1},
-            },
-            timeout=120,
-        )
-        resp.raise_for_status()
-        llm_response = resp.json().get("response", "")
-    except Exception as e:
-        raise HTTPException(500, f"Erreur lors de l'analyse LLM : {e}")
-
-    # Parse LLM JSON response
-    import re
-    json_match = re.search(r'\{[^{}]*\}', llm_response, re.DOTALL)
-    if not json_match:
-        return OralConsentDetectionResponse(detected=False, explanation="Reponse LLM non exploitable.")
-
-    try:
-        result = json.loads(json_match.group())
-    except json.JSONDecodeError:
-        return OralConsentDetectionResponse(detected=False, explanation="Reponse LLM non exploitable.")
 
     if not result.get("detected"):
         return OralConsentDetectionResponse(
             detected=False,
-            explanation=result.get("explanation", "Aucune phrase de consentement detectee."),
+            explanation=result.get("explanation"),
         )
-
-    # Find the matching segment
-    consent_phrase = result.get("phrase", "")
-    matched_seg = None
-    seg_time = result.get("segment_time")
-
-    if seg_time and "-" in str(seg_time):
-        try:
-            start_str, end_str = str(seg_time).split("-", 1)
-            target_start = float(start_str)
-            for seg in analysis_segments:
-                if abs(seg.start_time - target_start) < 2.0:
-                    matched_seg = seg
-                    break
-        except (ValueError, TypeError):
-            pass
-
-    # Fallback: search by text content
-    if not matched_seg and consent_phrase:
-        phrase_lower = consent_phrase.lower()
-        for seg in analysis_segments:
-            if phrase_lower[:30] in seg.text.lower():
-                matched_seg = seg
-                break
-
-    # Resolve refusal speaker label if available
-    detection_type = result.get("type")
-    refusal_speaker_id = result.get("speaker_id")
-    refusal_speaker_label = None
-    if detection_type == "individual_refusal" and refusal_speaker_id:
-        for seg in analysis_segments:
-            if seg.speaker_id == refusal_speaker_id and seg.speaker_label:
-                refusal_speaker_label = seg.speaker_label
-                break
-
-    # Save ConsentDetection record for audit trail
-    from app.models.consent import ConsentDetection
-    cd = ConsentDetection(
-        tenant_id=job.tenant_id,
-        job_id=job_id,
-        detection_type=detection_type or "collective_consent",
-        segment_start_ms=matched_seg.start_time * 1000 if matched_seg else None,
-        segment_end_ms=matched_seg.end_time * 1000 if matched_seg else None,
-        transcript_text=consent_phrase,
-        speaker_id=refusal_speaker_id,
-        ai_confidence={"high": 0.9, "medium": 0.6, "low": 0.3}.get(
-            result.get("confidence", "medium"), 0.5
-        ),
-    )
-    db.add(cd)
-    db.commit()
 
     return OralConsentDetectionResponse(
         detected=True,
-        detection_type=detection_type,
-        consent_phrase=consent_phrase,
-        segment_id=matched_seg.id if matched_seg else None,
-        start_time=matched_seg.start_time if matched_seg else None,
-        end_time=matched_seg.end_time if matched_seg else None,
-        confidence=result.get("confidence", "medium"),
+        detection_type=result.get("detection_type"),
+        consent_phrase=result.get("consent_phrase"),
+        segment_id=result.get("segment_id"),
+        start_time=result.get("start_time"),
+        end_time=result.get("end_time"),
+        confidence=result.get("confidence"),
         explanation=result.get("explanation"),
-        refusal_speaker_id=refusal_speaker_id,
-        refusal_speaker_label=refusal_speaker_label,
+        refusal_speaker_id=result.get("refusal_speaker_id"),
+        refusal_speaker_label=result.get("refusal_speaker_label"),
     )
 
 

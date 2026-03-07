@@ -43,6 +43,8 @@ class TranscriptionJob(UUIDMixin, TimestampMixin, Base):
     attendees          = Column(Text, nullable=True)
     # "pending" | "valid" | "invalidated" | "blocked"
     recording_validity = Column(String(20), nullable=True)
+    # JSON result of automatic oral consent detection (stored for frontend display)
+    consent_detection_result = Column(Text, nullable=True)
 
     segments = relationship(
         "TranscriptionSegment",

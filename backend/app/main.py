@@ -179,6 +179,10 @@ def _add_missing_columns():
             conn.execute(text(
                 "ALTER TABLE transcription_jobs ADD recording_validity VARCHAR(20) NULL"
             ))
+        if "consent_detection_result" not in job_cols:
+            conn.execute(text(
+                "ALTER TABLE transcription_jobs ADD consent_detection_result NVARCHAR(MAX) NULL"
+            ))
 
         # speaker_profiles: contact_id
         if "speaker_profiles" in insp.get_table_names():

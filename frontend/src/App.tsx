@@ -31,6 +31,7 @@ import { WorkflowsPage } from "./pages/admin/WorkflowsPage";
 import { AISettingsPage } from "./pages/admin/AISettingsPage";
 import { SectorsPage } from "./pages/admin/SectorsPage";
 import { AnnouncementsPage } from "./pages/admin/AnnouncementsPage";
+import { EmailSettingsPage } from "./pages/admin/EmailSettingsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -92,6 +93,7 @@ function AppRoutes() {
           <Route path="admin/workflows" element={<WorkflowsPage />} />
           <Route path="admin/sectors" element={<SectorsPage />} />
           <Route path="admin/ai-settings" element={<AISettingsPage />} />
+          <Route path="admin/email-settings" element={<EmailSettingsPage />} />
           <Route path="admin/announcements" element={<AnnouncementsPage />} />
           <Route path="admin/audit-logs" element={<AuditLogsPage />} />
         </Route>

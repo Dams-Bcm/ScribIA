@@ -293,6 +293,13 @@ def process_transcription_job(job_id: str):
 
         logger.info(f"Job {job_id} completed: {len(segments)} segments")
 
+        # Auto-detect oral consent if pending_oral attendees
+        try:
+            from app.services.consent_detection import auto_detect_after_transcription
+            auto_detect_after_transcription(job_id, db)
+        except Exception as exc:
+            logger.warning(f"[CONSENT] Auto-detection failed for job {job_id}: {exc}")
+
         # Indexation RAG automatique
         try:
             from app.services.indexer import index_transcription
@@ -402,7 +409,18 @@ def process_partial_analysis(job_id: str):
             db.add(segment)
         db.commit()
 
-        # ── Step 4: Set status to consent_check ───────────────────────────
+        # ── Step 4: Auto-detect oral consent ────────────────────────────
+        _update_job(db, job,
+                    progress=90,
+                    progress_message="Détection automatique du consentement oral...")
+
+        try:
+            from app.services.consent_detection import auto_detect_after_transcription
+            auto_detect_after_transcription(job_id, db)
+        except Exception as exc:
+            logger.warning(f"[CONSENT] Auto-detection failed for partial job {job_id}: {exc}")
+
+        # ── Step 5: Set status to consent_check ───────────────────────────
         _update_job(db, job,
                     status=TranscriptionJobStatus.CONSENT_CHECK,
                     progress=100,

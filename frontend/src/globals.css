@@ -121,6 +121,17 @@ body.theme-blur {
 .theme-blur .text-yellow-700 { color: #facc15; }
 .theme-blur .text-gray-600 { color: #9ca3af; }
 
+/* Contextual windows (popovers, dialogs, dropdowns) – nearly opaque */
+.theme-blur [data-radix-popper-content-wrapper] > *,
+.theme-blur [role="dialog"],
+.theme-blur [data-state="open"][class*="SelectContent"],
+.theme-blur [data-state="open"][class*="DropdownMenuContent"] {
+  background: rgba(26, 33, 56, 0.95) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-color: rgba(101, 117, 148, 0.3) !important;
+}
+
 .theme-blur .hover\:shadow-sm:hover {
   box-shadow: 0 4px 20px rgba(118, 89, 255, 0.1);
 }

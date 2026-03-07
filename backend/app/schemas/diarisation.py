@@ -51,6 +51,7 @@ class DiarisationJobResponse(BaseModel):
 class DiarisationJobDetailResponse(DiarisationJobResponse):
     segments: list[DiarisationSegmentResponse] = []
     speakers: list[DiarisationSpeakerResponse] = []
+    consent_detection_result: Optional[str] = None
 
 
 class DiarisationJobUploadResponse(BaseModel):

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Loader2, ShieldCheck, Play, Users } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldCheck, Play, Users, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { api } from "@/api/client";
@@ -195,54 +195,119 @@ export function TranscriptionJobView({ jobId, onBack }: TranscriptionJobViewProp
           </div>
         )}
 
-        {liveStatus === "consent_check" && job && (
-          <div className="space-y-4">
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 dark:bg-amber-950 dark:border-amber-800">
-              <div className="flex items-center gap-2 mb-2">
-                <ShieldCheck className="w-5 h-5 text-amber-600" />
-                <h3 className="font-semibold text-amber-800 dark:text-amber-200">
-                  Analyse partielle terminée — Vérification du consentement
-                </h3>
-              </div>
-              <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
-                Les 60 premières secondes ont été transcrites. Vérifiez le consentement
-                oral dans l'onglet Diarisation avant de lancer la transcription complète.
-              </p>
-              <Button
-                size="sm"
-                onClick={async () => {
-                  await proceedMutation.mutateAsync(jobId);
-                  refetch();
-                }}
-                disabled={proceedMutation.isPending}
-              >
-                {proceedMutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Lancement…</>
-                ) : (
-                  <><Play className="w-4 h-4 mr-1" /> Consentement vérifié — Lancer la transcription complète</>
-                )}
-              </Button>
-            </div>
+        {liveStatus === "consent_check" && job && (() => {
+          const detection = job.consent_detection_result ? JSON.parse(job.consent_detection_result) : null;
+          const consentDetected = detection?.detected;
 
-            {job.segments && job.segments.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                  Aperçu (~60 premières secondes)
-                </h4>
-                <div className="bg-muted/30 rounded-lg p-4 max-h-60 overflow-y-auto text-sm space-y-1">
-                  {job.segments.map((seg) => (
-                    <p key={seg.order_index}>
-                      <span className="text-xs text-muted-foreground font-mono mr-2">
-                        {Math.floor(seg.start_time / 60)}:{String(Math.floor(seg.start_time % 60)).padStart(2, "0")}
+          return (
+            <div className="space-y-4">
+              {/* Auto-detection result banner */}
+              {detection && consentDetected && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 dark:bg-green-950 dark:border-green-800">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    <h3 className="font-semibold text-green-800 dark:text-green-200">
+                      Consentement oral détecté
+                    </h3>
+                    {detection.confidence && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-800">
+                        {detection.confidence}
                       </span>
-                      {seg.text}
+                    )}
+                  </div>
+                  {detection.consent_phrase && (
+                    <p className="text-sm text-green-700 dark:text-green-300 italic">
+                      &laquo; {detection.consent_phrase} &raquo;
                     </p>
-                  ))}
+                  )}
+                  {detection.start_time != null && (
+                    <p className="text-xs text-green-600 mt-1">
+                      à {Math.floor(detection.start_time / 60)}:{String(Math.floor(detection.start_time % 60)).padStart(2, "0")}
+                    </p>
+                  )}
+                  <Button
+                    size="sm"
+                    className="mt-3"
+                    onClick={async () => {
+                      await proceedMutation.mutateAsync(jobId);
+                      refetch();
+                    }}
+                    disabled={proceedMutation.isPending}
+                  >
+                    {proceedMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Lancement…</>
+                    ) : (
+                      <><Play className="w-4 h-4 mr-1" /> Consentement vérifié — Lancer la transcription complète</>
+                    )}
+                  </Button>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+
+              {detection && !consentDetected && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 dark:bg-amber-950 dark:border-amber-800">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                    <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+                      Aucun consentement oral détecté
+                    </h3>
+                  </div>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    {detection.explanation || "Aucune phrase de consentement détectée dans les 60 premières secondes."}
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-2">
+                    Veuillez obtenir le consentement par email de tous les participants avant de lancer la transcription.
+                  </p>
+                </div>
+              )}
+
+              {!detection && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 dark:bg-amber-950 dark:border-amber-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ShieldCheck className="w-5 h-5 text-amber-600" />
+                    <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+                      Analyse partielle terminée
+                    </h3>
+                  </div>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
+                    Les 60 premières secondes ont été transcrites. Vérifiez le consentement oral.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      await proceedMutation.mutateAsync(jobId);
+                      refetch();
+                    }}
+                    disabled={proceedMutation.isPending}
+                  >
+                    {proceedMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Lancement…</>
+                    ) : (
+                      <><Play className="w-4 h-4 mr-1" /> Consentement vérifié — Lancer la transcription complète</>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {job.segments && job.segments.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">
+                    Aperçu (~60 premières secondes)
+                  </h4>
+                  <div className="bg-muted/30 rounded-lg p-4 max-h-60 overflow-y-auto text-sm space-y-1">
+                    {job.segments.map((seg) => (
+                      <p key={seg.order_index}>
+                        <span className="text-xs text-muted-foreground font-mono mr-2">
+                          {Math.floor(seg.start_time / 60)}:{String(Math.floor(seg.start_time % 60)).padStart(2, "0")}
+                        </span>
+                        {seg.text}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {liveStatus === "completed" && job?.segments && (
           <TranscriptionResult segments={job.segments} jobId={jobId} title={job.title} />

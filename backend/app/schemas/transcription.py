@@ -33,6 +33,7 @@ class TranscriptionJobResponse(BaseModel):
 
 class TranscriptionJobDetailResponse(TranscriptionJobResponse):
     segments: list[TranscriptionSegmentResponse] = []
+    consent_detection_result: Optional[str] = None
 
 
 class TranscriptionJobUploadResponse(BaseModel):
