@@ -132,6 +132,27 @@ def start_processing(
     if job.status not in (TranscriptionJobStatus.QUEUED, TranscriptionJobStatus.ERROR):
         raise HTTPException(400, f"Le job ne peut pas être lancé (statut: {job.status})")
 
+    # ── RGPD: verify attendees & consent before processing ───────────
+    attendees = []
+    if job.attendees:
+        try:
+            attendees = json.loads(job.attendees)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if not attendees:
+        raise HTTPException(
+            400,
+            "Aucun participant défini. Veuillez sélectionner les participants avant de lancer le traitement.",
+        )
+
+    refused = [a for a in attendees if a.get("status") in ("refused", "withdrawn")]
+    if refused:
+        raise HTTPException(
+            400,
+            "Un ou plusieurs participants ont refusé le consentement. Le traitement est bloqué.",
+        )
+
     job.status = TranscriptionJobStatus.QUEUED
     job.progress = 5
     job.progress_message = "En file d'attente..."

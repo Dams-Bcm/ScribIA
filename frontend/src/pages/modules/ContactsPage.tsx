@@ -779,8 +779,9 @@ export function ContactsPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
-  // Auto-select "Tous" by default
-  const effectiveGroupId = selectedGroupId ?? "__all__";
+  // Auto-select "Défaut" group by default, fallback to "Tous"
+  const defaultGroupId = groups?.find((g) => g.is_default)?.id ?? "__all__";
+  const effectiveGroupId = selectedGroupId ?? defaultGroupId;
   const totalContacts = allGroup?.contact_count ?? 0;
 
   return (
