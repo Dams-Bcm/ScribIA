@@ -15,6 +15,7 @@ class TemplateCreate(BaseModel):
     document_type: DocumentType = "custom"
     system_prompt: str = Field(..., min_length=1)
     user_prompt_template: str = Field(..., min_length=1)
+    map_system_prompt: str | None = None
     ollama_model: str | None = None
     temperature: float = Field(0.3, ge=0.0, le=2.0)
     is_active: bool = True
@@ -26,6 +27,7 @@ class TemplateUpdate(BaseModel):
     document_type: DocumentType | None = None
     system_prompt: str | None = None
     user_prompt_template: str | None = None
+    map_system_prompt: str | None = None
     ollama_model: str | None = None
     temperature: float | None = Field(None, ge=0.0, le=2.0)
     is_active: bool | None = None
@@ -39,6 +41,7 @@ class TemplateResponse(BaseModel):
     document_type: str
     system_prompt: str
     user_prompt_template: str
+    map_system_prompt: str | None
     ollama_model: str | None
     temperature: float
     is_active: bool

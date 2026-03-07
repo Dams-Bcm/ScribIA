@@ -14,8 +14,9 @@ class AIDocumentTemplate(UUIDMixin, TimestampMixin, Base):
     # Valeurs : "pv" | "deliberation" | "summary" | "agenda" | "custom"
     system_prompt        = Column(Text, nullable=False)
     user_prompt_template = Column(Text, nullable=False)
+    map_system_prompt    = Column(Text, nullable=True)   # prompt système pour la passe map (map-reduce)
     # Placeholders supportés : {titre} {date} {organisation}
-    #                           {points} {transcription} {documents}
+    #                           {points} {transcription} {documents} {participants} {duree}
     ollama_model         = Column(String(100), nullable=True)  # None → config default
     temperature          = Column(Float, nullable=False, default=0.3)
     is_active            = Column(Boolean, nullable=False, default=True)

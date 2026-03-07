@@ -46,6 +46,7 @@ const EMPTY_FORM: AIDocumentTemplateCreate = {
   document_type: "custom",
   system_prompt: "",
   user_prompt_template: "",
+  map_system_prompt: null,
   ollama_model: null,
   temperature: 0.3,
   is_active: true,
@@ -78,6 +79,7 @@ export function TemplateManager() {
       document_type: tpl.document_type,
       system_prompt: tpl.system_prompt,
       user_prompt_template: tpl.user_prompt_template,
+      map_system_prompt: tpl.map_system_prompt ?? null,
       ollama_model: tpl.ollama_model ?? null,
       temperature: tpl.temperature,
       is_active: tpl.is_active,
@@ -183,6 +185,14 @@ export function TemplateManager() {
                     {tpl.user_prompt_template}
                   </pre>
                 </div>
+                {tpl.map_system_prompt && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">Prompt map (résumé par chunk)</p>
+                    <pre className="text-xs bg-background border border-border rounded p-2 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                      {tpl.map_system_prompt}
+                    </pre>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
                   Modèle : <span className="font-mono">{tpl.ollama_model ?? "(défaut config)"}</span>
                   {" · "}Température : {tpl.temperature}
@@ -269,6 +279,18 @@ export function TemplateManager() {
                 value={form.user_prompt_template}
                 onChange={(e) => set("user_prompt_template", e.target.value)}
                 placeholder="Rédige un document pour {organisation} le {date}.\n\nORDRE DU JOUR :\n{points}\n\nTRANSCRIPTION :\n{transcription}"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>
+                Prompt map <span className="text-xs text-muted-foreground">(optionnel · instructions pour le résumé de chaque chunk en map-reduce)</span>
+              </Label>
+              <textarea
+                className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-y"
+                value={form.map_system_prompt ?? ""}
+                onChange={(e) => set("map_system_prompt", e.target.value || null)}
+                placeholder="Laisser vide pour utiliser le prompt map par défaut. Ex : Tu es un assistant qui extrait les faits d'une transcription…"
               />
             </div>
 

@@ -233,6 +233,7 @@ def generate_document(
         "document_type": tpl.document_type,
         "system_prompt": tpl.system_prompt,
         "user_prompt_template": tpl.user_prompt_template,
+        "map_system_prompt": tpl.map_system_prompt,
         "ollama_model": tpl.ollama_model,
         "temperature": tpl.temperature,
     }

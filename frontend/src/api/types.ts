@@ -295,6 +295,7 @@ export interface AIDocumentTemplate {
   document_type: AIDocumentType;
   system_prompt: string;
   user_prompt_template: string;
+  map_system_prompt: string | null;
   ollama_model: string | null;
   temperature: number;
   is_active: boolean;
@@ -308,6 +309,7 @@ export interface AIDocumentTemplateCreate {
   document_type: AIDocumentType;
   system_prompt: string;
   user_prompt_template: string;
+  map_system_prompt?: string | null;
   ollama_model?: string | null;
   temperature?: number;
   is_active?: boolean;
@@ -319,6 +321,7 @@ export interface AIDocumentTemplateUpdate {
   document_type?: AIDocumentType;
   system_prompt?: string;
   user_prompt_template?: string;
+  map_system_prompt?: string | null;
   ollama_model?: string | null;
   temperature?: number;
   is_active?: boolean;

@@ -241,6 +241,19 @@ def _split_transcription(text: str, chunk_size: int, overlap_lines: int = 3) -> 
     return chunks
 
 
+_DEFAULT_MAP_SYSTEM_PROMPT = (
+    "Tu es un assistant qui extrait les faits d'une transcription de réunion. "
+    "Tu produis une liste de faits en bullet points (5 à 8 points maximum). "
+    "RÈGLES STRICTES :\n"
+    "- Chaque point fait UNE phrase maximum\n"
+    "- Note UNIQUEMENT ce qui est explicitement dit dans le texte\n"
+    "- N'invente JAMAIS d'information absente du texte\n"
+    "- Conserve les noms, chiffres, dates et décisions tels quels\n"
+    "- Sois CONCIS : 400 à 600 caractères maximum pour toute la liste\n"
+    "- Réponds en français"
+)
+
+
 def _map_reduce_generate(
     model: str,
     system_prompt: str,
@@ -251,6 +264,7 @@ def _map_reduce_generate(
     chunk_size: int,
     event_bus,
     doc_id: str,
+    map_system_prompt: str | None = None,
 ) -> str:
     """Génère un document en deux passes pour les longs contextes.
 
@@ -261,17 +275,10 @@ def _map_reduce_generate(
     logger.info(f"[AI] Map-Reduce: {len(chunks)} chunks de ~{chunk_size} chars")
 
     # ── Passe 1 : résumer chaque chunk ──
-    map_system = (
-        "Tu es un assistant qui extrait les points clés d'une transcription de réunion. "
-        "Tu produis un résumé COURT en bullet points (5 à 8 points maximum). "
-        "RÈGLES :\n"
-        "- Chaque point fait UNE phrase maximum\n"
-        "- Note les noms des intervenants, les décisions, les chiffres/dates importants\n"
-        "- Ne génère JAMAIS de placeholders comme [nom] ou [date]\n"
-        "- Sois CONCIS : 400 à 600 caractères maximum pour tout le résumé"
-    )
+    map_system = map_system_prompt or _DEFAULT_MAP_SYSTEM_PROMPT
 
     summaries = []
+    map_temperature = min(temperature, 0.1)  # très bas pour éviter les inventions
     for i, chunk in enumerate(chunks):
         event_bus.publish(doc_id, {
             "status": "generating",
@@ -283,11 +290,12 @@ def _map_reduce_generate(
         map_prompt = (
             f"Extrait {i+1}/{len(chunks)} d'une transcription de réunion :\n\n"
             f"{chunk}\n\n"
-            "Résume en bullet points courts (5-8 points max, 400-600 caractères max au total)."
+            "Liste les faits importants de cet extrait (5-8 points max). "
+            "Ne mentionne QUE ce qui est dit dans le texte ci-dessus."
         )
 
         parts = []
-        for text in _call_ollama(model, map_system, map_prompt, temperature, num_predict=512, keep_alive="10m"):
+        for text in _call_ollama(model, map_system, map_prompt, map_temperature, num_predict=512, keep_alive="10m"):
             parts.append(text)
         summary = "".join(parts)
         summaries.append(f"[Partie {i+1}/{len(chunks)}]\n{summary}")
@@ -476,6 +484,7 @@ def _run_generation(doc_id: str):
                 chunk_size=settings.ollama_map_reduce_chunk_size,
                 event_bus=event_bus,
                 doc_id=doc_id,
+                map_system_prompt=template_data.get("map_system_prompt"),
             )
         else:
             event_bus.publish(doc_id, {"status": "generating", "step": "llm"})

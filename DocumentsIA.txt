@@ -1,0 +1,325 @@
+================================================================================
+                    MODULE DOCUMENTS IA — DOCUMENTATION
+================================================================================
+
+1. PRÉSENTATION GÉNÉRALE
+========================
+
+Le module "Documents IA" permet de générer automatiquement des documents
+(procès-verbaux, comptes-rendus, résumés, délibérations...) à partir de
+transcriptions audio et/ou de dossiers préparatoires, en utilisant un LLM
+local via Ollama.
+
+Fonctionnalités principales :
+  - Templates de documents personnalisables (prompts système, utilisateur, map)
+  - Génération asynchrone avec suivi en temps réel (SSE)
+  - Pipeline Map-Reduce automatique pour les longs contextes
+  - Export en Markdown, TXT, PDF et DOCX
+  - Extraction automatique des participants et de la date depuis la diarisation
+  - Indexation RAG automatique après génération
+  - Multi-tenant avec seeding de templates par défaut
+
+
+2. ARCHITECTURE DES FICHIERS
+=============================
+
+Backend :
+  backend/app/models/ai_documents.py      — Modèles SQLAlchemy (AIDocumentTemplate, AIDocument)
+  backend/app/schemas/ai_documents.py     — Schémas Pydantic (validation API)
+  backend/app/routers/ai_documents.py     — Routes FastAPI (préfixe /ai-documents)
+  backend/app/services/ai_documents.py    — Service de génération (worker, Ollama, map-reduce)
+  backend/app/config.py                   — Configuration Ollama (URL, modèles, seuils)
+
+Frontend :
+  frontend/src/components/ai_documents/TemplateManager.tsx  — Gestion CRUD des templates
+  frontend/src/api/types.ts                                 — Types TypeScript
+  frontend/src/api/hooks/useAIDocuments.ts                  — Hooks React Query
+
+
+3. MODÈLE DE DONNÉES
+=====================
+
+3.1 AIDocumentTemplate
+-----------------------
+Table : ai_document_templates
+
+  id                    UUID (PK)
+  tenant_id             FK → tenants.id
+  name                  String(200), obligatoire
+  description           Text, optionnel
+  document_type         String(50) : "pv" | "deliberation" | "summary" | "agenda" | "custom"
+  system_prompt         Text, obligatoire — instructions globales du LLM (passe reduce)
+  user_prompt_template  Text, obligatoire — prompt utilisateur avec placeholders
+  map_system_prompt     Text, optionnel  — prompt système pour la passe map (map-reduce)
+                        Si NULL, le prompt map par défaut est utilisé.
+  ollama_model          String(100), optionnel — NULL = modèle par défaut de la config
+  temperature           Float, défaut 0.3 (entre 0.0 et 2.0)
+  is_active             Boolean, défaut true
+  created_at            DateTime (auto)
+  updated_at            DateTime (auto)
+
+3.2 AIDocument
+--------------
+Table : ai_documents
+
+  id                       UUID (PK)
+  tenant_id                FK → tenants.id
+  user_id                  FK → users.id (qui a lancé la génération)
+  template_id              FK → ai_document_templates.id
+  template_snapshot         Text (JSON) — copie figée du template au moment de la génération
+  title                    String(500), obligatoire
+  status                   String(20) : "pending" | "generating" | "completed" | "error"
+  source_dossier_id        FK → preparatory_dossiers.id (optionnel)
+  source_session_id        FK → transcription_jobs.id (optionnel)
+  extra_context            Text (JSON) — variables supplémentaires injectées à la création
+  result_text              Text — le document généré
+  error_message            Text — message d'erreur si échec
+  created_at               DateTime
+  generation_started_at    DateTime
+  generation_completed_at  DateTime
+
+
+4. PLACEHOLDERS DISPONIBLES DANS LES TEMPLATES
+================================================
+
+Les placeholders suivants sont remplacés automatiquement dans le
+user_prompt_template lors de la génération :
+
+  {organisation}    — Nom du tenant (collectivité)
+  {date}            — Date de la session (created_at du job) ou du dossier (meeting_date)
+  {titre}           — Titre du document
+  {points}          — Ordre du jour (depuis le dossier préparatoire)
+  {transcription}   — Texte complet de la transcription
+  {documents}       — Texte extrait des documents uploadés dans le dossier
+  {duree}           — Durée de la session (format "1h23min45s")
+  {participants}    — Liste des participants (depuis les contacts associés aux
+                      locuteurs identifiés en diarisation, avec nom et fonction)
+
+Si un placeholder n'a pas de valeur, il est remplacé par "(non disponible)".
+
+Les utilisateurs peuvent aussi ajouter des placeholders personnalisés dans
+leurs templates ; ils seront remplacés s'ils correspondent à une clé dans
+extra_context, sinon ils resteront tels quels.
+
+
+5. PIPELINE DE GÉNÉRATION
+==========================
+
+5.1 Flux général
+-----------------
+
+  1. L'utilisateur sélectionne un template + sources (session et/ou dossier)
+  2. POST /ai-documents/generate → crée un AIDocument en statut "pending"
+  3. Le document est mis en file d'attente (queue thread-safe, 1 job à la fois)
+  4. Le worker thread exécute _run_generation() :
+     a. Charge le snapshot template
+     b. Extrait le contexte (transcription, dossier, participants, date, etc.)
+     c. Construit le prompt final (remplacement des placeholders)
+     d. Choisit le mode de génération (direct ou map-reduce)
+     e. Appelle Ollama en streaming
+     f. Sauvegarde le résultat et publie l'événement SSE "completed"
+     g. Indexe le document dans le moteur RAG
+
+5.2 Mode direct
+-----------------
+Utilisé quand le prompt final est court (< seuil long contexte) ou quand
+le map-reduce est désactivé.
+
+  → Un seul appel Ollama avec system_prompt + user_prompt.
+
+5.3 Mode Map-Reduce (longs contextes)
+---------------------------------------
+Activé automatiquement quand :
+  - ollama_map_reduce = true (config)
+  - Le prompt final dépasse ollama_long_context_threshold (défaut: 20 000 chars)
+  - La transcription dépasse ollama_map_reduce_chunk_size (défaut: 4 000 chars)
+
+  Passe 1 — MAP :
+    - La transcription est découpée en chunks de ~4 000 chars (configurable)
+    - 3 lignes de chevauchement (overlap) entre chaque chunk
+    - Chaque chunk est envoyé à Ollama avec le map_system_prompt du template
+      (ou le prompt map par défaut si non défini)
+    - Température plafonnée à 0.1 pour éviter les hallucinations
+    - num_predict = 512 (résumés courts : 5-8 bullet points)
+    - keep_alive = "10m" pour garder le modèle chargé entre les chunks
+    - Résultat : une liste de faits extraits par chunk
+
+  Passe 2 — REDUCE :
+    - Tous les résumés partiels sont combinés
+    - Le system_prompt du template est enrichi avec des instructions de synthèse
+    - Le {transcription} dans le user_prompt est remplacé par les résumés combinés
+    - Température = celle du template
+    - num_predict = 4096 (document final complet)
+    - keep_alive = 0 (libère le modèle après la dernière passe)
+    - Résultat : le document final
+
+  Prompt map par défaut (si map_system_prompt du template est NULL) :
+    "Tu es un assistant qui extrait les faits d'une transcription de réunion.
+     Tu produis une liste de faits en bullet points (5 à 8 points maximum).
+     RÈGLES STRICTES :
+     - Chaque point fait UNE phrase maximum
+     - Note UNIQUEMENT ce qui est explicitement dit dans le texte
+     - N'invente JAMAIS d'information absente du texte
+     - Conserve les noms, chiffres, dates et décisions tels quels
+     - Sois CONCIS : 400 à 600 caractères maximum pour toute la liste
+     - Réponds en français"
+
+
+6. CONFIGURATION OLLAMA
+========================
+
+Variables d'environnement / config (backend/app/config.py) :
+
+  ollama_url                      URL de l'instance Ollama (défaut: http://localhost:11434)
+  ollama_default_model            Modèle par défaut (défaut: llama3.1:8b)
+  ollama_long_context_model       Modèle pour longs contextes (optionnel)
+  ollama_long_context_threshold   Seuil en chars pour basculer (défaut: 20 000)
+  ollama_map_reduce               Activer le map-reduce (défaut: true)
+  ollama_map_reduce_chunk_size    Taille des chunks en chars (défaut: 4 000)
+
+Paramètres Ollama envoyés à chaque appel :
+  - temperature      : selon template (0.1 pour map, valeur template pour reduce)
+  - num_predict      : 512 (map) ou 4096 (reduce/direct)
+  - repeat_penalty   : 1.2 (pénalise les répétitions, >1.3 perturbe qwen2.5)
+  - repeat_last_n    : 256 (fenêtre de détection des répétitions)
+  - keep_alive       : "10m" (map) ou 0 (reduce/direct)
+
+
+7. API REST
+============
+
+Toutes les routes sont sous le préfixe /ai-documents et nécessitent le
+module "ai_documents" activé pour le tenant.
+
+7.1 Templates
+--------------
+  GET    /ai-documents/templates                  Liste les templates du tenant
+  POST   /ai-documents/templates                  Crée un template
+  GET    /ai-documents/templates/{id}             Détail d'un template
+  PATCH  /ai-documents/templates/{id}             Modifie un template
+  DELETE /ai-documents/templates/{id}             Supprime un template
+
+7.2 Modèles Ollama
+--------------------
+  GET    /ai-documents/ollama-models              Liste les modèles disponibles
+  GET    /ai-documents/ollama-models/pull?model=  Télécharge un modèle (SSE, super admin)
+  DELETE /ai-documents/ollama-models/{name}       Supprime un modèle (super admin)
+
+7.3 Sources
+------------
+  GET    /ai-documents/sources/sessions           Liste les sessions de transcription complétées
+
+7.4 Documents
+--------------
+  POST   /ai-documents/generate                   Lance une génération (retourne 202)
+  GET    /ai-documents/documents                  Liste les documents générés
+  GET    /ai-documents/documents/{id}             Détail d'un document
+  PATCH  /ai-documents/documents/{id}             Met à jour le contenu (édition manuelle)
+  DELETE /ai-documents/documents/{id}             Supprime un document
+  GET    /ai-documents/documents/{id}/export?format=md|txt|pdf|docx   Export
+
+7.5 SSE (Server-Sent Events)
+------------------------------
+  GET    /ai-documents/documents/{id}/events      Stream de la progression
+
+  Événements envoyés :
+    {"status": "generating", "progress": 0}                         — démarrage
+    {"status": "generating", "step": "transcription"}               — extraction transcription
+    {"status": "generating", "step": "dossier"}                     — extraction dossier
+    {"status": "generating", "step": "map_reduce"}                  — début map-reduce
+    {"status": "generating", "step": "map_1_12", "progress": 6}    — passe map chunk 1/12
+    {"status": "generating", "step": "reduce", "progress": 85}     — passe reduce
+    {"status": "generating", "step": "llm"}                        — génération directe
+    {"status": "generating", "partial": "..."}                     — texte partiel (direct)
+    {"status": "completed"}                                        — terminé
+    {"status": "error", "error": "message"}                        — erreur
+
+
+8. TEMPLATES PAR DÉFAUT
+=========================
+
+Trois templates sont créés automatiquement (seed) pour chaque nouveau tenant :
+
+  1. Procès-verbal (type: pv, température: 0.3)
+     Génère un PV complet et structuré, en respectant l'ordre du jour.
+
+  2. Résumé exécutif (type: summary, température: 0.4)
+     Produit un résumé en bullet points (5-10 points max).
+
+  3. Compte-rendu de réunion (type: custom, température: 0.3)
+     Rédige un compte-rendu structuré par point à l'ordre du jour,
+     incluant participants, échanges et décisions.
+
+Aucun de ces templates n'a de map_system_prompt défini : ils utilisent
+le prompt map par défaut en cas de map-reduce.
+
+
+9. EXTRACTION DU CONTEXTE
+===========================
+
+9.1 Depuis une session de transcription (source_session_id)
+-------------------------------------------------------------
+  - transcription : texte complet avec labels de locuteurs ([SPEAKER_00] ...)
+  - duree         : durée formatée (ex: "1h23min45s")
+  - date          : date de création du job (format dd/mm/yyyy)
+  - participants  : noms et fonctions extraits des contacts (SpeakerProfile)
+                    associés aux locuteurs identifiés en diarisation.
+                    Chaîne : DiarisationSpeaker → SpeakerProfile (contact).
+                    Si le locuteur n'est pas identifié, on utilise son
+                    display_name manuel ou son speaker_id brut (SPEAKER_00).
+                    Format : "Jean Dupont (Maire), Marie Martin (DGS)"
+
+9.2 Depuis un dossier préparatoire (source_dossier_id)
+--------------------------------------------------------
+  - agenda         : ordre du jour numéroté (AgendaPoint)
+  - documents_text : texte extrait des documents uploadés (PDF, DOCX, TXT)
+                     limité à 8000 chars par document
+  - title          : titre du dossier
+  - date           : date de réunion du dossier
+
+9.3 Extra context
+------------------
+  Dictionnaire JSON stocké dans AIDocument.extra_context.
+  Permet d'injecter des variables supplémentaires à la génération
+  (ex: données d'une procédure de convocation).
+
+
+10. EXPORT DES DOCUMENTS
+==========================
+
+Formats supportés :
+
+  - Markdown (.md) : texte brut tel que généré
+  - Texte (.txt)   : idem
+  - PDF (.pdf)     : conversion Markdown → PDF via fpdf2
+                     Gère les titres (#, ##, ###), bullet points, séparateurs
+  - DOCX (.docx)   : conversion Markdown/HTML → DOCX via python-docx
+                     Gère le HTML (depuis l'éditeur) et le Markdown (depuis l'IA)
+
+
+11. NOTES TECHNIQUES
+======================
+
+  - File de travaux : queue.Queue thread-safe, un seul job à la fois (même
+    principe que la transcription). Les jobs sont traités dans l'ordre FIFO.
+
+  - Snapshot template : le template est copié en JSON au moment de la
+    génération. Ainsi, modifier un template après coup n'affecte pas les
+    documents déjà générés.
+
+  - Sélection automatique du modèle : si le prompt final dépasse le seuil
+    long contexte ET qu'un modèle long contexte est configuré, le système
+    bascule automatiquement dessus.
+
+  - Anti-hallucination (map) : température plafonnée à 0.1, instructions
+    strictes "N'invente JAMAIS", "Note UNIQUEMENT ce qui est dit".
+
+  - Compatibilité qwen2.5 : repeat_penalty ≤ 1.2 (au-delà, le modèle
+    génère du chinois), et "Réponds en français" dans le prompt map.
+
+  - Indexation RAG : après génération réussie, le document est indexé
+    automatiquement via app.services.indexer.index_ai_document().
+
+  - Ajout de colonnes : les nouvelles colonnes (comme map_system_prompt)
+    sont ajoutées automatiquement au démarrage via _add_missing_columns()
+    dans main.py.
