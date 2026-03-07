@@ -291,7 +291,9 @@ export function ConsentPanel({ jobId }: ConsentPanelProps) {
                         <span className="text-xs text-muted-foreground">({c.role})</span>
                       )}
                       {c.consent_status === "accepted" && (
-                        <Mail className="w-3 h-3 text-green-500 ml-auto" title="Consentement email valide" />
+                        <span className="ml-auto" title="Consentement email valide">
+                          <Mail className="w-3 h-3 text-green-500" />
+                        </span>
                       )}
                     </label>
                   ))}
