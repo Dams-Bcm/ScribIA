@@ -235,5 +235,13 @@ def delete_contact(
     c = db.query(Contact).filter_by(id=contact_id, group_id=group_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Contact introuvable")
+
+    # Clear FK references before deleting
+    from app.models.consent import ConsentRequest, ConsentDetection
+    db.query(ConsentRequest).filter(ConsentRequest.contact_id == contact_id).delete(
+        synchronize_session=False)
+    db.query(ConsentDetection).filter(ConsentDetection.contact_id == contact_id).delete(
+        synchronize_session=False)
+
     db.delete(c)
     db.commit()
