@@ -753,6 +753,7 @@ export interface ContactCreate {
 
 export interface ContactUpdate {
   name?: string;
+  first_name?: string | null;
   email?: string | null;
   phone?: string | null;
   role?: string | null;

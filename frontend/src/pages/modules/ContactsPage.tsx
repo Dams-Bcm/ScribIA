@@ -315,7 +315,6 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
   const isAllView = groupId === "__all__";
   const { data: group, isLoading } = useContactGroup(groupId);
   const deleteContact = useDeleteContact();
-  const updateContact = useUpdateContact();
   const resetEnrollment = useResetEnrollment();
   const sendConsent = useSendConsentRequest();
   const [showAdd, setShowAdd] = useState(false);
@@ -454,7 +453,7 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
                   <EditContactRow
                     key={c.id}
                     contact={c}
-                    groupId={isAllView ? c.group_ids[0] : groupId}
+                    groupId={isAllView ? (c.group_ids[0] ?? groupId) : groupId}
                     onDone={() => setEditingId(null)}
                   />
                 ) : (
