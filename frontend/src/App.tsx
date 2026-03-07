@@ -22,6 +22,7 @@ import { ContactsPage } from "./pages/modules/ContactsPage";
 import { SearchPage } from "./pages/modules/SearchPage";
 import { DictionaryPage } from "./pages/modules/DictionaryPage";
 import { FormPage } from "./pages/public/FormPage";
+import { ConsentResponsePage } from "./pages/public/ConsentResponsePage";
 
 // Admin pages
 import { TenantsPage } from "./pages/admin/TenantsPage";
@@ -68,6 +69,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/form/:token" element={<FormPage />} />
+      <Route path="/consent-response" element={<ConsentResponsePage />} />
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
           {/* Dashboard */}

@@ -1,0 +1,669 @@
+================================================================================
+        REVUE DE CODE — ScribIA v2 — 2026-03-07 (v2)
+================================================================================
+
+Table des matieres :
+  1. Resume executif
+  2. Backend (Python / FastAPI / SQLAlchemy)
+  3. Frontend (React / TypeScript / Vite)
+  4. Infrastructure & Configuration (Docker / Nginx)
+  5. Recommandations prioritaires
+
+
+================================================================================
+1. RESUME EXECUTIF
+================================================================================
+
+  CRITICAL :  9 issues
+  HIGH     : 18 issues
+  MEDIUM   : 18 issues
+  LOW      : 15 issues
+  TOTAL    : 60 issues
+
+  Points forts :
+  + Bonne separation des responsabilites (routers/services/models/schemas)
+  + Audit logging via log_action() sur operations sensibles
+  + Middleware tenant routing avec cache
+  + TypeScript strict mode active
+  + Multi-stage Docker builds
+  + TanStack Query pour le data fetching
+  + Chroma pinne a une version specifique
+  + Healthcheck DB present
+
+  Points faibles principaux :
+  - Credentials en dur dans config.py (DB + JWT)
+  - IP de production en dur dans nginx.conf
+  - Erreurs silencieuses (catch vides) cote frontend ET backend
+  - Pas d'Error Boundaries React
+  - CORS trop permissif
+  - --reload en production dans le Dockerfile backend
+  - Pas de HTTPS dans nginx
+  - Race conditions (SSE+polling frontend, step completion backend)
+
+
+================================================================================
+2. BACKEND — Python / FastAPI / SQLAlchemy
+================================================================================
+
+--- CRITICAL ---
+
+[B-01] Credentials DB en dur dans config.py
+  Fichier : backend/app/config.py:11
+  Categorie : Securite
+  Description : db_password="ScribIA_Dev_2026!" en valeur par defaut.
+    Si les variables d'env ne sont pas definies, l'app tourne avec ces
+    credentials en production.
+  Correction : Supprimer la valeur par defaut. Lever une erreur au
+    demarrage si SCRIBIA_DB_PASSWORD n'est pas defini.
+
+[B-02] Secret JWT en dur dans config.py
+  Fichier : backend/app/config.py:27
+  Categorie : Securite
+  Description : jwt_secret="CHANGE-ME-IN-PRODUCTION". Facilement
+    brute-forcable si oublie en prod.
+  Correction : Pas de default. Fail fast au startup si absent.
+    Valider longueur minimale (32+ chars).
+
+[B-03] Risque d'injection SQL dans dedicated_db.py
+  Fichier : backend/app/services/dedicated_db.py:34,131,140,149,180,198
+  Categorie : Securite (SQL Injection)
+  Description : Noms de tables/colonnes/DB construits par f-string dans du
+    SQL brut : text(f"IF DB_ID('{db_name}') IS NULL CREATE DATABASE [{db_name}]")
+    Bien que _safe_db_name() sanitize, le pattern est fragile si refactore.
+  Correction : Utiliser les objets DDL de SQLAlchemy. Valider db_name
+    contre un pattern whitelist strict.
+
+[B-04] Isolation tenant manquante sur endpoints publics (forms)
+  Fichier : backend/app/routers/procedures.py:720-750
+  Categorie : Securite (controle d'acces manquant)
+  Description : GET /forms/{token} et POST /forms/{token}/submit ne
+    verifient pas que le participant appartient a un tenant valide/actif.
+    Fuite d'information cross-tenant possible si token devine ou fuite.
+  Correction : Valider que la procedure appartient a un tenant actif.
+    Ajouter rate limiting et expiration de token.
+
+
+--- HIGH ---
+
+[B-05] Validation tenant insuffisante sur creation user super_admin
+  Fichier : backend/app/routers/admin.py:943-944
+  Categorie : Securite
+  Description : L'endpoint accepte body.tenant_id sans valider que
+    le super_admin a l'autorisation sur ce tenant specifique.
+  Correction : Valider explicitement. Retourner 403 si un admin non-super
+    tente de specifier un autre tenant_id.
+
+[B-06] Suppression tenant sans cascade validee
+  Fichier : backend/app/routers/admin.py:138-144
+  Categorie : Bug (coherence donnees)
+  Description : La suppression manuelle des tables liees (ConsentDetection,
+    ConsentRequest, etc.) risque de rater de nouvelles tables ajoutees.
+    Les modeles ont ondelete="NO ACTION".
+  Correction : Lister toutes les tables avec tenant_id dans un commentaire
+    de maintenance, ou passer a ondelete="CASCADE".
+
+[B-07] IDOR sur retrait de consentement (withdrawal_token)
+  Fichier : backend/app/routers/consent.py:96-116
+  Categorie : Securite
+  Description : Le withdrawal_token est utilise pour identifier le profil
+    sans validation tenant ni rate limiting. Si un token est
+    devine/fuite, n'importe qui peut retirer le consentement.
+  Correction : Ajouter rate limiting sur les endpoints publics de
+    consentement. Tokens suffisamment longs (token_urlsafe(32) = ok).
+
+[B-08] JSON deserialization sans validation de schema
+  Fichier : backend/app/routers/admin.py:232-233,301-303
+  Categorie : Bug
+  Description : json.loads(raw) sur suggestions et default_modules
+    sans valider la structure avec un modele Pydantic.
+  Correction : Valider avec des modeles Pydantic avant sauvegarde.
+
+[B-09] Race condition sur completion de step
+  Fichier : backend/app/routers/procedures.py:554-603
+  Categorie : Bug
+  Description : complete_step met a jour le statut et avance au step
+    suivant sans isolation transactionnelle. Deux requetes concurrentes
+    peuvent marquer le meme step COMPLETED et avancer deux fois.
+  Correction : Utiliser with_for_update() ou transaction serialisable.
+
+[B-10] Race condition sur transitions de statut de job
+  Fichier : backend/app/routers/transcription.py:128-137
+  Categorie : Bug
+  Description : job.status = QUEUED sans verifier l'etat courant de
+    maniere atomique. Entre le .first() et le .commit(), un autre
+    thread peut modifier le job → updates perdus.
+  Correction : UPDATE WHERE old_status=X ou verrouillage optimiste
+    avec champ version.
+
+[B-11] Echec silencieux du parsing JSON (convocation)
+  Fichier : backend/app/routers/procedures.py:661-670
+  Categorie : Bug
+  Description : json.loads(p.responses) dans try/except qui fait
+    "continue" sans log. Participants silencieusement ignores si donnees
+    corrompues. L'admin ne sait pas que des donnees manquent.
+  Correction : Logger l'erreur. Inclure un avertissement dans le document.
+
+[B-12] _parse_questions retourne [] silencieusement sur erreur
+  Fichier : backend/app/routers/procedures.py:55-56
+  Categorie : Bug
+  Description : FormQuestion(**q) dans un try/except qui retourne []
+    sans log. Les questions peuvent etre perdues sans trace.
+  Correction : Logger les echecs de parsing.
+
+[B-13] CSRF sur endpoints publics de consentement (GET modifie l'etat)
+  Fichier : backend/app/routers/consent.py:45-66
+  Categorie : Securite
+  Description : GET /consent/accept et GET /consent/decline modifient
+    l'etat en base. Viole les principes REST et permet des attaques
+    CSRF via des liens dans des emails.
+  Correction : Utiliser POST avec verification additionnelle, ou ajouter
+    une page de confirmation intermediaire.
+
+[B-14] Pas d'audit trail sur creation/suppression de tenant
+  Fichier : backend/app/routers/admin.py:48-86
+  Categorie : Securite
+  Description : Tenant creation/deletion ne passe pas par log_action()
+    contrairement aux autres operations sensibles.
+  Correction : Ajouter audit logging sur toutes les operations CRUD tenant.
+
+
+--- MEDIUM ---
+
+[B-15] Null pointer safety fragile sur speaker profile
+  Fichier : backend/app/services/ai_documents.py:120-122
+  Categorie : Bug
+  Description : Code suppose que spk.profile existe. Si le profil est
+    supprime mais la FK non nullifiee, crash possible.
+  Correction : Ajouter null checks explicites.
+
+[B-16] Requete non bornee sur audit_logs
+  Fichier : backend/app/routers/compliance.py:197-200
+  Categorie : Performance
+  Description : Jusqu'a 1000 records charges en memoire.
+  Correction : S'assurer que limit est toujours applique.
+
+[B-17] Validation taille fichier sans verification contenu
+  Fichier : backend/app/routers/transcription.py:67-69
+  Categorie : Securite
+  Description : Taille verifiee mais pas les magic bytes ni l'espace
+    disque disponible.
+  Correction : Valider les magic bytes du fichier audio.
+
+[B-18] Modele procedure peut avoir roles ET steps simultanement
+  Fichier : backend/app/models/procedures.py:66-77
+  Categorie : Bug
+  Description : Rien n'empeche de stocker les deux. Le router gere via
+    "if steps -> wizard" mais c'est fragile.
+  Correction : Validation au niveau modele : l'un OU l'autre.
+
+[B-19] Pas de validation email dans les modeles
+  Fichier : backend/app/models/speaker.py:23
+  Categorie : Bug
+  Description : Le champ email accepte n'importe quelle string.
+  Correction : Utiliser pydantic.EmailStr dans les schemas.
+
+[B-20] JSON extra_context sans schema
+  Fichier : backend/app/models/ai_documents.py:45
+  Categorie : Bug
+  Description : NVARCHAR(MAX) sans validation de structure. Peut casser
+    la generation de templates.
+  Correction : Definir et valider le schema avant sauvegarde.
+
+[B-21] Injection de prompt LLM
+  Fichier : backend/app/routers/admin.py:324-346
+  Categorie : Securite
+  Description : Description secteur (input user) interpolee directement
+    dans le prompt LLM par f-string.
+  Correction : Format structure (JSON template). Sanitizer l'input.
+
+[B-22] Connexions DB non fermees dans certains chemins d'erreur
+  Fichier : backend/app/services/dedicated_db.py
+  Categorie : Bug (fuite de ressources)
+  Correction : Context managers partout.
+
+[B-23] N+1 query sur contact dans retrait de consentement
+  Fichier : backend/app/routers/consent.py:191-193
+  Categorie : Performance
+  Description : Contact charge individuellement dans une boucle.
+  Correction : Batch load au debut de l'operation.
+
+
+--- LOW ---
+
+[B-24] Messages d'erreur inconsistants (francais/anglais)
+  Categorie : Qualite
+  Correction : Standardiser en francais.
+
+[B-25] Reponses 404 differentes selon la raison (enumeration)
+  Categorie : Securite
+  Description : Permet de distinguer "n'existe pas" de "pas autorise"
+    via timing.
+  Correction : Reponses 404 identiques partout.
+
+[B-26] FFmpeg stderr peut leaker des chemins systeme
+  Fichier : backend/app/services/transcription.py:96
+  Categorie : Securite
+  Correction : Sanitiser les messages d'erreur avant logging.
+
+[B-27] Index DB manquants sur colonnes filtrees
+  Fichiers : models/transcription.py, models/speaker.py, models/consent.py
+  Categorie : Performance
+  Correction : Index sur status, consent_status, mode.
+
+[B-28] TODO en production (envoi email)
+  Fichier : backend/app/routers/speakers.py:435
+  Categorie : Qualite
+  Correction : Implementer ou supprimer le TODO.
+
+[B-29] Docstrings manquants sur les endpoints
+  Categorie : Qualite
+  Correction : Ajouter des docstrings OpenAPI.
+
+
+================================================================================
+3. FRONTEND — React / TypeScript / Vite
+================================================================================
+
+--- CRITICAL ---
+
+[F-01] Token localStorage vulnerable au XSS
+  Fichiers : frontend/src/api/client.ts:13-15,26-28,50-54,87-92,139,173,
+    238,286 + 11 autres fichiers (15+ occurrences)
+  Categorie : Securite
+  Description : Token recupere depuis localStorage dans 15+ endroits
+    differents. Pas de verification d'expiration. Pas de protection HTTPS
+    verifiee. Vulnerable si un script tiers est compromis.
+  Correction : Centraliser la gestion du token dans un service unique.
+    Idealement httpOnly cookie (necessite support backend). Ajouter
+    verification d'expiration et refresh token.
+
+
+--- HIGH ---
+
+[F-02] SSE parsing avec catch vide
+  Fichier : frontend/src/api/client.ts:121-123
+  Categorie : Bug
+  Description : Le catch du stream SSE avale les erreurs silencieusement.
+    Aucun feedback utilisateur en cas d'echec.
+  Correction : Logger l'erreur et fournir un callback onError.
+
+[F-03] Race condition SSE + polling dans TranscriptionJobView
+  Fichier : frontend/src/components/transcription/TranscriptionJobView.tsx:38-85
+  Categorie : Bug
+  Description : 3 useEffect independants gerent le meme state (liveStatus,
+    progress). SSE, polling 3s, et sync job peuvent declencher des updates
+    simultanement sans coordination.
+  Correction : Consolider en un seul effect avec AbortController.
+
+[F-04] Pas d'Error Boundaries React
+  Fichier : frontend/src/App.tsx (global)
+  Categorie : Bug
+  Description : Si RichTextEditor, StepWorkflowView, ConsentPanel ou tout
+    autre composant crash, la page entiere crash sans fallback.
+  Correction : Creer un composant ErrorBoundary et wrapper les routes
+    et sections critiques.
+
+[F-05] JSON.parse non protege
+  Fichiers : TranscriptionJobView.tsx:203, DiarisationJobView.tsx:232,
+    AISettingsPage.tsx:254-268, client.ts:112,156,163
+  Categorie : Bug
+  Description : JSON.parse sans try-catch ou avec catch vide. Si le
+    backend retourne du JSON invalide, le composant crash.
+  Correction : Wrapper dans try-catch avec fallback null et log.
+
+[F-06] window.location.href au lieu de React Router pour logout
+  Fichiers : frontend/src/api/client.ts:34-35,67-68,150
+  Categorie : Bug / Qualite
+  Description : Sur 401, window.location.href="/login" cause un full page
+    reload et perte du state React. Plusieurs requetes 401 simultanees
+    declenchent plusieurs redirections.
+  Correction : Utiliser React Router navigate() via un contexte auth.
+
+[F-07] Pas de sauvegarde automatique ni warning on unload pour RichTextEditor
+  Fichier : frontend/src/components/editor/RichTextEditor.tsx:60-120
+  Categorie : Bug (perte de donnees)
+  Description : L'editeur de texte riche n'a ni autosave ni avertissement
+    beforeunload. L'utilisateur peut perdre ses modifications sans
+    avertissement.
+  Correction : Implementer autosave localStorage + beforeunload si dirty.
+
+[F-08] Erreurs de ConsentPanel avalees silencieusement
+  Fichier : frontend/src/components/diarisation/ConsentPanel.tsx:68-79,130-141
+  Categorie : Bug / UX
+  Description : API errors dans loadGroupContacts pris dans catch qui fait
+    juste setGroupContacts([]). L'utilisateur ne sait pas pourquoi les
+    contacts ont disparu.
+  Correction : Afficher un etat d'erreur explicite.
+
+[F-09] Erreur de soumission de formulaire public non affichee
+  Fichier : frontend/src/pages/public/FormPage.tsx:22-26,113-119
+  Categorie : UX
+  Description : Si submit.mutateAsync echoue, aucun message d'erreur
+    n'est affiche. L'utilisateur ne sait pas que sa soumission a echoue.
+  Correction : Ajouter {submit.isError && <p className="text-destructive">...}
+
+[F-10] Page ConsentResponse ignore le theme sombre
+  Fichier : frontend/src/pages/public/ConsentResponsePage.tsx:34-72
+  Categorie : UX / Theme
+  Description : Utilise des couleurs en dur (bg-gray-50, bg-white,
+    text-gray-600) au lieu des variables du theme. Page blanche en dark mode.
+  Correction : Utiliser bg-background, text-foreground, border-border.
+
+[F-11] 15+ catch vides dans le frontend
+  Fichiers : client.ts:41,114-115,121-123, ConsentPanel.tsx:74-75,
+    AISettingsPage.tsx:267, et autres
+  Categorie : Bug
+  Description : Les erreurs sont avalees silencieusement partout. Debug en
+    production quasi impossible.
+  Correction : Centraliser le logging. Remplacer tous les catch vides
+    par des logs + feedback utilisateur.
+
+[F-12] Micro permission refusee sans retry possible
+  Fichier : frontend/src/components/transcription/AudioRecorder.tsx:27-66
+  Categorie : UX
+  Description : Si l'acces micro est refuse, pas de mecanisme pour
+    re-demander. L'utilisateur doit changer les settings du navigateur.
+  Correction : Ajouter un bouton "Reessayer" avec explication.
+
+
+--- MEDIUM ---
+
+[F-13] Theme localStorage non valide
+  Fichier : frontend/src/components/Layout.tsx:49-58
+  Categorie : Bug
+  Description : localStorage.getItem("theme") caste en ThemeKey sans
+    validation. Si la valeur est corrompue, echec silencieux.
+  Correction : Valider contre les valeurs autorisees.
+
+[F-14] Token passe dans les headers depuis 15+ fichiers differents
+  Fichiers : TranscriptionResult.tsx:30,85, DocumentViewer.tsx:10,
+    ProcedureDetail.tsx:49, etc.
+  Categorie : Qualite / Securite
+  Description : Chaque composant accede directement a localStorage pour
+    le token au lieu de passer par le client API.
+  Correction : Centraliser l'acces au token dans api/client.ts.
+
+[F-15] Test email mutation avec erreur avalee
+  Fichier : frontend/src/pages/admin/EmailSettingsPage.tsx:76-84
+  Categorie : UX
+  Description : Si la mutation throw, l'erreur est prise dans catch
+    generique. Message peu informatif.
+  Correction : Gerer ApiError explicitement avec message structure.
+
+[F-16] Validation manquante sur formulaires ProcedureDetail
+  Fichier : frontend/src/components/procedures/ProcedureDetail.tsx:236-270
+  Categorie : Bug
+  Description : Champs marques "required" non valides cote client avant
+    soumission. Le formulaire accepte des champs vides.
+  Correction : Validation client + desactiver le bouton submit si invalide.
+
+[F-17] Performance Set operations sur grandes listes de contacts
+  Fichier : frontend/src/components/diarisation/ConsentPanel.tsx:264,271,433,440
+  Categorie : Performance
+  Description : new Set([...]) recree a chaque clic sur des listes de
+    100+ contacts, causant des re-renders inutiles.
+  Correction : useCallback ou memoisation.
+
+[F-18] AnnouncementPopup localStorage sans expiration
+  Fichier : frontend/src/components/AnnouncementPopup.tsx:7-27
+  Categorie : Bug
+  Description : "Ne plus afficher" persiste indefiniment. Pas de moyen
+    admin de forcer le re-affichage apres mise a jour.
+  Correction : Expiration basee sur timestamp ou ID d'annonce.
+
+[F-19] confirm() natif au lieu de dialog shadcn
+  Fichier : frontend/src/pages/admin/AISettingsPage.tsx
+  Categorie : UX / Qualite
+  Description : Utilise le confirm() natif du navigateur, inconsistant
+    avec le reste de l'UI.
+  Correction : Composant ConfirmDialog reutilisable.
+
+
+--- LOW ---
+
+[F-20] Pattern "saved" duplique 4x
+  Fichier : frontend/src/pages/admin/AISettingsPage.tsx:213-222,278-284
+  Categorie : Qualite (DRY)
+  Description : setSaved(true) + setTimeout(() => setSaved(false), 2000)
+    repete 4 fois.
+  Correction : Extraire dans un hook useTempSuccess(duration).
+
+[F-21] MIME type fallback vide dans AudioRecorder
+  Fichier : frontend/src/components/transcription/AudioRecorder.tsx:33-36
+  Categorie : Compatibilite
+  Description : Si aucun MIME type supporte, string vide comme fallback.
+  Correction : Defaut a "audio/webm".
+
+[F-22] Aria-labels manquants sur boutons icones
+  Fichiers : Layout.tsx et composants divers
+  Categorie : Accessibilite
+  Correction : Ajouter aria-label sur les boutons icone-only.
+
+[F-23] Type assertions non valides a runtime
+  Fichier : frontend/src/components/procedures/ProcedureDetail.tsx:237
+  Categorie : Qualite
+  Correction : Utiliser zod pour validation runtime.
+
+[F-24] Upload error message generique
+  Fichier : frontend/src/pages/modules/TranscriptionPage.tsx:41-44
+  Categorie : UX
+  Description : "Une erreur est survenue" sans details sur limites
+    de taille/format.
+  Correction : Messages d'erreur contextuels (taille max 500 MB, etc.)
+
+
+================================================================================
+4. INFRASTRUCTURE & CONFIGURATION
+================================================================================
+
+--- CRITICAL ---
+
+[I-01] IP de production en dur dans nginx.conf
+  Fichier : frontend/nginx.conf:9
+  Categorie : Securite
+  Description : proxy_pass http://178.170.43.132:8001/ — IP de serveur
+    exposee dans le code versionne.
+  Correction : Utiliser envsubst ou variable d'environnement Docker.
+
+[I-02] Dependance requests non pinnee
+  Fichier : backend/requirements.txt:20
+  Categorie : Fiabilite
+  Description : requests sans version. Peut introduire des breaking
+    changes ou des vulnerabilites.
+  Correction : Pinner : requests==2.31.0
+
+[I-03] Image ollama:latest non pinnee
+  Fichier : docker-compose.yml:31
+  Categorie : Fiabilite
+  Description : image: ollama/ollama:latest — builds non reproductibles.
+  Correction : Pinner a une version specifique.
+
+
+--- HIGH ---
+
+[I-04] Pas de HTTPS/TLS dans nginx
+  Fichier : frontend/nginx.conf
+  Categorie : Securite
+  Description : Nginx ecoute uniquement sur HTTP port 80. Tout le trafic
+    est en clair en production.
+  Correction : Ajouter config SSL avec certificats. Redirection HTTP→HTTPS.
+
+[I-05] --reload en production dans le Dockerfile backend
+  Fichier : backend/Dockerfile:37
+  Categorie : Performance / Securite
+  Description : uvicorn --reload est un flag de developpement. Augmente
+    la consommation memoire et degrade les performances en production.
+  Correction : Supprimer --reload. Utiliser une variable d'environnement
+    pour le mode dev vs prod.
+
+[I-06] CORS trop permissif
+  Fichier : backend/app/main.py:317-318
+  Categorie : Securite
+  Description : allow_methods=["*"], allow_headers=["*"]
+  Correction : Restreindre :
+    methods=["GET","POST","PUT","DELETE","OPTIONS"],
+    headers=["Content-Type","Authorization"]
+
+[I-07] Pas de healthcheck Docker pour backend/frontend
+  Fichier : docker-compose.yml
+  Categorie : Fiabilite
+  Description : Seul le service DB a un healthcheck. Docker ne peut pas
+    detecter si le backend ou le frontend est sain.
+  Correction : Ajouter healthcheck HTTP sur /health pour le backend
+    et wget sur / pour le frontend.
+
+[I-08] Headers de securite Nginx manquants
+  Fichier : frontend/nginx.conf
+  Categorie : Securite
+  Description : Pas de X-Frame-Options, X-Content-Type-Options,
+    X-XSS-Protection, HSTS, Referrer-Policy, Content-Security-Policy.
+  Correction : Ajouter les headers standard.
+
+[I-09] Pas de .dockerignore
+  Categorie : Performance / Securite
+  Description : .git, node_modules, __pycache__, .env, venv copies
+    dans les images Docker. Augmente la taille et peut exposer des secrets.
+  Correction : Creer .dockerignore pour backend et frontend.
+
+[I-10] Backend Docker tourne en root
+  Fichier : backend/Dockerfile
+  Categorie : Securite
+  Description : Pas de directive USER. Le processus tourne en root.
+  Correction : Creer un utilisateur non-root : RUN useradd -m scribia
+    puis USER scribia.
+
+
+--- MEDIUM ---
+
+[I-11] Validation CORS origins manquante
+  Fichier : backend/app/main.py:315
+  Categorie : Securite
+  Description : cors_origins.split(",") sans validation. Espaces, valeurs
+    vides ou wildcards possibles.
+  Correction : Valider avec @field_validator dans config.py.
+
+[I-12] Credentials DB dans la connection string (risque de log)
+  Fichier : backend/app/database.py:16-21
+  Categorie : Securite
+  Description : Le mot de passe est en clair dans database_url. Si une
+    erreur est loggee, les credentials fuient.
+  Correction : Version sanitisee pour le logging.
+
+[I-13] npm install au lieu de npm ci dans le Dockerfile frontend
+  Fichier : frontend/Dockerfile:5
+  Categorie : Fiabilite
+  Description : package-lock.json* avec wildcard = optionnel. Si absent,
+    resolution fresh = build non reproductible.
+  Correction : COPY package.json package-lock.json (sans wildcard)
+    puis RUN npm ci --frozen-lockfile.
+
+[I-14] Frontend nginx tourne en root
+  Fichier : frontend/Dockerfile
+  Categorie : Securite
+  Correction : Configurer nginx pour tourner en non-root.
+
+[I-15] Logging non configurable par environnement
+  Fichier : backend/app/main.py:7-11
+  Categorie : Qualite
+  Description : Niveau de log en dur a INFO. En prod, WARNING ou ERROR
+    preferable.
+  Correction : LOG_LEVEL configurable via env var.
+
+[I-16] Documentation env vars manquante
+  Fichier : backend/app/config.py
+  Categorie : Qualite
+  Description : Pas de docstrings expliquant quelles variables sont
+    requises vs optionnelles.
+  Correction : Ajouter docstrings avec liste des variables.
+
+
+--- LOW ---
+
+[I-17] Pas de cache sur API dans nginx
+  Fichier : frontend/nginx.conf
+  Categorie : Bug
+  Description : Reponses API peuvent etre cachees par le navigateur.
+  Correction : Cache-Control: no-store sur location /api/.
+
+[I-18] SMTP defaults vides sans warning
+  Fichier : backend/app/config.py:74-77
+  Categorie : Qualite
+  Description : Email echoue silencieusement si SMTP non configure.
+  Correction : Logger un warning si SMTP non configure.
+
+[I-19] HF_TOKEN non valide quand diarisation activee
+  Fichier : backend/app/config.py:47
+  Categorie : Qualite
+  Description : Default vide. Diarisation echoue sans message clair.
+  Correction : Validation conditionnelle si module diarisation actif.
+
+[I-20] Pas de pre-commit hooks
+  Categorie : Securite
+  Description : Pas de detection de secrets avant commit.
+  Correction : Configurer detect-secrets ou gitleaks.
+
+[I-21] Chemins audio/docs en dur
+  Fichier : backend/app/config.py:35,54,64
+  Categorie : Qualite
+  Description : /data/audio, /data/prep_docs, /data/ai_docs en dur.
+  Correction : Configurable via env vars.
+
+[I-22] Pas de request logging middleware
+  Fichier : backend/app/main.py
+  Categorie : Qualite
+  Description : Pas de trace des requetes HTTP. Debugging et monitoring
+    difficiles.
+  Correction : Ajouter un middleware de logging avec request_id.
+
+
+================================================================================
+5. RECOMMANDATIONS PRIORITAIRES (par ordre d'urgence)
+================================================================================
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ IMMEDIAT — Securite critique                                          │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │ 1. Supprimer les credentials par defaut de config.py     [B-01, B-02] │
+  │ 2. Retirer l'IP en dur de nginx.conf                          [I-01] │
+  │ 3. Supprimer --reload du Dockerfile backend                   [I-05] │
+  │ 4. Restreindre CORS                                           [I-06] │
+  │ 5. Ajouter les headers de securite Nginx                      [I-08] │
+  │ 6. Pinner toutes les dependances                         [I-02, I-03] │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ SPRINT 1 — Stabilite applicative                                      │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │ 7. Ajouter Error Boundaries React                             [F-04] │
+  │ 8. Corriger la race condition SSE+polling                     [F-03] │
+  │ 9. Proteger tous les JSON.parse                     [F-05, B-11, B-12]│
+  │ 10. Remplacer les 15+ catch vides par du logging    [F-11, B-11]      │
+  │ 11. Centraliser la gestion du token JWT frontend    [F-01, F-14]      │
+  │ 12. Afficher les erreurs de formulaire public       [F-09]            │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ SPRINT 2 — Securite renforcee                                         │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │ 13. Verification tenant sur endpoints publics                 [B-04] │
+  │ 14. Row locks sur completion de step                          [B-09] │
+  │ 15. CSRF protection sur endpoints consent GET→POST            [B-13] │
+  │ 16. Rate limiting sur endpoints publics                       [B-07] │
+  │ 17. Healthchecks Docker backend/frontend                      [I-07] │
+  │ 18. .dockerignore                                             [I-09] │
+  │ 19. Container non-root                                   [I-10, I-14]│
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ SPRINT 3 — Qualite & UX                                               │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │ 20. Page ConsentResponse : respecter le theme sombre          [F-10] │
+  │ 21. Autosave RichTextEditor + beforeunload                    [F-07] │
+  │ 22. Remplacer confirm() natif par dialog shadcn               [F-19] │
+  │ 23. Aria-labels accessibilite                                 [F-22] │
+  │ 24. Audit logging creation/suppression tenant                 [B-14] │
+  │ 25. Index DB sur colonnes filtrees                            [B-27] │
+  │ 26. HTTPS/TLS nginx                                           [I-04] │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================

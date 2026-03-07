@@ -11,6 +11,11 @@ from app.config import settings
 from app.database import get_db
 from app.models import Tenant, TenantModule, User, AVAILABLE_MODULES, AuditLog, AIDocumentTemplate, ProcedureTemplate, ProcedureTemplateRole, ProcedureTemplateStep, AISetting, AI_USAGES, Sector
 from app.models.announcement import Announcement, announcement_tenants
+from app.models.transcription import TranscriptionJob
+from app.models.preparatory import PreparatoryDossier
+from app.models.consent import ConsentRequest, ConsentDetection
+from app.models.contacts import Contact, ContactGroup
+from app.models.procedures import Procedure
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantModuleUpdate
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.schemas.announcement import AnnouncementCreate, AnnouncementUpdate, AnnouncementResponse
@@ -128,6 +133,15 @@ def delete_tenant(
     # Detach children before deleting group
     if tenant.tenant_type == "group":
         db.query(Tenant).filter(Tenant.parent_id == tenant_id).update({"parent_id": None})
+
+    # Clean up tables without ondelete CASCADE
+    db.query(ConsentDetection).filter(ConsentDetection.tenant_id == tenant_id).delete()
+    db.query(ConsentRequest).filter(ConsentRequest.tenant_id == tenant_id).delete()
+    db.query(TranscriptionJob).filter(TranscriptionJob.tenant_id == tenant_id).delete()
+    db.query(PreparatoryDossier).filter(PreparatoryDossier.tenant_id == tenant_id).delete()
+    db.query(Contact).filter(Contact.tenant_id == tenant_id).delete()
+    db.query(ContactGroup).filter(ContactGroup.tenant_id == tenant_id).delete()
+    db.query(Procedure).filter(Procedure.tenant_id == tenant_id).delete()
 
     db.delete(tenant)
     db.commit()
