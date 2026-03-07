@@ -162,22 +162,11 @@ export function TranscriptionJobView({ jobId, onBack }: TranscriptionJobViewProp
                   );
                 }
 
-                // No attendees yet — allow starting without (backward compat)
+                // No attendees yet — must add at least one
                 return (
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      await startProcessing.mutateAsync(jobId);
-                      refetch();
-                    }}
-                    disabled={startProcessing.isPending}
-                  >
-                    {startProcessing.isPending ? (
-                      <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Lancement…</>
-                    ) : (
-                      <><Play className="w-4 h-4 mr-1" /> Lancer sans sélectionner de participants</>
-                    )}
-                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    Ajoutez au moins un participant pour pouvoir lancer la transcription.
+                  </p>
                 );
               })()}
             </div>
