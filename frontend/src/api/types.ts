@@ -217,6 +217,35 @@ export interface DiarisationSSEEvent {
   error_message: string | null;
 }
 
+// ── Consent / Attendees ─────────────────────────────────────────────────────
+
+export type AttendeeStatus =
+  | "pending"
+  | "pending_oral"
+  | "accepted_email"
+  | "accepted_oral"
+  | "refused"
+  | "withdrawn";
+
+export interface AttendeeEntry {
+  contact_id: string;
+  status: AttendeeStatus;
+  evidence_type: string | null;
+  evidence_id: string | null;
+  segment_start_ms: number | null;
+  segment_end_ms: number | null;
+  decided_at: string | null;
+  decided_by: string | null;
+  withdrawn_at: string | null;
+  withdrawn_via: string | null;
+}
+
+export interface AttendeesResponse {
+  attendees: AttendeeEntry[];
+  recording_validity: string | null;
+  summary: string | null;
+}
+
 // ── Preparatory Phases ──────────────────────────────────────────────────────
 
 export type DossierStatus = "draft" | "ready" | "archived";

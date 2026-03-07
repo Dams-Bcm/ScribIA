@@ -1,24 +1,53 @@
 import { useState } from "react";
-import { Shield, Loader2, CheckCircle2, AlertTriangle, Search, Users } from "lucide-react";
+import {
+  Shield,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  Search,
+  Users,
+  UserPlus,
+  Mail,
+  Mic,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDetectOralConsent, useValidateCollectiveConsent } from "@/api/hooks/useSpeakers";
 import { useContactGroups } from "@/api/hooks/useContacts";
+import { useAttendees, useSetAttendees } from "@/api/hooks/useConsent";
 import { ApiError } from "@/api/client";
 import { api } from "@/api/client";
-import type { OralConsentDetection, Contact, ContactGroupDetail } from "@/api/types";
+import type { OralConsentDetection, Contact, ContactGroupDetail, AttendeeEntry } from "@/api/types";
 
 interface ConsentPanelProps {
   jobId: string;
 }
 
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  accepted_email: { label: "Email", color: "text-green-600" },
+  accepted_oral: { label: "Oral", color: "text-green-600" },
+  pending_oral: { label: "Oral en attente", color: "text-amber-600" },
+  pending: { label: "En attente", color: "text-gray-500" },
+  refused: { label: "Refusé", color: "text-red-600" },
+  withdrawn: { label: "Retiré", color: "text-red-600" },
+};
+
 export function ConsentPanel({ jobId }: ConsentPanelProps) {
   const detectConsent = useDetectOralConsent();
   const validateConsent = useValidateCollectiveConsent();
   const { data: groups = [] } = useContactGroups();
+  const { data: attendeesData, isLoading: loadingAttendees } = useAttendees(jobId);
+  const setAttendees = useSetAttendees();
 
   const [detection, setDetection] = useState<OralConsentDetection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Attendees selection
+  const [showAttendeeSelector, setShowAttendeeSelector] = useState(false);
+  const [attendeeGroupId, setAttendeeGroupId] = useState<string | null>(null);
+  const [attendeeContacts, setAttendeeContacts] = useState<Contact[]>([]);
+  const [loadingAttendeeContacts, setLoadingAttendeeContacts] = useState(false);
+  const [selectedAttendeeIds, setSelectedAttendeeIds] = useState<Set<string>>(new Set());
 
   // Contact selection for collective consent
   const [showContactSelector, setShowContactSelector] = useState(false);
@@ -26,6 +55,58 @@ export function ConsentPanel({ jobId }: ConsentPanelProps) {
   const [groupContacts, setGroupContacts] = useState<Contact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
+
+  const attendees = attendeesData?.attendees ?? [];
+  const hasAttendees = attendees.length > 0;
+
+  // ── Attendees handlers ──────────────────────────────────────────────────
+
+  async function loadAttendeeGroupContacts(groupId: string) {
+    setLoadingAttendeeContacts(true);
+    try {
+      const detail = await api.get<ContactGroupDetail>(`/contacts/groups/${groupId}`);
+      setAttendeeContacts(detail.contacts);
+      setSelectedAttendeeIds(new Set(detail.contacts.map((c) => c.id)));
+    } catch {
+      setAttendeeContacts([]);
+    } finally {
+      setLoadingAttendeeContacts(false);
+    }
+  }
+
+  function handleAttendeeGroupChange(groupId: string) {
+    setAttendeeGroupId(groupId);
+    if (groupId) {
+      loadAttendeeGroupContacts(groupId);
+    } else {
+      setAttendeeContacts([]);
+      setSelectedAttendeeIds(new Set());
+    }
+  }
+
+  function toggleAttendee(id: string) {
+    setSelectedAttendeeIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  async function handleSetAttendees() {
+    setError(null);
+    try {
+      const result = await setAttendees.mutateAsync({
+        jobId,
+        contactIds: Array.from(selectedAttendeeIds),
+      });
+      setSuccess(result.summary ?? "Participants définis");
+      setShowAttendeeSelector(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Erreur");
+    }
+  }
+
+  // ── Oral consent handlers ─────────────────────────────────────────────
 
   async function handleDetect() {
     setError(null);
@@ -68,21 +149,9 @@ export function ConsentPanel({ jobId }: ConsentPanelProps) {
   function toggleContact(contactId: string) {
     setSelectedContactIds((prev) => {
       const next = new Set(prev);
-      if (next.has(contactId)) {
-        next.delete(contactId);
-      } else {
-        next.add(contactId);
-      }
+      next.has(contactId) ? next.delete(contactId) : next.add(contactId);
       return next;
     });
-  }
-
-  function selectAll() {
-    setSelectedContactIds(new Set(groupContacts.map((c) => c.id)));
-  }
-
-  function deselectAll() {
-    setSelectedContactIds(new Set());
   }
 
   async function handleValidate() {
@@ -103,168 +172,307 @@ export function ConsentPanel({ jobId }: ConsentPanelProps) {
   }
 
   return (
-    <div className="border border-border rounded-lg p-4 space-y-3">
+    <div className="border border-border rounded-lg p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Shield className="w-4 h-4 text-primary" />
         <h3 className="text-sm font-semibold">Consentement RGPD</h3>
       </div>
 
-      {/* Detect button */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleDetect}
-        disabled={detectConsent.isPending}
-      >
-        {detectConsent.isPending ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <Search className="w-4 h-4" />
-        )}
-        {detectConsent.isPending
-          ? "Analyse en cours..."
-          : "Detecter consentement oral"}
-      </Button>
-
-      {/* Detection result */}
-      {detection && (
-        <div
-          className={`rounded-lg px-3 py-2 text-sm ${
-            detection.detected
-              ? "bg-green-50 border border-green-200 text-green-800"
-              : "bg-amber-50 border border-amber-200 text-amber-800"
-          }`}
-        >
-          {detection.detected ? (
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5 font-medium">
-                <CheckCircle2 className="w-4 h-4" />
-                Consentement oral detecte
-                {detection.confidence && (
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-green-100">
-                    {detection.confidence}
-                  </span>
-                )}
-              </div>
-              {detection.consent_phrase && (
-                <p className="italic">&laquo; {detection.consent_phrase} &raquo;</p>
-              )}
-              {detection.start_time != null && (
-                <p className="text-xs">
-                  a {Math.floor(detection.start_time / 60)}:{String(Math.floor(detection.start_time % 60)).padStart(2, "0")}
-                </p>
-              )}
-              {detection.explanation && (
-                <p className="text-xs opacity-75">{detection.explanation}</p>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5">
-              <AlertTriangle className="w-4 h-4" />
-              {detection.explanation || "Aucune phrase de consentement detectee dans la transcription."}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Contact selector for collective consent */}
-      {showContactSelector && detection?.detected && (
-        <div className="border border-border rounded-lg p-3 space-y-3">
+      {/* ── Section 1: Participants ──────────────────────────────────────── */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            <span className="text-sm font-medium">
-              Valider le consentement collectif
-            </span>
+            <Users className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Participants</span>
           </div>
-
-          <p className="text-xs text-muted-foreground">
-            Selectionnez le groupe de contacts presents lors de cet enregistrement.
-            Tous les contacts selectionnes seront tagges comme ayant consenti.
-          </p>
-
-          {/* Group selector */}
-          <select
-            value={selectedGroupId || ""}
-            onChange={(e) => handleGroupChange(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            <option value="">-- Choisir un groupe de contacts --</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name} ({g.contact_count} contacts)
-              </option>
-            ))}
-          </select>
-
-          {/* Contact list */}
-          {loadingContacts && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Chargement...
-            </div>
-          )}
-
-          {groupContacts.length > 0 && (
-            <div className="space-y-1">
-              <div className="flex gap-2 text-xs">
-                <button
-                  onClick={selectAll}
-                  className="text-primary hover:underline"
-                >
-                  Tout selectionner
-                </button>
-                <span className="text-muted-foreground">|</span>
-                <button
-                  onClick={deselectAll}
-                  className="text-primary hover:underline"
-                >
-                  Tout deselectionner
-                </button>
-                <span className="ml-auto text-muted-foreground">
-                  {selectedContactIds.size}/{groupContacts.length}
-                </span>
-              </div>
-
-              <div className="max-h-48 overflow-y-auto space-y-0.5">
-                {groupContacts.map((c) => (
-                  <label
-                    key={c.id}
-                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedContactIds.has(c.id)}
-                      onChange={() => toggleContact(c.id)}
-                      className="rounded"
-                    />
-                    <span>{c.name}</span>
-                    {c.role && (
-                      <span className="text-xs text-muted-foreground">
-                        ({c.role})
-                      </span>
-                    )}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Validate button */}
           <Button
+            variant="outline"
             size="sm"
-            onClick={handleValidate}
-            disabled={selectedContactIds.size === 0 || validateConsent.isPending}
+            onClick={() => setShowAttendeeSelector(!showAttendeeSelector)}
           >
-            {validateConsent.isPending && (
-              <Loader2 className="w-4 h-4 animate-spin mr-1" />
-            )}
-            Valider le consentement ({selectedContactIds.size} contact
-            {selectedContactIds.size > 1 ? "s" : ""})
+            <UserPlus className="w-3.5 h-3.5" />
+            {hasAttendees ? "Modifier" : "Définir"}
           </Button>
         </div>
-      )}
 
-      {/* Error / Success */}
+        {/* Current attendees summary */}
+        {loadingAttendees && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Chargement...
+          </div>
+        )}
+
+        {hasAttendees && (
+          <div className="space-y-1">
+            {attendeesData?.summary && (
+              <p className="text-xs text-muted-foreground">{attendeesData.summary}</p>
+            )}
+            {attendeesData?.recording_validity && (
+              <RecordingValidityBadge validity={attendeesData.recording_validity} />
+            )}
+            <div className="max-h-32 overflow-y-auto space-y-0.5">
+              {attendees.map((a) => (
+                <AttendeeRow key={a.contact_id} attendee={a} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!hasAttendees && !loadingAttendees && (
+          <p className="text-xs text-muted-foreground">
+            Aucun participant défini. Sélectionnez les contacts présents à cet enregistrement.
+          </p>
+        )}
+
+        {/* Attendee selector */}
+        {showAttendeeSelector && (
+          <div className="border border-border rounded-lg p-3 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Sélectionnez le groupe de contacts puis les participants présents.
+              Le système vérifiera automatiquement les consentements email existants.
+            </p>
+
+            <select
+              value={attendeeGroupId || ""}
+              onChange={(e) => handleAttendeeGroupChange(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">-- Choisir un groupe de contacts --</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name} ({g.contact_count} contacts)
+                </option>
+              ))}
+            </select>
+
+            {loadingAttendeeContacts && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Chargement...
+              </div>
+            )}
+
+            {attendeeContacts.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex gap-2 text-xs">
+                  <button
+                    onClick={() => setSelectedAttendeeIds(new Set(attendeeContacts.map((c) => c.id)))}
+                    className="text-primary hover:underline"
+                  >
+                    Tout sélectionner
+                  </button>
+                  <span className="text-muted-foreground">|</span>
+                  <button
+                    onClick={() => setSelectedAttendeeIds(new Set())}
+                    className="text-primary hover:underline"
+                  >
+                    Tout désélectionner
+                  </button>
+                  <span className="ml-auto text-muted-foreground">
+                    {selectedAttendeeIds.size}/{attendeeContacts.length}
+                  </span>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto space-y-0.5">
+                  {attendeeContacts.map((c) => (
+                    <label
+                      key={c.id}
+                      className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedAttendeeIds.has(c.id)}
+                        onChange={() => toggleAttendee(c.id)}
+                        className="rounded"
+                      />
+                      <span>{c.name}</span>
+                      {c.role && (
+                        <span className="text-xs text-muted-foreground">({c.role})</span>
+                      )}
+                      {c.consent_status === "accepted" && (
+                        <Mail className="w-3 h-3 text-green-500 ml-auto" title="Consentement email valide" />
+                      )}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button
+              size="sm"
+              onClick={handleSetAttendees}
+              disabled={selectedAttendeeIds.size === 0 || setAttendees.isPending}
+            >
+              {setAttendees.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              )}
+              Définir {selectedAttendeeIds.size} participant
+              {selectedAttendeeIds.size > 1 ? "s" : ""}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Section 2: Oral consent detection ───────────────────────────── */}
+      <div className="border-t border-border pt-3 space-y-3">
+        <div className="flex items-center gap-2">
+          <Mic className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Consentement oral</span>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDetect}
+          disabled={detectConsent.isPending}
+        >
+          {detectConsent.isPending ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Search className="w-4 h-4" />
+          )}
+          {detectConsent.isPending
+            ? "Analyse en cours..."
+            : "Détecter consentement oral"}
+        </Button>
+
+        {/* Detection result */}
+        {detection && (
+          <div
+            className={`rounded-lg px-3 py-2 text-sm ${
+              detection.detected
+                ? "bg-green-50 border border-green-200 text-green-800"
+                : "bg-amber-50 border border-amber-200 text-amber-800"
+            }`}
+          >
+            {detection.detected ? (
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 font-medium">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Consentement oral détecté
+                  {detection.confidence && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-green-100">
+                      {detection.confidence}
+                    </span>
+                  )}
+                </div>
+                {detection.consent_phrase && (
+                  <p className="italic">&laquo; {detection.consent_phrase} &raquo;</p>
+                )}
+                {detection.start_time != null && (
+                  <p className="text-xs">
+                    à {Math.floor(detection.start_time / 60)}:
+                    {String(Math.floor(detection.start_time % 60)).padStart(2, "0")}
+                  </p>
+                )}
+                {detection.explanation && (
+                  <p className="text-xs opacity-75">{detection.explanation}</p>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4" />
+                {detection.explanation ||
+                  "Aucune phrase de consentement détectée dans la transcription."}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Contact selector for collective consent */}
+        {showContactSelector && detection?.detected && (
+          <div className="border border-border rounded-lg p-3 space-y-3">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              <span className="text-sm font-medium">
+                Valider le consentement collectif
+              </span>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Confirmez que le consentement oral couvre bien chaque participant sélectionné.
+            </p>
+
+            <select
+              value={selectedGroupId || ""}
+              onChange={(e) => handleGroupChange(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">-- Choisir un groupe de contacts --</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name} ({g.contact_count} contacts)
+                </option>
+              ))}
+            </select>
+
+            {loadingContacts && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Chargement...
+              </div>
+            )}
+
+            {groupContacts.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex gap-2 text-xs">
+                  <button
+                    onClick={() => setSelectedContactIds(new Set(groupContacts.map((c) => c.id)))}
+                    className="text-primary hover:underline"
+                  >
+                    Tout sélectionner
+                  </button>
+                  <span className="text-muted-foreground">|</span>
+                  <button
+                    onClick={() => setSelectedContactIds(new Set())}
+                    className="text-primary hover:underline"
+                  >
+                    Tout désélectionner
+                  </button>
+                  <span className="ml-auto text-muted-foreground">
+                    {selectedContactIds.size}/{groupContacts.length}
+                  </span>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto space-y-0.5">
+                  {groupContacts.map((c) => (
+                    <label
+                      key={c.id}
+                      className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedContactIds.has(c.id)}
+                        onChange={() => toggleContact(c.id)}
+                        className="rounded"
+                      />
+                      <span>{c.name}</span>
+                      {c.role && (
+                        <span className="text-xs text-muted-foreground">({c.role})</span>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button
+              size="sm"
+              onClick={handleValidate}
+              disabled={selectedContactIds.size === 0 || validateConsent.isPending}
+            >
+              {validateConsent.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              )}
+              Valider le consentement ({selectedContactIds.size} contact
+              {selectedContactIds.size > 1 ? "s" : ""})
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Error / Success ──────────────────────────────────────────────── */}
       {error && <p className="text-sm text-destructive">{error}</p>}
       {success && (
         <div className="flex items-center gap-2 text-sm text-green-600">
@@ -273,5 +481,53 @@ export function ConsentPanel({ jobId }: ConsentPanelProps) {
         </div>
       )}
     </div>
+  );
+}
+
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function AttendeeRow({ attendee }: { attendee: AttendeeEntry }) {
+  const info = STATUS_LABELS[attendee.status] ?? { label: attendee.status, color: "text-gray-500" };
+  const icon = attendee.status.includes("email") ? (
+    <Mail className="w-3 h-3" />
+  ) : (
+    <Mic className="w-3 h-3" />
+  );
+
+  return (
+    <div className="flex items-center gap-2 px-2 py-0.5 text-sm">
+      <span className={`flex items-center gap-1 ${info.color}`}>
+        {icon}
+        <span className="text-xs">{info.label}</span>
+      </span>
+      <span className="text-muted-foreground">—</span>
+      <span className="truncate">{attendee.contact_id}</span>
+    </div>
+  );
+}
+
+function RecordingValidityBadge({ validity }: { validity: string }) {
+  const styles: Record<string, string> = {
+    valid: "bg-green-100 text-green-800 border-green-200",
+    pending: "bg-amber-100 text-amber-800 border-amber-200",
+    blocked: "bg-red-100 text-red-800 border-red-200",
+    invalidated: "bg-red-100 text-red-800 border-red-200",
+  };
+  const labels: Record<string, string> = {
+    valid: "Enregistrement valide",
+    pending: "Consentements en attente",
+    blocked: "Enregistrement bloqué",
+    invalidated: "Enregistrement invalidé",
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full border ${
+        styles[validity] ?? "bg-gray-100 text-gray-800 border-gray-200"
+      }`}
+    >
+      {labels[validity] ?? validity}
+    </span>
   );
 }

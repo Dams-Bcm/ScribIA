@@ -12,6 +12,7 @@ from app.models.procedures import (
     ProcedureStatus, StepType, StepStatus,
 )
 from app.models.contacts import ContactGroup, Contact
+from app.models.consent import ConsentRequest, ConsentDetection
 from app.models.ai_settings import AISetting, AI_USAGES
 from app.models.sector import Sector
 from app.models.substitution import SubstitutionRule
@@ -29,6 +30,7 @@ __all__ = [
     "Procedure", "ProcedureParticipant", "ProcedureStepInstance",
     "ProcedureStatus", "StepType", "StepStatus",
     "ContactGroup", "Contact",
+    "ConsentRequest", "ConsentDetection",
     "AISetting", "AI_USAGES",
     "Sector",
     "SubstitutionRule",

@@ -540,17 +540,25 @@ DEFAULT_TEMPLATES = [
         "document_type": "pv",
         "system_prompt": (
             "Tu es un rédacteur spécialisé dans la rédaction de procès-verbaux de réunions. "
-            "Tu rédiges des documents clairs, formels et précis en français."
+            "Tu rédiges des documents clairs, formels et précis en français.\n"
+            "RÈGLES STRICTES :\n"
+            "- N'invente JAMAIS d'information absente des données fournies\n"
+            "- N'utilise JAMAIS de crochets ou de placeholders comme [nom], [date], [à compléter]\n"
+            "- Si une information manque, omets simplement la section concernée\n"
+            "- Utilise UNIQUEMENT les informations fournies dans le prompt"
         ),
         "user_prompt_template": (
             "Rédige le procès-verbal de la séance suivante.\n\n"
             "Organisation : {organisation}\n"
             "Date : {date}\n"
-            "Titre : {titre}\n\n"
+            "Titre : {titre}\n"
+            "Durée : {duree}\n"
+            "Participants présents : {participants}\n\n"
             "ORDRE DU JOUR :\n{points}\n\n"
             "TRANSCRIPTION DE LA SÉANCE :\n{transcription}\n\n"
             "Rédige un procès-verbal complet et structuré, en respectant l'ordre du jour. "
-            "Pour chaque point, résume les discussions et les décisions prises."
+            "Pour chaque point, résume les discussions et les décisions prises. "
+            "Utilise les noms des participants tels que fournis ci-dessus."
         ),
         "temperature": 0.3,
     },
@@ -560,12 +568,19 @@ DEFAULT_TEMPLATES = [
         "document_type": "summary",
         "system_prompt": (
             "Tu es un assistant spécialisé dans la rédaction de synthèses de réunions en français. "
-            "Tu rédiges des résumés concis, clairs et structurés."
+            "Tu rédiges des résumés concis, clairs et structurés.\n"
+            "RÈGLES STRICTES :\n"
+            "- N'invente JAMAIS d'information absente des données fournies\n"
+            "- N'utilise JAMAIS de crochets ou de placeholders comme [nom], [date], [à compléter]\n"
+            "- Si une information manque, omets simplement la section concernée\n"
+            "- Utilise UNIQUEMENT les informations fournies dans le prompt"
         ),
         "user_prompt_template": (
             "Rédige un résumé exécutif de la réunion suivante.\n\n"
             "Organisation : {organisation}\n"
             "Date : {date}\n"
+            "Participants : {participants}\n"
+            "Durée : {duree}\n"
             "Points abordés : {points}\n\n"
             "TRANSCRIPTION :\n{transcription}\n\n"
             "Produis un résumé en bullet points (5 à 10 points maximum), "
@@ -579,18 +594,26 @@ DEFAULT_TEMPLATES = [
         "document_type": "custom",
         "system_prompt": (
             "Tu es un assistant spécialisé dans la rédaction de comptes-rendus de réunions en français. "
-            "Tu rédiges des documents structurés, fidèles aux échanges et accessibles."
+            "Tu rédiges des documents structurés, fidèles aux échanges et accessibles.\n"
+            "RÈGLES STRICTES :\n"
+            "- N'invente JAMAIS d'information absente des données fournies\n"
+            "- N'utilise JAMAIS de crochets ou de placeholders comme [nom], [date], [à compléter]\n"
+            "- Si une information manque, omets simplement la section concernée\n"
+            "- Utilise UNIQUEMENT les informations fournies dans le prompt"
         ),
         "user_prompt_template": (
             "Rédige un compte-rendu de la réunion suivante.\n\n"
             "Organisation : {organisation}\n"
             "Date : {date}\n"
-            "Titre : {titre}\n\n"
+            "Titre : {titre}\n"
+            "Durée : {duree}\n"
+            "Participants présents : {participants}\n\n"
             "ORDRE DU JOUR :\n{points}\n\n"
             "TRANSCRIPTION :\n{transcription}\n\n"
             "DOCUMENTS FOURNIS :\n{documents}\n\n"
             "Rédige un compte-rendu clair et structuré par point à l'ordre du jour. "
-            "Indique les participants, les échanges principaux et les décisions ou actions à suivre."
+            "Mentionne les participants par leur nom quand ils interviennent, "
+            "les échanges principaux et les décisions ou actions à suivre."
         ),
         "temperature": 0.3,
     },

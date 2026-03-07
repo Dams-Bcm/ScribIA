@@ -170,6 +170,16 @@ def _add_missing_columns():
                 "ALTER TABLE procedures ADD current_step_index INT NULL"
             ))
 
+        # transcription_jobs: attendees, recording_validity
+        if "attendees" not in job_cols:
+            conn.execute(text(
+                "ALTER TABLE transcription_jobs ADD attendees NVARCHAR(MAX) NULL"
+            ))
+        if "recording_validity" not in job_cols:
+            conn.execute(text(
+                "ALTER TABLE transcription_jobs ADD recording_validity VARCHAR(20) NULL"
+            ))
+
         # speaker_profiles: contact_id
         if "speaker_profiles" in insp.get_table_names():
             sp_cols = {c["name"] for c in insp.get_columns("speaker_profiles")}

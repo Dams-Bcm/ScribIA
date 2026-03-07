@@ -37,6 +37,12 @@ class TranscriptionJob(UUIDMixin, TimestampMixin, Base):
     num_speakers      = Column(Integer, nullable=True)
     detected_speakers = Column(Integer, nullable=True)
 
+    # ── Consentement / Participants ────────────────────────────────────────────
+    # JSON array d'objets avec contact_id, status, evidence_type, evidence_id, etc.
+    attendees          = Column(Text, nullable=True)
+    # "pending" | "valid" | "invalidated" | "blocked"
+    recording_validity = Column(String(20), nullable=True)
+
     segments = relationship(
         "TranscriptionSegment",
         back_populates="job",
