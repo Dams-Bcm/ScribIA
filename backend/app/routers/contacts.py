@@ -241,6 +241,13 @@ def add_contact(
     db.add(c)
     db.commit()
     db.refresh(c)
+    # Reload with groups eagerly loaded
+    c = (
+        db.query(Contact)
+        .options(joinedload(Contact.groups))
+        .filter(Contact.id == c.id)
+        .first()
+    )
     return _to_contact_response(c)
 
 
