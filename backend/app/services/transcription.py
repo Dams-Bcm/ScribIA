@@ -281,24 +281,26 @@ def process_transcription_job(job_id: str):
             db.add(segment)
         db.commit()
 
-        # ── Done ─────────────────────────────────────────────────────────
-        _update_job(db, job,
-                    status=TranscriptionJobStatus.COMPLETED,
-                    progress=100,
-                    progress_message="Transcription terminée")
-
         # Clean up WAV if different from original
         if wav_path != original_path and wav_path.exists():
             wav_path.unlink()
 
         logger.info(f"Job {job_id} completed: {len(segments)} segments")
 
-        # Auto-detect oral consent if pending_oral attendees
+        # Auto-detect oral consent BEFORE setting completed status
         try:
             from app.services.consent_detection import auto_detect_after_transcription
+            _update_job(db, job, progress=98,
+                        progress_message="Détection automatique du consentement oral...")
             auto_detect_after_transcription(job_id, db)
         except Exception as exc:
             logger.warning(f"[CONSENT] Auto-detection failed for job {job_id}: {exc}")
+
+        # ── Done ─────────────────────────────────────────────────────────
+        _update_job(db, job,
+                    status=TranscriptionJobStatus.COMPLETED,
+                    progress=100,
+                    progress_message="Transcription terminée")
 
         # Indexation RAG automatique
         try:

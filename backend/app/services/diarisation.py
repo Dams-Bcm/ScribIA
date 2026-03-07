@@ -759,12 +759,6 @@ def process_diarisation_job(job_id: str):
                 "[MATCHING] No speaker embeddings available — auto-match skipped"
             )
 
-        # ── Done ─────────────────────────────────────────────────────────
-        _update_job(db, job,
-                    status=TranscriptionJobStatus.COMPLETED,
-                    progress=100,
-                    progress_message="Transcription + diarisation terminées")
-
         # Clean up WAV
         if wav_path != original_path and wav_path.exists():
             wav_path.unlink()
@@ -772,12 +766,21 @@ def process_diarisation_job(job_id: str):
         logger.info(f"Diarisation job {job_id} completed: {len(aligned)} segments, "
                     f"{len(unique_speakers)} speakers")
 
-        # Auto-detect oral consent if pending_oral attendees
+        # Auto-detect oral consent BEFORE setting completed status
+        # so that attendees are updated when frontend receives the completed event
         try:
             from app.services.consent_detection import auto_detect_after_transcription
+            _update_job(db, job, progress=98,
+                        progress_message="Détection automatique du consentement oral...")
             auto_detect_after_transcription(job_id, db)
         except Exception as exc:
             logger.warning(f"[CONSENT] Auto-detection failed for job {job_id}: {exc}")
+
+        # ── Done ─────────────────────────────────────────────────────────
+        _update_job(db, job,
+                    status=TranscriptionJobStatus.COMPLETED,
+                    progress=100,
+                    progress_message="Transcription + diarisation terminées")
 
     except Exception as e:
         logger.exception(f"Diarisation job {job_id} failed unexpectedly")

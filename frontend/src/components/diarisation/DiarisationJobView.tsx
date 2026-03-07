@@ -46,8 +46,12 @@ export function DiarisationJobView({ jobId, onBack }: DiarisationJobViewProps) {
         setLiveStatus(evt.status);
 
         if (evt.status === "completed" || evt.status === "error") {
-          refetch();
-          qc.invalidateQueries({ queryKey: ["diarisation", "jobs"] });
+          // Delay refetch slightly to let auto-detection finish updating attendees
+          setTimeout(() => {
+            refetch();
+            qc.invalidateQueries({ queryKey: ["diarisation", "jobs"] });
+            qc.invalidateQueries({ queryKey: ["consent", "attendees", jobId] });
+          }, 2000);
         }
       },
       () => {

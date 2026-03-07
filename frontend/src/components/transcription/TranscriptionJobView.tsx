@@ -48,8 +48,12 @@ export function TranscriptionJobView({ jobId, onBack }: TranscriptionJobViewProp
         setLiveStatus(evt.status);
 
         if (evt.status === "completed" || evt.status === "error" || evt.status === "consent_check") {
-          refetch();
-          qc.invalidateQueries({ queryKey: ["transcription", "jobs"] });
+          // Delay refetch slightly to let auto-detection finish updating attendees
+          setTimeout(() => {
+            refetch();
+            qc.invalidateQueries({ queryKey: ["transcription", "jobs"] });
+            qc.invalidateQueries({ queryKey: ["consent", "attendees", jobId] });
+          }, 2000);
         }
       },
       () => {
