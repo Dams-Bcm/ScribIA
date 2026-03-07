@@ -21,7 +21,7 @@ from app.schemas.transcription import (
     TranscriptionJobUploadResponse,
 )
 from app.services.event_bus import event_bus
-from app.services.transcription import get_audio_duration, run_job_in_thread, run_partial_analysis_in_thread
+from app.services.transcription import get_audio_duration, run_job_in_thread, run_partial_analysis_in_thread, cancel_job
 
 router = APIRouter(prefix="/transcription", tags=["transcription"])
 
@@ -239,6 +239,22 @@ def delete_job(
     )
     if not job:
         raise HTTPException(404, "Job introuvable")
+
+    # Block deletion while actively processing on GPU
+    if job.status in (
+        TranscriptionJobStatus.CONVERTING,
+        TranscriptionJobStatus.TRANSCRIBING,
+        TranscriptionJobStatus.ALIGNING,
+    ):
+        raise HTTPException(
+            409,
+            "Impossible de supprimer un job en cours de traitement. "
+            "Attendez la fin ou une erreur avant de supprimer.",
+        )
+
+    # Cancel if waiting in GPU queue
+    if job.status == TranscriptionJobStatus.QUEUED and job.progress > 0:
+        cancel_job(job.id)
 
     # Delete audio file
     if job.audio_filename:

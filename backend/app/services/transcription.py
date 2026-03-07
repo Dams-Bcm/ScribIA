@@ -22,6 +22,26 @@ logger = logging.getLogger(__name__)
 # ── GPU semaphore (1 transcription at a time) ────────────────────────────────
 _gpu_semaphore = threading.Semaphore(1)
 
+# ── Cancelled jobs set (thread-safe) ─────────────────────────────────────────
+_cancelled_jobs: set[str] = set()
+_cancelled_lock = threading.Lock()
+
+
+def cancel_job(job_id: str):
+    """Mark a job as cancelled so threads bail out early."""
+    with _cancelled_lock:
+        _cancelled_jobs.add(job_id)
+
+
+def _is_cancelled(job_id: str) -> bool:
+    with _cancelled_lock:
+        return job_id in _cancelled_jobs
+
+
+def _clear_cancelled(job_id: str):
+    with _cancelled_lock:
+        _cancelled_jobs.discard(job_id)
+
 # ── Whisper model (lazy-loaded) ──────────────────────────────────────────────
 _whisper_model = None
 
@@ -175,6 +195,11 @@ def _update_job(db, job: TranscriptionJob, **kwargs):
 
 def process_transcription_job(job_id: str):
     """Full pipeline: convert → transcribe → save segments. Runs in a thread."""
+    if _is_cancelled(job_id):
+        _clear_cancelled(job_id)
+        logger.info(f"Job {job_id} was cancelled before starting")
+        return
+
     db = SessionLocal()
     try:
         job = db.query(TranscriptionJob).filter(TranscriptionJob.id == job_id).first()
@@ -214,6 +239,14 @@ def process_transcription_job(job_id: str):
         duration = get_audio_duration(wav_path)
         if duration > 0:
             job.duration_seconds = duration
+
+        # Check cancellation before heavy work
+        if _is_cancelled(job_id):
+            _clear_cancelled(job_id)
+            logger.info(f"Job {job_id} cancelled after conversion")
+            if wav_path != original_path and wav_path.exists():
+                wav_path.unlink()
+            return
 
         # ── Step 2: Transcribe ───────────────────────────────────────────
         _update_job(db, job,
@@ -290,6 +323,11 @@ def process_partial_analysis(job_id: str):
     Used for imported audio when some attendees are pending_oral.
     Only transcribes the first ~60 seconds to check for oral consent.
     """
+    if _is_cancelled(job_id):
+        _clear_cancelled(job_id)
+        logger.info(f"[PARTIAL] Job {job_id} was cancelled before starting")
+        return
+
     db = SessionLocal()
     try:
         job = db.query(TranscriptionJob).filter(TranscriptionJob.id == job_id).first()
