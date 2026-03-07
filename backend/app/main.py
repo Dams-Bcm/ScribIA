@@ -144,6 +144,13 @@ def _add_missing_columns():
                 "ALTER TABLE ai_documents ADD extra_context NVARCHAR(MAX) NULL"
             ))
 
+        # ai_document_templates: map_system_prompt
+        ai_tpl_cols = {c["name"] for c in insp.get_columns("ai_document_templates")}
+        if "map_system_prompt" not in ai_tpl_cols:
+            conn.execute(text(
+                "ALTER TABLE ai_document_templates ADD map_system_prompt NVARCHAR(MAX) NULL"
+            ))
+
         # sectors: description, suggestions
         if "sectors" in insp.get_table_names():
             sector_cols = {c["name"] for c in insp.get_columns("sectors")}
