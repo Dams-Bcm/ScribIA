@@ -393,7 +393,7 @@ export function ContactsPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   // Auto-select first group
-  const effectiveGroupId = selectedGroupId ?? (groups && groups.length > 0 ? groups[0].id : null);
+  const effectiveGroupId = selectedGroupId ?? (groups && groups.length > 0 ? groups[0]!.id : null);
 
   // No groups: empty state
   if (!isLoading && (!groups || groups.length === 0) && !showCreate) {
