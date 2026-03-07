@@ -171,7 +171,7 @@ function StatsBar({ contacts }: { contacts: Contact[] }) {
 
 // ── Detail panel ─────────────────────────────────────────────────────────────
 
-function GroupDetailPanel({ groupId }: { groupId: string }) {
+function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?: { id: string; name: string }[] }) {
   const isAllView = groupId === "__all__";
   const { data: group, isLoading } = useContactGroup(groupId);
   const deleteContact = useDeleteContact();
@@ -181,6 +181,12 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
   const [search, setSearch] = useState("");
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
   const { confirm, dialog: confirmDialog } = useConfirm();
+
+  // Map group ids to names for display in "Tous" view
+  const groupNameMap = useMemo(() => {
+    if (!allGroups) return {};
+    return Object.fromEntries(allGroups.map((g) => [g.id, g.name]));
+  }, [allGroups]);
 
   const filtered = useMemo(() => {
     if (!group) return [];
@@ -277,6 +283,9 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Email</th>
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden md:table-cell">Téléphone</th>
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Rôle</th>
+                {isAllView && (
+                  <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden md:table-cell">Groupes</th>
+                )}
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide">Consentement</th>
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Enrollment</th>
                 <th className="px-4 py-2.5 w-16" />
@@ -290,6 +299,17 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
                   <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{c.email ?? ""}</td>
                   <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{c.phone ?? ""}</td>
                   <td className="px-4 py-2.5 text-muted-foreground hidden lg:table-cell">{c.role ?? ""}</td>
+                  {isAllView && (
+                    <td className="px-4 py-2.5 hidden md:table-cell">
+                      <div className="flex flex-wrap gap-1">
+                        {c.group_ids.map((gid) => (
+                          <span key={gid} className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-muted text-muted-foreground">
+                            {groupNameMap[gid] ?? gid}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                  )}
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5">
                       <ConsentBadge status={c.consent_status} type={c.consent_type} />
@@ -349,7 +369,7 @@ function GroupDetailPanel({ groupId }: { groupId: string }) {
               ))}
               {filtered.length === 0 && search && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={isAllView ? 9 : 8} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     Aucun contact trouvé pour « {search} »
                   </td>
                 </tr>
@@ -504,7 +524,7 @@ export function ContactsPage() {
 
           {/* ── Detail ──────────────────────────────── */}
           {effectiveGroupId ? (
-            <GroupDetailPanel groupId={effectiveGroupId} />
+            <GroupDetailPanel groupId={effectiveGroupId} allGroups={groups} />
           ) : (
             <div className="bg-background rounded-xl border border-border flex items-center justify-center text-sm text-muted-foreground">
               Sélectionnez un groupe

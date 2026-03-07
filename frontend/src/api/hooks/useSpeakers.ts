@@ -15,7 +15,7 @@ export interface ContactForEnrollment {
   email: string | null;
   phone: string | null;
   role: string | null;
-  group_id: string;
+  group_ids: string[];
   speaker_profile: {
     profile_id: string;
     enrollment_status: string | null;

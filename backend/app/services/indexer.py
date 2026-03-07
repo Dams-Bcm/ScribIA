@@ -263,7 +263,7 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
         ContactGroup.tenant_id == tenant_id,
     ).all()
     for group in groups:
-        contacts_list = db.query(Contact).filter_by(group_id=group.id).all()
+        contacts_list = group.contacts
         if contacts_list:
             c_data = []
             for c in contacts_list:

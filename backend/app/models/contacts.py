@@ -1,9 +1,18 @@
 """Models for the Contacts module — generic contact groups and contacts."""
 
-from sqlalchemy import Column, String, Text, ForeignKey, Integer
+from sqlalchemy import Column, String, Text, ForeignKey, Integer, Table
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base, UUIDMixin, TimestampMixin
+
+
+# N:N junction table
+contact_group_members = Table(
+    "contact_group_members",
+    Base.metadata,
+    Column("contact_id", String(36), ForeignKey("contacts.id", ondelete="CASCADE"), primary_key=True),
+    Column("group_id", String(36), ForeignKey("contact_groups.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class ContactGroup(UUIDMixin, TimestampMixin, Base):
@@ -15,20 +24,28 @@ class ContactGroup(UUIDMixin, TimestampMixin, Base):
     description = Column(Text, nullable=True)
     metadata_   = Column("metadata", Text, nullable=True)  # JSON — sector-specific (total_tantiemes, etc.)
 
-    contacts = relationship("Contact", back_populates="group", cascade="all, delete-orphan", order_by="Contact.name")
+    contacts = relationship(
+        "Contact",
+        secondary=contact_group_members,
+        back_populates="groups",
+        order_by="Contact.name",
+    )
 
 
 class Contact(UUIDMixin, TimestampMixin, Base):
-    """A contact within a group (e.g. Copropriétaire, Élu, Entreprise)."""
+    """A contact within one or more groups (e.g. Copropriétaire, Élu, Entreprise)."""
     __tablename__ = "contacts"
 
     tenant_id     = Column(String(36), ForeignKey("tenants.id"), nullable=False)
-    group_id      = Column(String(36), ForeignKey("contact_groups.id", ondelete="CASCADE"), nullable=False)
     name          = Column(String(255), nullable=False)
     first_name    = Column(String(255), nullable=True)
     email         = Column(String(255), nullable=True)
     phone         = Column(String(50), nullable=True)
-    role          = Column(String(100), nullable=True)  # e.g. "Copropriétaire", "Conseil syndical"
-    custom_fields = Column(Text, nullable=True)  # JSON — sector-specific (lot_number, tantiemes, etc.)
+    role          = Column(String(100), nullable=True)
+    custom_fields = Column(Text, nullable=True)  # JSON — sector-specific
 
-    group = relationship("ContactGroup", back_populates="contacts")
+    groups = relationship(
+        "ContactGroup",
+        secondary=contact_group_members,
+        back_populates="contacts",
+    )

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.deps import get_current_user, require_module
-from app.models.contacts import Contact, ContactGroup
+from app.models.contacts import Contact, ContactGroup, contact_group_members
 from app.models.speaker import SpeakerProfile
 from app.models.user import User
 from app.schemas.contacts import (
@@ -57,7 +57,7 @@ def _to_group_response(g: ContactGroup) -> ContactGroupResponse:
 def _to_contact_response(c: Contact, speaker_profile=None) -> ContactResponse:
     return ContactResponse(
         id=c.id,
-        group_id=c.group_id,
+        group_ids=[g.id for g in c.groups] if c.groups else [],
         name=c.name,
         first_name=c.first_name,
         email=c.email,
@@ -84,6 +84,16 @@ def _get_group(db: Session, group_id: str, tenant_id: str) -> ContactGroup:
     return g
 
 
+def _build_profile_map(db: Session, contact_ids: list[str], tenant_id: str) -> dict[str, SpeakerProfile]:
+    if not contact_ids:
+        return {}
+    profiles = db.query(SpeakerProfile).filter(
+        SpeakerProfile.contact_id.in_(contact_ids),
+        SpeakerProfile.tenant_id == tenant_id,
+    ).all()
+    return {p.contact_id: p for p in profiles}
+
+
 # ── All contacts (virtual "Tous" group) ───────────────────────────────────────
 
 @router.get("/all", response_model=ContactGroupDetailResponse)
@@ -92,35 +102,25 @@ def list_all_contacts(
     db: Session = Depends(get_db),
 ):
     """Return all contacts across all groups for this tenant."""
-    groups = (
-        db.query(ContactGroup)
-        .options(joinedload(ContactGroup.contacts))
-        .filter(ContactGroup.tenant_id == user.tenant_id)
+    all_contacts = (
+        db.query(Contact)
+        .options(joinedload(Contact.groups))
+        .filter(Contact.tenant_id == user.tenant_id)
+        .order_by(Contact.name)
         .all()
     )
-    all_contacts: list[Contact] = []
-    for g in groups:
-        all_contacts.extend(g.contacts or [])
 
     contact_ids = [c.id for c in all_contacts]
-    profile_map: dict[str, SpeakerProfile] = {}
-    if contact_ids:
-        profiles = db.query(SpeakerProfile).filter(
-            SpeakerProfile.contact_id.in_(contact_ids),
-            SpeakerProfile.tenant_id == user.tenant_id,
-        ).all()
-        for p in profiles:
-            profile_map[p.contact_id] = p
+    profile_map = _build_profile_map(db, contact_ids, user.tenant_id)
 
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
-    total = len(all_contacts)
     return ContactGroupDetailResponse(
         id="__all__",
         name="Tous",
         description=None,
         metadata=None,
-        contact_count=total,
+        contact_count=len(all_contacts),
         created_at=now,
         updated_at=now,
         contacts=[_to_contact_response(c, profile_map.get(c.id)) for c in all_contacts],
@@ -173,16 +173,13 @@ def get_group(
 ):
     g = _get_group(db, group_id, user.tenant_id)
 
-    # Load consent status from linked speaker profiles
     contact_ids = [c.id for c in g.contacts]
-    profile_map: dict[str, SpeakerProfile] = {}
-    if contact_ids:
-        profiles = db.query(SpeakerProfile).filter(
-            SpeakerProfile.contact_id.in_(contact_ids),
-            SpeakerProfile.tenant_id == user.tenant_id,
-        ).all()
-        for p in profiles:
-            profile_map[p.contact_id] = p
+    profile_map = _build_profile_map(db, contact_ids, user.tenant_id)
+
+    # Eager-load groups for each contact so group_ids is populated
+    for c in g.contacts:
+        if not hasattr(c, '_sa_instance_state') or 'groups' not in c.__dict__:
+            db.refresh(c, ['groups'])
 
     return ContactGroupDetailResponse(
         **_to_group_response(g).model_dump(),
@@ -228,10 +225,9 @@ def add_contact(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _get_group(db, group_id, user.tenant_id)
+    g = _get_group(db, group_id, user.tenant_id)
     c = Contact(
         tenant_id=user.tenant_id,
-        group_id=group_id,
         name=body.name,
         first_name=body.first_name,
         email=body.email,
@@ -239,6 +235,7 @@ def add_contact(
         role=body.role,
         custom_fields=json.dumps(body.custom_fields) if body.custom_fields else None,
     )
+    c.groups.append(g)
     db.add(c)
     db.commit()
     db.refresh(c)
@@ -254,8 +251,13 @@ def update_contact(
     db: Session = Depends(get_db),
 ):
     _get_group(db, group_id, user.tenant_id)
-    c = db.query(Contact).filter_by(id=contact_id, group_id=group_id).first()
-    if not c:
+    c = (
+        db.query(Contact)
+        .options(joinedload(Contact.groups))
+        .filter(Contact.id == contact_id, Contact.tenant_id == user.tenant_id)
+        .first()
+    )
+    if not c or not any(g.id == group_id for g in c.groups):
         raise HTTPException(status_code=404, detail="Contact introuvable")
     updates = body.model_dump(exclude_unset=True)
     if "custom_fields" in updates:
@@ -275,8 +277,13 @@ def delete_contact(
     db: Session = Depends(get_db),
 ):
     _get_group(db, group_id, user.tenant_id)
-    c = db.query(Contact).filter_by(id=contact_id, group_id=group_id).first()
-    if not c:
+    c = (
+        db.query(Contact)
+        .options(joinedload(Contact.groups))
+        .filter(Contact.id == contact_id, Contact.tenant_id == user.tenant_id)
+        .first()
+    )
+    if not c or not any(g.id == group_id for g in c.groups):
         raise HTTPException(status_code=404, detail="Contact introuvable")
 
     # Clear FK references before deleting
@@ -288,3 +295,49 @@ def delete_contact(
 
     db.delete(c)
     db.commit()
+
+
+# ── Group membership management ──────────────────────────────────────────────
+
+@router.post("/contacts/{contact_id}/groups/{group_id}", status_code=204)
+def add_contact_to_group(
+    contact_id: str,
+    group_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Add an existing contact to a group."""
+    g = _get_group(db, group_id, user.tenant_id)
+    c = (
+        db.query(Contact)
+        .options(joinedload(Contact.groups))
+        .filter(Contact.id == contact_id, Contact.tenant_id == user.tenant_id)
+        .first()
+    )
+    if not c:
+        raise HTTPException(status_code=404, detail="Contact introuvable")
+    if g not in c.groups:
+        c.groups.append(g)
+        db.commit()
+
+
+@router.delete("/contacts/{contact_id}/groups/{group_id}", status_code=204)
+def remove_contact_from_group(
+    contact_id: str,
+    group_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Remove a contact from a group (does not delete the contact)."""
+    g = _get_group(db, group_id, user.tenant_id)
+    c = (
+        db.query(Contact)
+        .options(joinedload(Contact.groups))
+        .filter(Contact.id == contact_id, Contact.tenant_id == user.tenant_id)
+        .first()
+    )
+    if not c:
+        raise HTTPException(status_code=404, detail="Contact introuvable")
+    if g in c.groups:
+        c.groups.remove(g)
+        db.commit()

@@ -18,7 +18,7 @@ class ContactGroupUpdate(BaseModel):
 
 class ContactResponse(BaseModel):
     id: str
-    group_id: str
+    group_ids: list[str] = []
     name: str
     first_name: str | None = None
     email: str | None

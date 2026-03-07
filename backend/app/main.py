@@ -245,6 +245,38 @@ def _add_missing_columns():
                     "ALTER TABLE contacts ADD first_name NVARCHAR(255) NULL"
                 ))
 
+        # contacts N:N migration: create junction table, migrate data, drop old group_id
+        tables = insp.get_table_names()
+        if "contact_group_members" not in tables and "contacts" in tables:
+            contact_cols = {c["name"] for c in insp.get_columns("contacts")}
+            if "group_id" in contact_cols:
+                conn.execute(text("""
+                    CREATE TABLE contact_group_members (
+                        contact_id VARCHAR(36) NOT NULL,
+                        group_id VARCHAR(36) NOT NULL,
+                        PRIMARY KEY (contact_id, group_id),
+                        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
+                        FOREIGN KEY (group_id) REFERENCES contact_groups(id) ON DELETE CASCADE
+                    )
+                """))
+                conn.execute(text("""
+                    INSERT INTO contact_group_members (contact_id, group_id)
+                    SELECT id, group_id FROM contacts WHERE group_id IS NOT NULL
+                """))
+                # Drop FK constraint on group_id before dropping column
+                # MSSQL: find and drop the constraint dynamically
+                conn.execute(text("""
+                    DECLARE @fk NVARCHAR(255)
+                    SELECT @fk = fk.name
+                    FROM sys.foreign_keys fk
+                    JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+                    JOIN sys.columns c ON fkc.parent_object_id = c.object_id AND fkc.parent_column_id = c.column_id
+                    WHERE OBJECT_NAME(fk.parent_object_id) = 'contacts' AND c.name = 'group_id'
+                    IF @fk IS NOT NULL
+                        EXEC('ALTER TABLE contacts DROP CONSTRAINT ' + @fk)
+                """))
+                conn.execute(text("ALTER TABLE contacts DROP COLUMN group_id"))
+
         conn.commit()
 
 

@@ -77,7 +77,7 @@ export interface TenantCreate {
 export interface ProvisionResult {
   sector: string;
   procedure_templates: { id: string; name: string }[];
-  document_templates: { id: string; name: string }[];
+  document_templates?: { id: string; name: string }[];
 }
 
 export interface TenantUpdate {
@@ -712,7 +712,7 @@ export interface ContactGroup {
 
 export interface Contact {
   id: string;
-  group_id: string;
+  group_ids: string[];
   name: string;
   first_name: string | null;
   email: string | null;

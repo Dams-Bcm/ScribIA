@@ -238,7 +238,7 @@ def contacts_for_enrollment(
             "email": c.email,
             "phone": c.phone,
             "role": c.role,
-            "group_id": c.group_id,
+            "group_ids": [g.id for g in c.groups] if c.groups else [],
             "speaker_profile": linked_profiles.get(c.id),
         }
         for c in contacts

@@ -11,7 +11,7 @@ from app.models.procedures import (
     Procedure, ProcedureParticipant, ProcedureStepInstance,
     ProcedureStatus, StepType, StepStatus,
 )
-from app.models.contacts import ContactGroup, Contact
+from app.models.contacts import ContactGroup, Contact, contact_group_members
 from app.models.consent import ConsentRequest, ConsentDetection
 from app.models.ai_settings import AISetting, AI_USAGES
 from app.models.sector import Sector
@@ -30,7 +30,7 @@ __all__ = [
     "ProcedureTemplate", "ProcedureTemplateRole", "ProcedureTemplateStep",
     "Procedure", "ProcedureParticipant", "ProcedureStepInstance",
     "ProcedureStatus", "StepType", "StepStatus",
-    "ContactGroup", "Contact",
+    "ContactGroup", "Contact", "contact_group_members",
     "ConsentRequest", "ConsentDetection",
     "AISetting", "AI_USAGES",
     "Sector",

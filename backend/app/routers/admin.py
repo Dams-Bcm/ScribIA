@@ -1427,14 +1427,22 @@ def test_email_settings(
     if not settings.smtp_host:
         return {"success": False, "error": "SMTP non configuré (smtp_host vide)"}
 
+    from app.services.email import _info_box
     test_body = (
-        '<p style="margin:0 0 16px 0; font-size:16px; font-weight:bold;">Test SMTP</p>'
-        '<p style="margin:0;">Si vous recevez cet email, la configuration SMTP est correcte.</p>'
+        '<p style="margin:0 0 14px 0;">'
+        'Si vous recevez cet email, la configuration SMTP est <strong>correcte</strong>.'
+        '</p>'
+        + _info_box(
+            '<span style="font-weight:600;">Configuration active</span><br/>'
+            'Les emails de consentement, notifications et procédures pourront être envoyés.',
+            bg="#eff6ff", border="#bfdbfe", color="#1e40af",
+        )
     )
     success = send_generic_email(
         settings.smtp_from_email,
         "Test SMTP — ScribIA",
         test_body,
+        title="Test SMTP",
     )
     if success:
         return {"success": True, "message": f"Email de test envoyé à {settings.smtp_from_email}"}
