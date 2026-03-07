@@ -163,6 +163,11 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
 
     logger.info(f"[CONSENT] Parsed LLM result for job {job.id}: {json.dumps(result, ensure_ascii=False)[:500]}")
 
+    # Validate that the result has the expected schema
+    if "detected" not in result:
+        logger.warning(f"[CONSENT] LLM returned unexpected JSON schema for job {job.id} (no 'detected' key)")
+        return {"detected": False, "explanation": "Reponse LLM hors format — le modele n'a pas suivi les instructions."}
+
     if not result.get("detected"):
         return {
             "detected": False,
