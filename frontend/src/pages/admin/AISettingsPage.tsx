@@ -403,7 +403,7 @@ export function AISettingsPage() {
                     <p className="text-xs text-muted-foreground">actuel : {data.long_context_model || "(non défini)"}</p>
                   </div>
                   <Select
-                    value={longCtxModel ?? data.long_context_model || "__none__"}
+                    value={longCtxModel ?? (data.long_context_model || "__none__")}
                     onValueChange={(v) => { setLongCtxModel(v === "__none__" ? "" : v); setLongCtxSaved(false); }}
                   >
                     <SelectTrigger className="flex-1">
