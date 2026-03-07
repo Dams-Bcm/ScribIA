@@ -265,6 +265,9 @@ def delete_job(
     # Clear FK references from speaker tables before deleting segments
     from app.models.speaker import SpeakerProfile, SpeakerEnrollmentSegment
     from app.models.transcription import TranscriptionSegment
+    from app.models.consent import ConsentRequest, ConsentDetection
+    from app.models.ai_documents import AIDocument
+    from app.models.procedures import Procedure
 
     seg_ids = [s.id for s in db.query(TranscriptionSegment.id).filter(
         TranscriptionSegment.job_id == job_id
@@ -278,6 +281,16 @@ def delete_job(
     db.query(SpeakerEnrollmentSegment).filter(
         SpeakerEnrollmentSegment.job_id == job_id
     ).delete(synchronize_session=False)
+
+    # Clear FK references from consent, ai_documents, procedures
+    db.query(ConsentRequest).filter(ConsentRequest.job_id == job_id).update(
+        {ConsentRequest.job_id: None}, synchronize_session=False)
+    db.query(ConsentDetection).filter(ConsentDetection.job_id == job_id).delete(
+        synchronize_session=False)
+    db.query(AIDocument).filter(AIDocument.source_session_id == job_id).update(
+        {AIDocument.source_session_id: None}, synchronize_session=False)
+    db.query(Procedure).filter(Procedure.source_session_id == job_id).update(
+        {Procedure.source_session_id: None}, synchronize_session=False)
 
     db.delete(job)
     db.commit()
