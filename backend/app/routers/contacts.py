@@ -7,7 +7,7 @@ Module requis : contacts
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, subqueryload
 
 from app.database import get_db
 from app.deps import get_current_user, require_module
@@ -104,7 +104,7 @@ def list_all_contacts(
     """Return all contacts across all groups for this tenant."""
     all_contacts = (
         db.query(Contact)
-        .options(joinedload(Contact.groups))
+        .options(subqueryload(Contact.groups))
         .filter(Contact.tenant_id == user.tenant_id)
         .order_by(Contact.name)
         .all()
