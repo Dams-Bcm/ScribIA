@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24  # 24 hours
 
     # ── Transcription ──────────────────────────────────────────────────────────
-    whisper_model: str = "medium"
+    whisper_model: str = "large-v3"
     device: str = "cuda"
     compute_type: str = "float16"
     audio_path: str = "/data/audio"
