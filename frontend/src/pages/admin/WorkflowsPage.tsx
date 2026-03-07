@@ -98,7 +98,7 @@ interface GeneratedTemplate {
 
 // ── Template manager for a sector ───────────────────────────────────────────
 
-function SectorTemplateManager({ sector }: { sector: string }) {
+export function SectorTemplateManager({ sector }: { sector: string }) {
   const { data: templates = [], isLoading } = useSectorTemplates(sector);
   const createTemplate = useCreateSectorTemplate(sector);
   const deleteTemplate = useDeleteSectorTemplate(sector);

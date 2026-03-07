@@ -16,6 +16,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { SectorTemplateManager } from "./WorkflowsPage";
 
 export function SectorsPage() {
   const { data: sectors = [], isLoading } = useSectors();
@@ -247,6 +248,9 @@ export function SectorsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Procedure templates */}
+              <SectorTemplateManager sector={selected.key} />
 
               {/* Document templates */}
               <SectorDocTemplateManager sector={selected.key} />

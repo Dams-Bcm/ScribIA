@@ -117,25 +117,26 @@ PRIORITE : 🔴 Critique (bloquant pour scaling horizontal)
 ================================================================================
 
 ACTUEL :
-  - MSSQL 2022 dans conteneur Docker
-  - Volume mssql_data (local)
-  - Pas de backup automatique
-  - Migrations via ALTER TABLE en Python au startup
+  ✅ MSSQL sur serveur Windows dedie supporte
+     - Variables d'env : SCRIBIA_DB_HOST, SCRIBIA_DB_PORT, SCRIBIA_DB_USER,
+       SCRIBIA_DB_PASSWORD, SCRIBIA_DB_NAME
+     - Fichier .env.archi-3-mssql-distant pret a l'emploi
+     - Pas de backup automatique (a configurer cote serveur DB)
+     - Migrations via ALTER TABLE en Python au startup
 
-A FAIRE :
+RESTE A FAIRE :
   Phase 1 — Securisation :
   [ ] Sauvegardes automatiques quotidiennes (MSSQL Agent ou script cron)
   [ ] Externaliser backups (S3/MinIO ou serveur distant)
   [ ] Monitoring espace disque + connexions
   [ ] Chiffrement TDE (Transparent Data Encryption)
 
-  Phase 2 — Serveur dedie :
-  [ ] DB sur VM/serveur dedie (pas dans docker-compose applicatif)
+  Phase 2 — Hardening :
   [ ] Acces reseau prive uniquement (pas expose sur Internet)
   [ ] Firewall : seul le backend peut se connecter
   [ ] Credentials dans secrets manager (pas .env)
 
-  Phase 3 — Haute disponibilite :
+  Phase 3 — Haute disponibilite (optionnel) :
   [ ] MSSQL Always On ou replica lecture
   [ ] Ou migration vers PostgreSQL (plus adapte containerise)
       → Bonus : pgvector natif (remplacerait ChromaDB)
@@ -146,12 +147,11 @@ A FAIRE :
   [ ] CI qui valide les migrations avant deploy
 
 FICHIERS CONCERNES :
-  - docker-compose.yml (externaliser service db)
+  - Config serveur MSSQL Windows (backups, TDE, firewall)
   - backend/app/main.py (retirer _add_missing_columns)
   - alembic/ (compléter les migrations)
-  - Scripts backup (nouveau)
 
-PRIORITE : 🔴 Critique (perte de donnees possible)
+PRIORITE : 🟡 Moyenne (DB dediee OK, reste securisation/backups)
 
 
 ================================================================================
@@ -434,7 +434,7 @@ SPRINT 1 — Securite & fondations (2-3 semaines)
   [S1.1] ✅ BunkerWeb WAF deja en place (point 1) — affiner regles
   [S1.2] Reseau prive Docker (point 9)
   [S1.3] Redis (point 5)
-  [S1.4] Backup DB automatique (point 4 phase 1)
+  [S1.4] ✅ DB dediee MSSQL Windows (point 4) — reste backup + hardening
   [S1.5] Healthchecks tous services
 
 SPRINT 2 — Decouplage workers (3-4 semaines)
@@ -451,7 +451,7 @@ SPRINT 3 — Storage & abstraction (2-3 semaines)
   [S3.4] Migration fichiers existants vers MinIO
 
 SPRINT 4 — Robustesse & scaling (2-3 semaines)
-  [S4.1] DB sur serveur dedie (point 4 phase 2)
+  [S4.1] ✅ DB sur serveur dedie — OK (point 4)
   [S4.2] Alembic migrations completes (point 4 phase 4)
   [S4.3] Monitoring centralise (Prometheus + Grafana)
   [S4.4] Logs centralises (Loki ou ELK)

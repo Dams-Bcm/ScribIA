@@ -15,7 +15,6 @@ import {
   FolderOpen,
   ClipboardList,
   BookUser,
-  Settings2,
   FolderCog,
   Search,
   BookOpen,
@@ -86,7 +85,6 @@ export function Layout() {
     { to: "/admin/users", label: "Utilisateurs", icon: Users, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/ai-settings", label: "Gestion IA", icon: Sparkles, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/email-settings", label: "Email (SMTP)", icon: Mail, visible: isSuperAdmin, section: "Administration" },
-    { to: "/admin/workflows", label: "Workflows", icon: Settings2, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/announcements", label: "Communications", icon: Megaphone, visible: isSuperAdmin, section: "Administration" },
     { to: "/admin/audit-logs", label: "Journal d'audit", icon: Shield, visible: isSuperAdmin, section: "Administration" },
 

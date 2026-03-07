@@ -28,7 +28,6 @@ import { ConsentResponsePage } from "./pages/public/ConsentResponsePage";
 import { TenantsPage } from "./pages/admin/TenantsPage";
 import { UsersPage } from "./pages/admin/UsersPage";
 import { AuditLogsPage } from "./pages/admin/AuditLogsPage";
-import { WorkflowsPage } from "./pages/admin/WorkflowsPage";
 import { AISettingsPage } from "./pages/admin/AISettingsPage";
 import { SectorsPage } from "./pages/admin/SectorsPage";
 import { AnnouncementsPage } from "./pages/admin/AnnouncementsPage";
@@ -92,7 +91,6 @@ function AppRoutes() {
           {/* Administration */}
           <Route path="admin/tenants" element={<TenantsPage />} />
           <Route path="admin/users" element={<UsersPage />} />
-          <Route path="admin/workflows" element={<WorkflowsPage />} />
           <Route path="admin/sectors" element={<SectorsPage />} />
           <Route path="admin/ai-settings" element={<AISettingsPage />} />
           <Route path="admin/email-settings" element={<EmailSettingsPage />} />
