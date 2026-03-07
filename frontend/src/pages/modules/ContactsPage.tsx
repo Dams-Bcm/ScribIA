@@ -514,8 +514,13 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
                   )}
                   <td className="px-4 py-2.5 text-center">
                     <div className="flex items-center justify-center gap-1.5">
-                      <ConsentBadge status={c.consent_status} type={c.consent_type} />
-                      {!c.consent_status && c.email && !sentIds.has(c.id) && (
+                      {c.consent_status ? (
+                        <ConsentBadge status={c.consent_status} type={c.consent_type} />
+                      ) : sentIds.has(c.id) ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                          <Send className="w-3 h-3" /> Envoyé
+                        </span>
+                      ) : c.email ? (
                         <button
                           onClick={() => {
                             sendConsent.mutate(
@@ -529,9 +534,8 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
                         >
                           <Send className="w-3.5 h-3.5" />
                         </button>
-                      )}
-                      {sentIds.has(c.id) && (
-                        <span className="text-xs text-green-600">Envoyé</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </div>
                   </td>
@@ -649,6 +653,7 @@ function SidebarCreateForm({ onDone, onCreated }: { onDone: () => void; onCreate
 
 export function ContactsPage() {
   const { data: groups, isLoading } = useContactGroups();
+  const { data: allGroup } = useContactGroup("__all__");
   const deleteGroup = useDeleteContactGroup();
   const [showCreate, setShowCreate] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -656,7 +661,7 @@ export function ContactsPage() {
 
   // Auto-select "Tous" by default
   const effectiveGroupId = selectedGroupId ?? "__all__";
-  const totalContacts = groups?.reduce((sum, g) => sum + g.contact_count, 0) ?? 0;
+  const totalContacts = allGroup?.contact_count ?? 0;
 
   return (
     <div>
