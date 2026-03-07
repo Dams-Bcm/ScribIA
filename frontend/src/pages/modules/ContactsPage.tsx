@@ -23,6 +23,7 @@ import {
   useDeleteContact,
   useResetEnrollment,
 } from "@/api/hooks/useContacts";
+import { useSendConsentRequest } from "@/api/hooks/useConsent";
 import type { ContactGroupCreate, ContactCreate } from "@/api/types";
 
 // ── Group creation dialog (inline) ──────────────────────────────────────────
@@ -153,7 +154,9 @@ function GroupDetail({ groupId, onBack }: { groupId: string; onBack: () => void 
   const { data: group, isLoading } = useContactGroup(groupId);
   const deleteContact = useDeleteContact();
   const resetEnrollment = useResetEnrollment();
+  const sendConsent = useSendConsentRequest();
   const [showAdd, setShowAdd] = useState(false);
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
 
   if (isLoading || !group) {
     return (
@@ -175,9 +178,29 @@ function GroupDetail({ groupId, onBack }: { groupId: string; onBack: () => void 
           {group.description && <p className="text-sm text-muted-foreground">{group.description}</p>}
           <p className="text-xs text-muted-foreground mt-1">{group.contacts.length} contact(s)</p>
         </div>
-        <Button size="sm" onClick={() => setShowAdd(true)}>
-          <UserPlus className="w-4 h-4" /> Ajouter
-        </Button>
+        <div className="flex gap-2">
+          {group.contacts.some((c) => !c.consent_status && c.email) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                const toSend = group.contacts.filter((c) => !c.consent_status && c.email && !sentIds.has(c.id));
+                for (const c of toSend) {
+                  try {
+                    await sendConsent.mutateAsync({ contactId: c.id });
+                    setSentIds((prev) => new Set(prev).add(c.id));
+                  } catch { /* skip failed */ }
+                }
+              }}
+              disabled={sendConsent.isPending}
+            >
+              <Send className="w-4 h-4" /> Envoyer consentement à tous
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setShowAdd(true)}>
+            <UserPlus className="w-4 h-4" /> Ajouter
+          </Button>
+        </div>
       </div>
 
       {showAdd && <AddContactForm groupId={groupId} onDone={() => setShowAdd(false)} />}
@@ -207,7 +230,29 @@ function GroupDetail({ groupId, onBack }: { groupId: string; onBack: () => void 
                   <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{c.email ?? "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{c.phone ?? "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{c.role ?? "—"}</td>
-                  <td className="px-4 py-3 hidden lg:table-cell"><ConsentBadge status={c.consent_status} type={c.consent_type} /></td>
+                  <td className="px-4 py-3 hidden lg:table-cell">
+                    <div className="flex items-center gap-1.5">
+                      <ConsentBadge status={c.consent_status} type={c.consent_type} />
+                      {!c.consent_status && c.email && !sentIds.has(c.id) && (
+                        <button
+                          onClick={() => {
+                            sendConsent.mutate(
+                              { contactId: c.id },
+                              { onSuccess: () => setSentIds((prev) => new Set(prev).add(c.id)) },
+                            );
+                          }}
+                          disabled={sendConsent.isPending}
+                          className="text-blue-600 hover:text-blue-800 transition-colors"
+                          title="Envoyer demande de consentement par email"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {sentIds.has(c.id) && (
+                        <span className="text-xs text-green-600">Envoyé</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <div className="flex items-center gap-1">
                       <EnrollmentBadge status={c.enrollment_status} />

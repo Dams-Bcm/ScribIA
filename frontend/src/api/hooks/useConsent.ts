@@ -29,3 +29,17 @@ export function useSetAttendees() {
     },
   });
 }
+
+export function useSendConsentRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ contactId, jobId }: { contactId: string; jobId?: string }) =>
+      api.post("/consent/send", {
+        contact_id: contactId,
+        job_id: jobId ?? null,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["contacts"] });
+    },
+  });
+}
