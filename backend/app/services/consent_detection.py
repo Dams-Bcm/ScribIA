@@ -232,6 +232,22 @@ def auto_detect_after_transcription(job_id: str, db: Session):
 
     # Store result on job for frontend to read
     job.consent_detection_result = json.dumps(result)
+
+    # If collective consent detected, update pending_oral attendees → accepted_oral
+    if result.get("detected") and result.get("detection_type") == "collective_consent":
+        try:
+            attendees = json.loads(job.attendees) if job.attendees else []
+            updated = False
+            for att in attendees:
+                if att.get("status") == "pending_oral":
+                    att["status"] = "accepted_oral"
+                    updated = True
+            if updated:
+                job.attendees = json.dumps(attendees)
+                logger.info(f"[CONSENT] Updated pending_oral attendees to accepted_oral for job {job_id}")
+        except (json.JSONDecodeError, TypeError):
+            logger.warning(f"[CONSENT] Could not parse attendees JSON for job {job_id}")
+
     db.commit()
 
     logger.info(f"[CONSENT] Auto-detection for job {job_id}: detected={result.get('detected')}, "
