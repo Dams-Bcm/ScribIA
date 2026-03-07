@@ -200,11 +200,15 @@ def _call_ollama(model: str, system_prompt: str, user_prompt: str, temperature: 
         "prompt": user_prompt,
         "stream": True,
         "keep_alive": 0,  # décharge le modèle de la VRAM immédiatement après génération
-        "options": {"temperature": temperature},
+        "options": {
+            "temperature": temperature,
+            "num_predict": 4096,       # limite la génération pour éviter les boucles
+            "repeat_penalty": 1.3,     # pénalise les répétitions
+        },
     }
     url = f"{settings.ollama_url}/api/generate"
     try:
-        with requests.post(url, json=payload, stream=True, timeout=300) as resp:
+        with requests.post(url, json=payload, stream=True, timeout=600) as resp:
             resp.raise_for_status()
             for line in resp.iter_lines():
                 if not line:
@@ -281,8 +285,16 @@ def _run_generation(doc_id: str):
         system_prompt, user_prompt = _build_prompt(template_data, context)
 
         from app.services.ai_config import get_model_for_usage
-        model = template_data.get("ollama_model") or get_model_for_usage("ai_documents")
+        base_model = template_data.get("ollama_model") or get_model_for_usage("ai_documents")
         temperature = float(template_data.get("temperature", 0.3))
+
+        # Sélection auto : si le user prompt dépasse le seuil, utiliser le modèle long contexte
+        model = base_model
+        if (len(user_prompt) > settings.ollama_long_context_threshold
+                and settings.ollama_long_context_model):
+            model = settings.ollama_long_context_model
+            logger.info(f"[AI] Context trop long ({len(user_prompt)} chars > {settings.ollama_long_context_threshold}), "
+                        f"bascule vers modèle long contexte: {model}")
 
         # Génération en streaming
         logger.info(f"[AI] Model: {model}, Temperature: {temperature}")

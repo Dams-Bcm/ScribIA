@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     # ── AI Documents / Ollama ───────────────────────────────────────────────────
     ollama_url: str = "http://localhost:11434"
     ollama_default_model: str = "llama3.1:8b"
+    ollama_long_context_model: str = ""  # modèle pour longs contextes (>20k chars), ex: qwen2.5:32b
+    ollama_long_context_threshold: int = 20000  # seuil en chars pour basculer sur le modèle long contexte
     ai_docs_path: str = "/data/ai_docs"
 
     # ── RAG / ChromaDB ──────────────────────────────────────────────────────────

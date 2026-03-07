@@ -1041,12 +1041,19 @@ def get_ai_settings(
         "ollama_models": ollama_models,
         "default_model": settings.ollama_default_model,
         "ollama_url": settings.ollama_url,
+        "long_context_model": settings.ollama_long_context_model,
+        "long_context_threshold": settings.ollama_long_context_threshold,
     }
 
 
 class AISettingUpdate(BaseModel):
     usage_key: str
     model_name: str | None  # None = revert to default
+
+
+class LongContextUpdate(BaseModel):
+    long_context_model: str | None = None
+    long_context_threshold: int | None = None
 
 
 @router.put("/ai-settings")
@@ -1071,6 +1078,22 @@ def update_ai_settings(
                 db.delete(existing)
     db.commit()
     return {"message": "Configuration IA mise à jour"}
+
+
+@router.put("/ai-settings/long-context")
+def update_long_context_settings(
+    body: LongContextUpdate,
+    _: User = Depends(require_super_admin),
+):
+    """Met à jour les paramètres du modèle long contexte."""
+    if body.long_context_model is not None:
+        settings.ollama_long_context_model = body.long_context_model
+    if body.long_context_threshold is not None:
+        settings.ollama_long_context_threshold = max(1000, body.long_context_threshold)
+    return {
+        "long_context_model": settings.ollama_long_context_model,
+        "long_context_threshold": settings.ollama_long_context_threshold,
+    }
 
 
 # ── Whisper / Transcription Settings ──────────────────────────────────────────

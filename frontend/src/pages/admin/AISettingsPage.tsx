@@ -20,6 +20,8 @@ interface AISettingsResponse {
   ollama_models: string[];
   default_model: string;
   ollama_url: string;
+  long_context_model: string;
+  long_context_threshold: number;
 }
 
 interface RAGSetting {
@@ -122,6 +124,15 @@ function useUpdatePyannoteSettings() {
   });
 }
 
+function useUpdateLongContext() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { long_context_model?: string; long_context_threshold?: number }) =>
+      api.put("/admin/ai-settings/long-context", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ai-settings"] }),
+  });
+}
+
 const SUGGESTED_MODELS = [
   { name: "llama3.1:8b",   desc: "Llama 3.1 8B — polyvalent, rapide (~5 Go)" },
   { name: "llama3.1:70b",  desc: "Llama 3.1 70B — haute qualité (~40 Go)" },
@@ -158,6 +169,7 @@ export function AISettingsPage() {
   const updateRAG = useUpdateRAGSettings();
   const updateWhisper = useUpdateWhisperSettings();
   const updatePyannote = useUpdatePyannoteSettings();
+  const updateLongContext = useUpdateLongContext();
   const deleteModel = useDeleteModel();
 
   const [overrides, setOverrides] = useState<Record<string, string | null>>({});
@@ -171,6 +183,9 @@ export function AISettingsPage() {
   const [ragSaved, setRAGSaved] = useState(false);
   const [whisperSaved, setWhisperSaved] = useState(false);
   const [pyannoteSaved, setPyannoteSaved] = useState(false);
+  const [longCtxModel, setLongCtxModel] = useState<string | null>(null);
+  const [longCtxThreshold, setLongCtxThreshold] = useState<string | null>(null);
+  const [longCtxSaved, setLongCtxSaved] = useState(false);
 
   if (isLoading || !data) {
     return (
@@ -271,6 +286,19 @@ export function AISettingsPage() {
     setTimeout(() => setPyannoteSaved(false), 2000);
   }
 
+  const hasLongCtxChanges = longCtxModel !== null || longCtxThreshold !== null;
+
+  async function handleLongCtxSave() {
+    const body: Record<string, unknown> = {};
+    if (longCtxModel !== null) body.long_context_model = longCtxModel;
+    if (longCtxThreshold !== null) body.long_context_threshold = parseInt(longCtxThreshold, 10) || 20000;
+    await updateLongContext.mutateAsync(body as { long_context_model?: string; long_context_threshold?: number });
+    setLongCtxModel(null);
+    setLongCtxThreshold(null);
+    setLongCtxSaved(true);
+    setTimeout(() => setLongCtxSaved(false), 2000);
+  }
+
   const hasChanges = Object.keys(overrides).length > 0;
   const hasRAGChanges = Object.keys(ragOverrides).length > 0;
   const hasWhisperChanges = Object.keys(whisperOverrides).length > 0;
@@ -336,6 +364,73 @@ export function AISettingsPage() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Long context auto-switch */}
+          <div className="bg-background rounded-xl border border-border p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold">Modèle long contexte</h2>
+                <p className="text-[11px] text-muted-foreground/70">
+                  Bascule automatiquement vers un modèle plus puissant quand la transcription dépasse le seuil
+                </p>
+              </div>
+              <Button size="sm" onClick={handleLongCtxSave} disabled={!hasLongCtxChanges && !longCtxSaved || updateLongContext.isPending}>
+                {longCtxSaved ? (
+                  <><Check className="w-4 h-4 mr-1" /> Sauvegardé</>
+                ) : updateLongContext.isPending ? (
+                  <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Sauvegarde…</>
+                ) : (
+                  <><Save className="w-4 h-4 mr-1" /> Sauvegarder</>
+                )}
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center gap-4">
+                  <div className="w-60 shrink-0">
+                    <Label className="text-sm font-medium">Modèle long contexte</Label>
+                    <p className="text-xs text-muted-foreground">actuel : {data.long_context_model || "(non défini)"}</p>
+                  </div>
+                  <Select
+                    value={longCtxModel ?? data.long_context_model || "__none__"}
+                    onValueChange={(v) => { setLongCtxModel(v === "__none__" ? "" : v); setLongCtxSaved(false); }}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Désactivé (pas de bascule auto)</SelectItem>
+                      {data.ollama_models.map((m) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  Modèle utilisé quand le prompt dépasse le seuil. Choisir un modèle avec grande fenêtre de contexte (ex: qwen2.5:32b)
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-4">
+                  <div className="w-60 shrink-0">
+                    <Label className="text-sm font-medium">Seuil de bascule (chars)</Label>
+                    <p className="text-xs text-muted-foreground">actuel : {data.long_context_threshold.toLocaleString()}</p>
+                  </div>
+                  <Input
+                    className="flex-1 font-mono text-sm"
+                    type="number"
+                    value={longCtxThreshold ?? String(data.long_context_threshold)}
+                    onChange={(e) => { setLongCtxThreshold(e.target.value); setLongCtxSaved(false); }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  Si le prompt utilisateur dépasse ce nombre de caractères, le modèle long contexte est utilisé automatiquement. ~20 000 chars ≈ 15 min de réunion
+                </p>
+              </div>
             </div>
           </div>
 
