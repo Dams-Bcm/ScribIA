@@ -199,23 +199,27 @@ export function SectorTemplateManager({ sector }: { sector: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-          Templates de procédure
-        </p>
+        <div>
+          <h3 className="text-base font-semibold">Templates de procédure</h3>
+          <p className="text-xs text-muted-foreground">
+            Templates copiés lors du provisionnement d'un tenant de ce secteur
+          </p>
+        </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setGenerateOpen(true)}>
             <Sparkles className="w-3.5 h-3.5 mr-1" /> Générer avec IA
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="w-3.5 h-3.5 mr-1" /> Nouveau template
           </Button>
         </div>
       </div>
 
       {templates.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-6">
-          Aucun template pour ce secteur. Les seeds par défaut seront utilisées lors du provisionnement.
-        </p>
+        <div className="text-center py-6 text-muted-foreground">
+          <FileText className="w-6 h-6 mx-auto mb-2 opacity-40" />
+          <p className="text-sm">Aucun template pour ce secteur.</p>
+        </div>
       ) : (
         <div className="space-y-2">
           {templates.map((tpl) => (

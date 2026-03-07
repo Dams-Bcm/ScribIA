@@ -622,7 +622,7 @@ function SectorDocTemplateManager({ sector }: { sector: string }) {
       {templates.length === 0 ? (
         <div className="text-center py-6 text-muted-foreground">
           <FileText className="w-6 h-6 mx-auto mb-2 opacity-40" />
-          <p className="text-sm">Aucun template. Les seeds par defaut seront utilisees au provisionnement.</p>
+          <p className="text-sm">Aucun template pour ce secteur.</p>
         </div>
       ) : (
         <div className="space-y-2">
