@@ -50,53 +50,28 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
     model = get_model_for_usage("consent_detection")
     logger.info(f"[CONSENT] Using model '{model}' for job {job.id}")
 
-    system_prompt = (
-        "Tu es un assistant d'analyse de transcriptions de reunions.\n"
-        "Tu dois analyser la transcription pour detecter si les PARTICIPANTS ont donne "
-        "leur consentement a l'enregistrement.\n\n"
-        "ATTENTION — il y a DEUX etapes distinctes :\n"
-        "1. L'ANNONCE : l'organisateur informe que la reunion est enregistree "
-        "(ex: 'cette reunion va etre enregistree', 'nous enregistrons cette seance'). "
-        "L'annonce seule N'EST PAS un consentement.\n"
-        "2. Le CONSENTEMENT : les autres participants acceptent explicitement ou implicitement. "
-        "Exemples de consentement :\n"
-        "   - Acceptation explicite : 'oui pas de souci', 'd'accord', 'aucun probleme', 'ok'\n"
-        "   - Absence d'objection apres une demande : 'si ca ne derange personne' suivi de silence "
-        "ou de poursuite normale de la reunion (= consentement implicite)\n"
-        "   - Confirmation collective : 'tout le monde est d'accord ?', 'oui'\n\n"
-        "Pour detecter un CONSENTEMENT COLLECTIF valide, il faut :\n"
-        "- Une annonce de l'enregistrement par un participant (l'organisateur)\n"
-        "- ET une acceptation (explicite ou implicite) par les autres participants\n"
-        "- Si l'organisateur demande 'si ca ne derange personne' et que personne ne s'y oppose "
-        "dans les segments suivants, c'est un consentement IMPLICITE valide (confidence: medium).\n"
-        "- Si des participants repondent explicitement 'oui', 'ok', 'd'accord', c'est un "
-        "consentement EXPLICITE (confidence: high).\n\n"
-        "Pour detecter un REFUS individuel :\n"
-        "- Un participant dit explicitement qu'il refuse l'enregistrement "
-        "(ex: 'je refuse d'etre enregistre', 'non je ne suis pas d'accord', "
-        "'je m'oppose a l'enregistrement').\n\n"
-        "IMPORTANT : Si un consentement ET un refus sont detectes, retourne le REFUS (plus critique).\n\n"
-        "Dans le champ 'phrase', cite la phrase d'ACCEPTATION ou de REFUS des participants "
-        "(PAS l'annonce de l'organisateur).\n"
-        "Dans le champ 'announcement', cite la phrase d'annonce de l'organisateur.\n\n"
-        "Reponds UNIQUEMENT en JSON valide avec cette structure :\n"
-        "{\n"
-        '  "detected": true/false,\n'
-        '  "type": "collective_consent" ou "individual_refusal" ou null,\n'
-        '  "announcement": "la phrase d\'annonce de l\'organisateur ou null",\n'
-        '  "phrase": "la phrase d\'acceptation/refus des participants ou null",\n'
-        '  "segment_time": "start_time-end_time ou null",\n'
-        '  "speaker_id": "le SPEAKER_XX qui a accepte/refuse ou null",\n'
-        '  "confidence": "high/medium/low",\n'
-        '  "explanation": "courte explication"\n'
-        "}\n\n"
-        "Si aucun consentement ni refus n'est detecte :\n"
+    system_prompt = "You analyze meeting transcripts to detect recording consent. Respond ONLY with a JSON object."
+
+    user_prompt = (
+        "Does this French meeting transcript contain consent to being recorded?\n\n"
+        "Look for:\n"
+        "- Someone announcing the recording (e.g. 'cette seance va etre enregistree')\n"
+        "- Participants accepting (e.g. 'ok', 'd'accord', 'c'est bon', no objection)\n"
+        "- OR someone refusing (e.g. 'je refuse d'etre enregistre')\n\n"
+        "Respond with this exact JSON structure:\n"
+        '{"detected": true, "type": "collective_consent", '
+        '"announcement": "the announcement phrase", '
+        '"phrase": "the acceptance/refusal phrase", '
+        '"segment_time": "1.2-10.8", '
+        '"speaker_id": "SPEAKER_XX", '
+        '"confidence": "high", '
+        '"explanation": "short explanation"}\n\n'
+        "If no consent detected:\n"
         '{"detected": false, "type": null, "announcement": null, "phrase": null, '
         '"segment_time": null, "speaker_id": null, "confidence": null, '
-        '"explanation": "Aucun consentement detecte."}'
+        '"explanation": "No consent detected"}\n\n'
+        f"TRANSCRIPT:\n{transcript_text}"
     )
-
-    user_prompt = f"Analyse cette transcription :\n\n{transcript_text}"
     logger.info(f"[CONSENT] Sending {len(analysis_segments)} segments to LLM for job {job.id}. First 300 chars: {transcript_text[:300]}")
 
     try:
