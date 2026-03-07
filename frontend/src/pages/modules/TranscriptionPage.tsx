@@ -74,8 +74,8 @@ export function TranscriptionPage() {
   if (selectedJobId) {
     return (
       <div>
-        <h1 className="text-2xl font-bold mb-1">Transcription simple</h1>
-        <p className="text-muted-foreground mb-6">Convertissez vos fichiers audio en texte</p>
+        <h1 className="text-2xl font-bold mb-1">Dictée vocale</h1>
+        <p className="text-muted-foreground mb-6">Transcrivez vos enregistrements mono-locuteur</p>
         <TranscriptionJobView jobId={selectedJobId} onBack={() => setSelectedJobId(null)} />
       </div>
     );

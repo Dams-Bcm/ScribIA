@@ -247,9 +247,9 @@ def _add_missing_columns():
 
         # contacts N:N migration: create junction table, migrate data, drop old group_id
         tables = insp.get_table_names()
-        if "contact_group_members" not in tables and "contacts" in tables:
+        if "contacts" in tables:
             contact_cols = {c["name"] for c in insp.get_columns("contacts")}
-            if "group_id" in contact_cols:
+            if "contact_group_members" not in tables and "group_id" in contact_cols:
                 conn.execute(text("""
                     CREATE TABLE contact_group_members (
                         contact_id VARCHAR(36) NOT NULL,
@@ -263,8 +263,9 @@ def _add_missing_columns():
                     INSERT INTO contact_group_members (contact_id, group_id)
                     SELECT id, group_id FROM contacts WHERE group_id IS NOT NULL
                 """))
+            # Drop group_id column if it still exists (even if junction table already created)
+            if "group_id" in contact_cols:
                 # Drop FK constraint on group_id before dropping column
-                # MSSQL: find and drop the constraint dynamically
                 conn.execute(text("""
                     DECLARE @fk NVARCHAR(255)
                     SELECT @fk = fk.name

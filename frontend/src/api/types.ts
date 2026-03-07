@@ -532,7 +532,7 @@ export interface SpeakerProfileCreate {
 // ── Modules ──────────────────────────────────────────────────────────────────
 
 export const AVAILABLE_MODULES: ModuleDefinition[] = [
-  { key: "transcription", label: "Transcription simple" },
+  { key: "transcription", label: "Dictée vocale" },
   { key: "transcription_diarisation", label: "Transcription + Diarisation" },
   { key: "preparatory_phases", label: "Phase(s) préparatoire(s)" },
   { key: "rgpd", label: "RGPD" },

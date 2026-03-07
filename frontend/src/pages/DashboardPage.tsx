@@ -6,8 +6,8 @@ import { Mic, FileText, FolderOpen, Scale, Sparkles } from "lucide-react";
 const modules = [
   {
     key: "transcription",
-    label: "Transcription simple",
-    description: "Convertissez vos fichiers audio en texte",
+    label: "Dictée vocale",
+    description: "Transcrivez vos enregistrements mono-locuteur",
     icon: Mic,
     color: "bg-blue-50 text-blue-600",
     to: "/transcription",

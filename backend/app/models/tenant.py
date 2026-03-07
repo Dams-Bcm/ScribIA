@@ -6,7 +6,7 @@ from app.models.base import Base, UUIDMixin, TimestampMixin
 
 # Available modules — single source of truth
 AVAILABLE_MODULES = {
-    "transcription":              "Transcription simple",
+    "transcription":              "Dictée vocale",
     "transcription_diarisation":  "Transcription + Diarisation",
     "preparatory_phases":         "Phase(s) préparatoire(s)",
     "rgpd":                       "RGPD",
