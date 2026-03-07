@@ -13,7 +13,7 @@ import { AudioRecorder } from "@/components/transcription/AudioRecorder";
 import { JobList } from "@/components/transcription/JobList";
 import { DiarisationJobView } from "@/components/diarisation/DiarisationJobView";
 
-export function TranscriptionDiarisationPage() {
+export function ReunionPage() {
   const qc = useQueryClient();
   const { data: jobs = [], isLoading } = useDiarisationJobs();
   const startProcessing = useStartDiarisationProcessing();
@@ -74,7 +74,7 @@ export function TranscriptionDiarisationPage() {
   if (selectedJobId) {
     return (
       <div>
-        <h1 className="text-2xl font-bold mb-1">Transcription + Diarisation</h1>
+        <h1 className="text-2xl font-bold mb-1">Réunion</h1>
         <p className="text-muted-foreground mb-6">Transcription avec identification des intervenants</p>
         <DiarisationJobView jobId={selectedJobId} onBack={() => setSelectedJobId(null)} />
       </div>
@@ -86,7 +86,7 @@ export function TranscriptionDiarisationPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Transcription + Diarisation</h1>
+      <h1 className="text-2xl font-bold mb-1">Réunion</h1>
       <p className="text-muted-foreground mb-6">Transcription avec identification des intervenants</p>
 
       <div className="space-y-6">

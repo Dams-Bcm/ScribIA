@@ -14,11 +14,11 @@ const modules = [
   },
   {
     key: "transcription_diarisation",
-    label: "Transcription + Diarisation",
+    label: "Réunion",
     description: "Transcription avec identification des intervenants",
     icon: FileText,
     color: "bg-purple-50 text-purple-600",
-    to: "/transcription-diarisation",
+    to: "/reunion",
   },
   {
     key: "preparatory_phases",

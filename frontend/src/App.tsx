@@ -15,7 +15,7 @@ const PrivacyPage = lazy(() => import("./pages/PrivacyPage").then(m => ({ defaul
 
 // Module pages
 const TranscriptionPage = lazy(() => import("./pages/modules/TranscriptionPage").then(m => ({ default: m.TranscriptionPage })));
-const TranscriptionDiarisationPage = lazy(() => import("./pages/modules/TranscriptionDiarisationPage").then(m => ({ default: m.TranscriptionDiarisationPage })));
+const ReunionPage = lazy(() => import("./pages/modules/ReunionPage").then(m => ({ default: m.ReunionPage })));
 const RGPDPage = lazy(() => import("./pages/modules/RGPDPage").then(m => ({ default: m.RGPDPage })));
 const AIDocumentsPage = lazy(() => import("./pages/modules/AIDocumentsPage").then(m => ({ default: m.AIDocumentsPage })));
 const PreparatoryPhasesPage = lazy(() => import("./pages/modules/PreparatoryPhasesPage").then(m => ({ default: m.PreparatoryPhasesPage })));
@@ -92,7 +92,7 @@ function AppRoutes() {
 
             {/* Modules */}
             <Route path="transcription" element={<TranscriptionPage />} />
-            <Route path="transcription-diarisation" element={<TranscriptionDiarisationPage />} />
+            <Route path="reunion" element={<ReunionPage />} />
             <Route path="phases-preparatoires" element={<PreparatoryPhasesPage />} />
             <Route path="rgpd" element={<RGPDPage />} />
             <Route path="documents-ia" element={<AIDocumentsPage />} />
