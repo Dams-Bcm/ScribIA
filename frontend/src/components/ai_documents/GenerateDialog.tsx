@@ -48,7 +48,7 @@ export function GenerateDialog({ onGenerated }: Props) {
   const { hasModule } = useAuth();
   const hasPrepModule = hasModule("preparatory_phases");
   const { data: templates = [] } = useTemplates();
-  const { data: dossiers = [] } = useDossiers();
+  const { data: dossiers = [] } = useDossiers(hasPrepModule);
   const { data: sessions = [] } = useTranscriptionSessions();
   const generate = useGenerateDocument();
 

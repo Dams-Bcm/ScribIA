@@ -17,10 +17,11 @@ const KEYS = {
 
 // ── Dossiers ──────────────────────────────────────────────────────────────────
 
-export function useDossiers() {
+export function useDossiers(enabled = true) {
   return useQuery<PreparatoryDossier[]>({
     queryKey: KEYS.list,
     queryFn: () => api.get<PreparatoryDossier[]>("/preparatory-phases"),
+    enabled,
   });
 }
 

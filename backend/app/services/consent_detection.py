@@ -116,15 +116,45 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
         logger.warning(f"[CONSENT] LLM detection failed for job {job.id}: {e}")
         return None
 
-    # Parse LLM JSON response
-    json_match = re.search(r'\{[^{}]*\}', llm_response, re.DOTALL)
-    if not json_match:
-        logger.warning(f"[CONSENT] LLM response not parseable for job {job.id}")
-        return {"detected": False, "explanation": "Reponse LLM non exploitable."}
+    # Parse LLM JSON response — try multiple strategies
+    logger.debug(f"[CONSENT] Raw LLM response for job {job.id}: {llm_response[:500]}")
+    result = None
 
+    # Strategy 1: direct parse (response is pure JSON)
     try:
-        result = json.loads(json_match.group())
-    except json.JSONDecodeError:
+        result = json.loads(llm_response.strip())
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # Strategy 2: find JSON block with balanced braces
+    if result is None:
+        # Find first '{' and match balanced braces
+        start = llm_response.find('{')
+        if start != -1:
+            depth = 0
+            for i in range(start, len(llm_response)):
+                if llm_response[i] == '{':
+                    depth += 1
+                elif llm_response[i] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            result = json.loads(llm_response[start:i+1])
+                        except json.JSONDecodeError:
+                            pass
+                        break
+
+    # Strategy 3: markdown code block
+    if result is None:
+        code_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', llm_response, re.DOTALL)
+        if code_match:
+            try:
+                result = json.loads(code_match.group(1))
+            except json.JSONDecodeError:
+                pass
+
+    if result is None:
+        logger.warning(f"[CONSENT] LLM response not parseable for job {job.id}: {llm_response[:200]}")
         return {"detected": False, "explanation": "Reponse LLM non exploitable."}
 
     if not result.get("detected"):
