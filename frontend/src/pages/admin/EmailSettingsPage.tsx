@@ -95,38 +95,40 @@ export function EmailSettingsPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="bg-background rounded-xl border border-border p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Mail className="w-5 h-5" />
-            <h1 className="text-xl font-semibold">Configuration Email (SMTP)</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleTest}
-              disabled={testEmail.isPending}
-            >
-              {testEmail.isPending ? (
-                <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Test…</>
-              ) : (
-                <><SendHorizonal className="w-4 h-4 mr-1" /> Tester</>
-              )}
-            </Button>
-            <Button size="sm" onClick={handleSave} disabled={!hasChanges && !saved || updateEmail.isPending}>
-              {saved ? (
-                <><Check className="w-4 h-4 mr-1" /> Sauvegardé</>
-              ) : updateEmail.isPending ? (
-                <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Sauvegarde…</>
-              ) : (
-                <><Save className="w-4 h-4 mr-1" /> Sauvegarder</>
-              )}
-            </Button>
-          </div>
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Configuration Email (SMTP)</h1>
+          <p className="text-sm text-muted-foreground">
+            Configurez le serveur SMTP pour l'envoi des emails de consentement RGPD
+          </p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleTest}
+            disabled={testEmail.isPending}
+          >
+            {testEmail.isPending ? (
+              <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Test…</>
+            ) : (
+              <><SendHorizonal className="w-4 h-4 mr-1" /> Tester</>
+            )}
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={!hasChanges && !saved || updateEmail.isPending}>
+            {saved ? (
+              <><Check className="w-4 h-4 mr-1" /> Sauvegardé</>
+            ) : updateEmail.isPending ? (
+              <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Sauvegarde…</>
+            ) : (
+              <><Save className="w-4 h-4 mr-1" /> Sauvegarder</>
+            )}
+          </Button>
+        </div>
+      </div>
 
+      <div className="bg-background rounded-xl border border-border p-6">
         {testResult && (
           <div className={`mb-4 rounded-lg border p-3 text-sm flex items-center gap-2 ${
             testResult.success
@@ -187,7 +189,6 @@ export function EmailSettingsPage() {
         </div>
 
         <p className="text-xs text-muted-foreground mt-4">
-          Configurez le serveur SMTP pour l'envoi des emails de consentement RGPD.
           Utilisez le bouton <strong>Tester</strong> pour vérifier la configuration (envoie un email à l'adresse expéditeur).
         </p>
       </div>

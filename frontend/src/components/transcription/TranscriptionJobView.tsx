@@ -215,9 +215,19 @@ export function TranscriptionJobView({ jobId, onBack }: TranscriptionJobViewProp
                       </span>
                     )}
                   </div>
+                  {detection.announcement && (
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      Annonce : &laquo; {detection.announcement} &raquo;
+                    </p>
+                  )}
                   {detection.consent_phrase && (
                     <p className="text-sm text-green-700 dark:text-green-300 italic">
-                      &laquo; {detection.consent_phrase} &raquo;
+                      Acceptation : &laquo; {detection.consent_phrase} &raquo;
+                    </p>
+                  )}
+                  {!detection.consent_phrase && detection.confidence === "medium" && (
+                    <p className="text-sm text-green-700 dark:text-green-300 italic">
+                      Consentement implicite (absence d'objection)
                     </p>
                   )}
                   {detection.start_time != null && (

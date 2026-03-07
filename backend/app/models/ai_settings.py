@@ -11,6 +11,7 @@ AI_USAGES = {
     "workflow_generation": "Génération de workflows",
     "convocations": "Génération de convocations",
     "sector_suggestions": "Suggestions sectorielles",
+    "consent_detection": "Détection du consentement oral",
 }
 
 

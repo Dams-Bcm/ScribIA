@@ -240,9 +240,19 @@ function AutoDetectionBanner({ resultJson }: { resultJson: string }) {
               </span>
             )}
           </div>
+          {result.announcement && (
+            <p className="text-sm text-green-700 dark:text-green-300">
+              Annonce : &laquo; {result.announcement} &raquo;
+            </p>
+          )}
           {result.consent_phrase && (
             <p className="text-sm text-green-700 dark:text-green-300 italic">
-              &laquo; {result.consent_phrase} &raquo;
+              Acceptation : &laquo; {result.consent_phrase} &raquo;
+            </p>
+          )}
+          {!result.consent_phrase && result.confidence === "medium" && (
+            <p className="text-sm text-green-700 dark:text-green-300 italic">
+              Consentement implicite (absence d'objection)
             </p>
           )}
           {result.start_time != null && (

@@ -51,27 +51,48 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
 
     system_prompt = (
         "Tu es un assistant d'analyse de transcriptions de reunions.\n"
-        "Tu dois analyser la transcription pour detecter :\n"
-        "1. Un CONSENTEMENT collectif a l'enregistrement (ex: 'cette reunion va etre enregistree', "
-        "'nous enregistrons cette seance', 'vous acceptez l'enregistrement', 'pas d'objection').\n"
-        "2. Un REFUS individuel d'etre enregistre (ex: 'je refuse d'etre enregistre', "
-        "'non je ne suis pas d'accord', 'je m'oppose a l'enregistrement').\n\n"
-        "IMPORTANT : Cherche d'abord le consentement, puis verifie s'il y a un refus apres.\n"
-        "Si un consentement ET un refus sont detectes, retourne le REFUS (plus critique).\n\n"
+        "Tu dois analyser la transcription pour detecter si les PARTICIPANTS ont donne "
+        "leur consentement a l'enregistrement.\n\n"
+        "ATTENTION — il y a DEUX etapes distinctes :\n"
+        "1. L'ANNONCE : l'organisateur informe que la reunion est enregistree "
+        "(ex: 'cette reunion va etre enregistree', 'nous enregistrons cette seance'). "
+        "L'annonce seule N'EST PAS un consentement.\n"
+        "2. Le CONSENTEMENT : les autres participants acceptent explicitement ou implicitement. "
+        "Exemples de consentement :\n"
+        "   - Acceptation explicite : 'oui pas de souci', 'd'accord', 'aucun probleme', 'ok'\n"
+        "   - Absence d'objection apres une demande : 'si ca ne derange personne' suivi de silence "
+        "ou de poursuite normale de la reunion (= consentement implicite)\n"
+        "   - Confirmation collective : 'tout le monde est d'accord ?', 'oui'\n\n"
+        "Pour detecter un CONSENTEMENT COLLECTIF valide, il faut :\n"
+        "- Une annonce de l'enregistrement par un participant (l'organisateur)\n"
+        "- ET une acceptation (explicite ou implicite) par les autres participants\n"
+        "- Si l'organisateur demande 'si ca ne derange personne' et que personne ne s'y oppose "
+        "dans les segments suivants, c'est un consentement IMPLICITE valide (confidence: medium).\n"
+        "- Si des participants repondent explicitement 'oui', 'ok', 'd'accord', c'est un "
+        "consentement EXPLICITE (confidence: high).\n\n"
+        "Pour detecter un REFUS individuel :\n"
+        "- Un participant dit explicitement qu'il refuse l'enregistrement "
+        "(ex: 'je refuse d'etre enregistre', 'non je ne suis pas d'accord', "
+        "'je m'oppose a l'enregistrement').\n\n"
+        "IMPORTANT : Si un consentement ET un refus sont detectes, retourne le REFUS (plus critique).\n\n"
+        "Dans le champ 'phrase', cite la phrase d'ACCEPTATION ou de REFUS des participants "
+        "(PAS l'annonce de l'organisateur).\n"
+        "Dans le champ 'announcement', cite la phrase d'annonce de l'organisateur.\n\n"
         "Reponds UNIQUEMENT en JSON valide avec cette structure :\n"
         "{\n"
         '  "detected": true/false,\n'
         '  "type": "collective_consent" ou "individual_refusal" ou null,\n'
-        '  "phrase": "la phrase exacte trouvee ou null",\n'
+        '  "announcement": "la phrase d\'annonce de l\'organisateur ou null",\n'
+        '  "phrase": "la phrase d\'acceptation/refus des participants ou null",\n'
         '  "segment_time": "start_time-end_time ou null",\n'
-        '  "speaker_id": "le SPEAKER_XX qui a prononce la phrase ou null",\n'
+        '  "speaker_id": "le SPEAKER_XX qui a accepte/refuse ou null",\n'
         '  "confidence": "high/medium/low",\n'
         '  "explanation": "courte explication"\n'
         "}\n\n"
-        "Si aucune phrase de consentement ni de refus n'est trouvee :\n"
-        '{"detected": false, "type": null, "phrase": null, "segment_time": null, '
-        '"speaker_id": null, "confidence": null, '
-        '"explanation": "Aucune phrase de consentement ou de refus detectee."}'
+        "Si aucun consentement ni refus n'est detecte :\n"
+        '{"detected": false, "type": null, "announcement": null, "phrase": null, '
+        '"segment_time": null, "speaker_id": null, "confidence": null, '
+        '"explanation": "Aucun consentement detecte."}'
     )
 
     user_prompt = f"Analyse cette transcription :\n\n{transcript_text}"
@@ -165,6 +186,7 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
     return {
         "detected": True,
         "detection_type": detection_type,
+        "announcement": result.get("announcement"),
         "consent_phrase": consent_phrase,
         "segment_id": matched_seg.id if matched_seg else None,
         "start_time": matched_seg.start_time if matched_seg else None,
