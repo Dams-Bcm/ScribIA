@@ -20,9 +20,10 @@ export function ConsentResponsePage() {
 
     api
       .get(`/consent/respond/${token}?action=${action}`)
-      .then((res: { status: string; message: string }) => {
-        setMessage(res.message);
-        setStatus(res.status === "accepted" ? "success" : "refused");
+      .then((res) => {
+        const data = res as { status: string; message: string };
+        setMessage(data.message);
+        setStatus(data.status === "accepted" ? "success" : "refused");
       })
       .catch((err) => {
         setStatus("error");
