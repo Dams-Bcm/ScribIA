@@ -474,7 +474,7 @@ def _enrich_attendee_names(db: Session, attendees: list[AttendeeEntry]):
         return
     contact_ids = [a.contact_id for a in attendees]
     contacts = db.query(Contact).filter(Contact.id.in_(contact_ids)).all()
-    name_map = {c.id: f"{c.first_name} {c.last_name}".strip() or c.email or c.id for c in contacts}
+    name_map = {c.id: c.name or c.email or c.id for c in contacts}
     for a in attendees:
         a.contact_name = name_map.get(a.contact_id, a.contact_id)
 
