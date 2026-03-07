@@ -7,7 +7,8 @@ from app.models.base import Base, UUIDMixin, TimestampMixin, _utcnow
 class AIDocumentTemplate(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "ai_document_templates"
 
-    tenant_id            = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    tenant_id            = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
+    sector               = Column(String(50), nullable=True, index=True)
     name                 = Column(String(200), nullable=False)
     description          = Column(Text, nullable=True)
     document_type        = Column(String(50), nullable=False, default="custom")

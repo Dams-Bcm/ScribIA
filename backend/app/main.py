@@ -217,6 +217,22 @@ def _add_missing_columns():
                     "ALTER TABLE speaker_enrollment_segments ALTER COLUMN segment_id VARCHAR(36) NULL"
                 ))
 
+        # ai_document_templates: tenant_id nullable + sector column
+        adt_cols = {c["name"] for c in insp.get_columns("ai_document_templates")} if "ai_document_templates" in insp.get_table_names() else set()
+        if "ai_document_templates" in insp.get_table_names():
+            tid_col = next(
+                (c for c in insp.get_columns("ai_document_templates") if c["name"] == "tenant_id"),
+                None,
+            )
+            if tid_col and not tid_col.get("nullable", True):
+                conn.execute(text(
+                    "ALTER TABLE ai_document_templates ALTER COLUMN tenant_id VARCHAR(36) NULL"
+                ))
+            if "sector" not in adt_cols:
+                conn.execute(text(
+                    "ALTER TABLE ai_document_templates ADD sector VARCHAR(50) NULL"
+                ))
+
         conn.commit()
 
 

@@ -500,6 +500,125 @@ def _sector_template_response(tpl: ProcedureTemplate) -> dict:
     }
 
 
+# ── Sector AI document templates ─────────────────────────────────────────────
+
+def _sector_doc_template_response(t: AIDocumentTemplate) -> dict:
+    return {
+        "id": t.id,
+        "name": t.name,
+        "description": t.description,
+        "document_type": t.document_type,
+        "system_prompt": t.system_prompt,
+        "user_prompt_template": t.user_prompt_template,
+        "map_system_prompt": t.map_system_prompt,
+        "temperature": t.temperature,
+        "sector": t.sector,
+        "is_active": t.is_active,
+        "created_at": str(t.created_at),
+        "updated_at": str(t.updated_at),
+    }
+
+
+@router.get("/sectors/{sector}/document-templates")
+def list_sector_doc_templates(
+    sector: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Liste les templates de documents IA sectoriels (master)."""
+    templates = (
+        db.query(AIDocumentTemplate)
+        .filter(AIDocumentTemplate.sector == sector, AIDocumentTemplate.tenant_id.is_(None))
+        .order_by(AIDocumentTemplate.created_at.desc())
+        .all()
+    )
+    return [_sector_doc_template_response(t) for t in templates]
+
+
+class SectorDocTemplateCreate(BaseModel):
+    name: str
+    description: str | None = None
+    document_type: str = "custom"
+    system_prompt: str
+    user_prompt_template: str
+    map_system_prompt: str | None = None
+    temperature: float = 0.3
+
+
+@router.post("/sectors/{sector}/document-templates", status_code=201)
+def create_sector_doc_template(
+    sector: str,
+    body: SectorDocTemplateCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Cree un template de document IA sectoriel."""
+    tpl = AIDocumentTemplate(
+        tenant_id=None,
+        sector=sector,
+        name=body.name,
+        description=body.description,
+        document_type=body.document_type,
+        system_prompt=body.system_prompt,
+        user_prompt_template=body.user_prompt_template,
+        map_system_prompt=body.map_system_prompt,
+        temperature=body.temperature,
+    )
+    db.add(tpl)
+    db.commit()
+    db.refresh(tpl)
+    return _sector_doc_template_response(tpl)
+
+
+class SectorDocTemplateUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    document_type: str | None = None
+    system_prompt: str | None = None
+    user_prompt_template: str | None = None
+    map_system_prompt: str | None = None
+    temperature: float | None = None
+    is_active: bool | None = None
+
+
+@router.patch("/sectors/document-templates/{template_id}")
+def update_sector_doc_template(
+    template_id: str,
+    body: SectorDocTemplateUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Met a jour un template de document IA sectoriel."""
+    tpl = db.query(AIDocumentTemplate).filter(
+        AIDocumentTemplate.id == template_id,
+        AIDocumentTemplate.tenant_id.is_(None),
+    ).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template introuvable")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(tpl, field, value)
+    db.commit()
+    db.refresh(tpl)
+    return _sector_doc_template_response(tpl)
+
+
+@router.delete("/sectors/document-templates/{template_id}", status_code=204)
+def delete_sector_doc_template(
+    template_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Supprime un template de document IA sectoriel."""
+    tpl = db.query(AIDocumentTemplate).filter(
+        AIDocumentTemplate.id == template_id,
+        AIDocumentTemplate.tenant_id.is_(None),
+    ).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template introuvable")
+    db.delete(tpl)
+    db.commit()
+
+
 # ── Workflow generation via LLM ───────────────────────────────────────────────
 
 _GENERATE_SYSTEM_PROMPT = """Tu es un expert en modélisation de workflows et procédures métier.
@@ -842,22 +961,45 @@ def provision_tenant(
 
     created_proc_templates = []
     created_doc_templates = []
-
-    # 1. Templates de documents IA (depuis les seeds hardcodées pour l'instant)
     seed = _SECTOR_SEEDS.get(tenant.sector, {})
-    for dt in seed.get("document_templates", []):
-        doc_tmpl = AIDocumentTemplate(
-            tenant_id=tenant_id,
-            name=dt["name"],
-            description=dt.get("description"),
-            document_type=dt.get("document_type", "custom"),
-            system_prompt=dt["system_prompt"],
-            user_prompt_template=dt["user_prompt_template"],
-            temperature=dt.get("temperature", 0.3),
-        )
-        db.add(doc_tmpl)
-        db.flush()
-        created_doc_templates.append({"id": doc_tmpl.id, "name": doc_tmpl.name})
+
+    # 1. Templates de documents IA : copier depuis les templates sectoriels en DB
+    sector_doc_templates = (
+        db.query(AIDocumentTemplate)
+        .filter(AIDocumentTemplate.sector == tenant.sector, AIDocumentTemplate.tenant_id.is_(None))
+        .all()
+    )
+
+    if sector_doc_templates:
+        for sdt in sector_doc_templates:
+            doc_tmpl = AIDocumentTemplate(
+                tenant_id=tenant_id,
+                name=sdt.name,
+                description=sdt.description,
+                document_type=sdt.document_type,
+                system_prompt=sdt.system_prompt,
+                user_prompt_template=sdt.user_prompt_template,
+                map_system_prompt=sdt.map_system_prompt,
+                temperature=sdt.temperature,
+            )
+            db.add(doc_tmpl)
+            db.flush()
+            created_doc_templates.append({"id": doc_tmpl.id, "name": doc_tmpl.name})
+    else:
+        # Fallback : utiliser les seeds hardcodées
+        for dt in seed.get("document_templates", []):
+            doc_tmpl = AIDocumentTemplate(
+                tenant_id=tenant_id,
+                name=dt["name"],
+                description=dt.get("description"),
+                document_type=dt.get("document_type", "custom"),
+                system_prompt=dt["system_prompt"],
+                user_prompt_template=dt["user_prompt_template"],
+                temperature=dt.get("temperature", 0.3),
+            )
+            db.add(doc_tmpl)
+            db.flush()
+            created_doc_templates.append({"id": doc_tmpl.id, "name": doc_tmpl.name})
 
     first_doc_id = created_doc_templates[0]["id"] if created_doc_templates else None
 
