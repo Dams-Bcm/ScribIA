@@ -91,7 +91,7 @@ function AddContactForm({ groupId, onDone }: { groupId: string; onDone: () => vo
       phone: phone || null,
       role: role || null,
     };
-    add.mutate(body, { onSuccess: () => { setName(""); setEmail(""); setPhone(""); setRole(""); onDone(); } });
+    add.mutate(body, { onSuccess: () => { setName(""); setEmail(""); setPhone(""); setRole(""); } });
   }
 
   return (
