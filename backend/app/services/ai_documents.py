@@ -190,6 +190,112 @@ def _build_prompt(
     return template_data["system_prompt"], user_prompt
 
 
+# ── Map-Reduce pour longs contextes ──────────────────────────────────────────
+
+def _split_transcription(text: str, chunk_size: int) -> list[str]:
+    """Découpe la transcription en chunks respectant les sauts de ligne."""
+    chunks = []
+    lines = text.split("\n")
+    current_chunk: list[str] = []
+    current_len = 0
+
+    for line in lines:
+        line_len = len(line) + 1  # +1 for \n
+        if current_len + line_len > chunk_size and current_chunk:
+            chunks.append("\n".join(current_chunk))
+            current_chunk = []
+            current_len = 0
+        current_chunk.append(line)
+        current_len += line_len
+
+    if current_chunk:
+        chunks.append("\n".join(current_chunk))
+
+    return chunks
+
+
+def _map_reduce_generate(
+    model: str,
+    system_prompt: str,
+    user_prompt_template: str,
+    transcription: str,
+    context: dict,
+    temperature: float,
+    chunk_size: int,
+    event_bus,
+    doc_id: str,
+) -> str:
+    """Génère un document en deux passes pour les longs contextes.
+
+    Passe 1 (map) : résume chaque chunk de transcription
+    Passe 2 (reduce) : synthèse finale à partir de tous les résumés
+    """
+    chunks = _split_transcription(transcription, chunk_size)
+    logger.info(f"[AI] Map-Reduce: {len(chunks)} chunks de ~{chunk_size} chars")
+
+    # ── Passe 1 : résumer chaque chunk ──
+    map_system = (
+        "Tu es un assistant spécialisé dans la prise de notes de réunion. "
+        "Tu dois résumer fidèlement l'extrait de transcription fourni. "
+        "Conserve les noms des intervenants, les décisions prises, les sujets abordés "
+        "et les actions à suivre. Sois précis et structuré."
+    )
+
+    summaries = []
+    for i, chunk in enumerate(chunks):
+        event_bus.publish(doc_id, {
+            "status": "generating",
+            "step": f"map_{i+1}_{len(chunks)}",
+            "progress": int((i / len(chunks)) * 80),
+        })
+        logger.info(f"[AI] Map-Reduce passe 1: chunk {i+1}/{len(chunks)} ({len(chunk)} chars)")
+
+        map_prompt = (
+            f"Voici l'extrait {i+1}/{len(chunks)} d'une transcription de réunion.\n\n"
+            f"EXTRAIT :\n{chunk}\n\n"
+            "Résume cet extrait en conservant tous les éléments importants : "
+            "intervenants, sujets, décisions, actions."
+        )
+
+        parts = []
+        for text in _call_ollama(model, map_system, map_prompt, temperature):
+            parts.append(text)
+        summary = "".join(parts)
+        summaries.append(f"--- Partie {i+1}/{len(chunks)} ---\n{summary}")
+        logger.info(f"[AI] Map-Reduce chunk {i+1}: résumé de {len(summary)} chars")
+
+    # ── Passe 2 : synthèse finale ──
+    event_bus.publish(doc_id, {
+        "status": "generating",
+        "step": "reduce",
+        "progress": 85,
+    })
+
+    combined_summaries = "\n\n".join(summaries)
+    logger.info(f"[AI] Map-Reduce passe 2: {len(combined_summaries)} chars de résumés combinés")
+
+    # Remplacer la transcription par les résumés dans le user prompt
+    reduce_user = user_prompt_template
+    builtin = {
+        "titre":         context.get("title", ""),
+        "date":          context.get("date", ""),
+        "organisation":  context.get("organisation", ""),
+        "points":        context.get("agenda", ""),
+        "transcription": combined_summaries,
+        "documents":     context.get("documents_text", ""),
+        "duree":         context.get("duree", ""),
+    }
+    for key, value in builtin.items():
+        reduce_user = reduce_user.replace("{" + key + "}", value or "(non disponible)")
+
+    logger.info(f"[AI] Map-Reduce passe 2: user prompt final {len(reduce_user)} chars")
+
+    parts = []
+    for text in _call_ollama(model, system_prompt, reduce_user, temperature):
+        parts.append(text)
+    return "".join(parts)
+
+
 # ── Appel Ollama ──────────────────────────────────────────────────────────────
 
 def _call_ollama(model: str, system_prompt: str, user_prompt: str, temperature: float) -> Generator[str, None, None]:
@@ -296,22 +402,44 @@ def _run_generation(doc_id: str):
             logger.info(f"[AI] Context trop long ({len(user_prompt)} chars > {settings.ollama_long_context_threshold}), "
                         f"bascule vers modèle long contexte: {model}")
 
-        # Génération en streaming
+        # Génération
         logger.info(f"[AI] Model: {model}, Temperature: {temperature}")
         logger.info(f"[AI] System prompt ({len(system_prompt)} chars): {system_prompt[:200]}...")
         logger.info(f"[AI] User prompt ({len(user_prompt)} chars): {user_prompt[:300]}...")
-        event_bus.publish(doc_id, {"status": "generating", "step": "llm"})
-        result_parts = []
-        for chunk in _call_ollama(model, system_prompt, user_prompt, temperature):
-            result_parts.append(chunk)
-            # Publier un événement tous les ~200 chars pour l'UI
-            if sum(len(p) for p in result_parts) % 200 < len(chunk):
-                event_bus.publish(doc_id, {
-                    "status": "generating",
-                    "partial": "".join(result_parts[-5:]),
-                })
 
-        result_text = "".join(result_parts)
+        # Map-Reduce si activé et contexte long
+        transcription_text = context.get("transcription", "")
+        use_map_reduce = (
+            settings.ollama_map_reduce
+            and len(user_prompt) > settings.ollama_long_context_threshold
+            and len(transcription_text) > settings.ollama_map_reduce_chunk_size
+        )
+
+        if use_map_reduce:
+            logger.info(f"[AI] Mode Map-Reduce activé (transcription: {len(transcription_text)} chars)")
+            event_bus.publish(doc_id, {"status": "generating", "step": "map_reduce"})
+            result_text = _map_reduce_generate(
+                model=model,
+                system_prompt=system_prompt,
+                user_prompt_template=template_data["user_prompt_template"],
+                transcription=transcription_text,
+                context=context,
+                temperature=temperature,
+                chunk_size=settings.ollama_map_reduce_chunk_size,
+                event_bus=event_bus,
+                doc_id=doc_id,
+            )
+        else:
+            event_bus.publish(doc_id, {"status": "generating", "step": "llm"})
+            result_parts = []
+            for chunk in _call_ollama(model, system_prompt, user_prompt, temperature):
+                result_parts.append(chunk)
+                if sum(len(p) for p in result_parts) % 200 < len(chunk):
+                    event_bus.publish(doc_id, {
+                        "status": "generating",
+                        "partial": "".join(result_parts[-5:]),
+                    })
+            result_text = "".join(result_parts)
         doc.status = "completed"
         doc.result_text = result_text
         doc.generation_completed_at = datetime.now(timezone.utc)

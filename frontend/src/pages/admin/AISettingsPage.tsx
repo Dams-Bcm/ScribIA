@@ -22,6 +22,8 @@ interface AISettingsResponse {
   ollama_url: string;
   long_context_model: string;
   long_context_threshold: number;
+  map_reduce: boolean;
+  map_reduce_chunk_size: number;
 }
 
 interface RAGSetting {
@@ -127,7 +129,7 @@ function useUpdatePyannoteSettings() {
 function useUpdateLongContext() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { long_context_model?: string; long_context_threshold?: number }) =>
+    mutationFn: (body: { long_context_model?: string; long_context_threshold?: number; map_reduce?: boolean; map_reduce_chunk_size?: number }) =>
       api.put("/admin/ai-settings/long-context", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ai-settings"] }),
   });
@@ -185,6 +187,8 @@ export function AISettingsPage() {
   const [pyannoteSaved, setPyannoteSaved] = useState(false);
   const [longCtxModel, setLongCtxModel] = useState<string | null>(null);
   const [longCtxThreshold, setLongCtxThreshold] = useState<string | null>(null);
+  const [mapReduce, setMapReduce] = useState<boolean | null>(null);
+  const [mapReduceChunkSize, setMapReduceChunkSize] = useState<string | null>(null);
   const [longCtxSaved, setLongCtxSaved] = useState(false);
 
   if (isLoading || !data) {
@@ -286,15 +290,19 @@ export function AISettingsPage() {
     setTimeout(() => setPyannoteSaved(false), 2000);
   }
 
-  const hasLongCtxChanges = longCtxModel !== null || longCtxThreshold !== null;
+  const hasLongCtxChanges = longCtxModel !== null || longCtxThreshold !== null || mapReduce !== null || mapReduceChunkSize !== null;
 
   async function handleLongCtxSave() {
     const body: Record<string, unknown> = {};
     if (longCtxModel !== null) body.long_context_model = longCtxModel;
     if (longCtxThreshold !== null) body.long_context_threshold = parseInt(longCtxThreshold, 10) || 20000;
-    await updateLongContext.mutateAsync(body as { long_context_model?: string; long_context_threshold?: number });
+    if (mapReduce !== null) body.map_reduce = mapReduce;
+    if (mapReduceChunkSize !== null) body.map_reduce_chunk_size = parseInt(mapReduceChunkSize, 10) || 4000;
+    await updateLongContext.mutateAsync(body as { long_context_model?: string; long_context_threshold?: number; map_reduce?: boolean; map_reduce_chunk_size?: number });
     setLongCtxModel(null);
     setLongCtxThreshold(null);
+    setMapReduce(null);
+    setMapReduceChunkSize(null);
     setLongCtxSaved(true);
     setTimeout(() => setLongCtxSaved(false), 2000);
   }
@@ -430,6 +438,52 @@ export function AISettingsPage() {
                 <p className="text-[11px] text-muted-foreground/70 mt-0.5">
                   Si le prompt utilisateur dépasse ce nombre de caractères, le modèle long contexte est utilisé automatiquement. ~20 000 chars ≈ 15 min de réunion
                 </p>
+              </div>
+
+              <div className="border-t border-border pt-4 mt-4">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-60 shrink-0">
+                    <Label className="text-sm font-medium">Résumé en 2 passes (Map-Reduce)</Label>
+                    <p className="text-xs text-muted-foreground">actuel : {data.map_reduce ? "activé" : "désactivé"}</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={mapReduce ?? data.map_reduce}
+                    onClick={() => { setMapReduce(!(mapReduce ?? data.map_reduce)); setLongCtxSaved(false); }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      (mapReduce ?? data.map_reduce) ? "bg-primary" : "bg-muted"
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      (mapReduce ?? data.map_reduce) ? "translate-x-6" : "translate-x-1"
+                    }`} />
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground/70 mb-4">
+                  Quand activé, les longues transcriptions sont découpées en morceaux, chaque morceau est résumé individuellement,
+                  puis une synthèse finale est produite. Résout le problème des modèles qui ignorent les longs contextes.
+                </p>
+
+                {(mapReduce ?? data.map_reduce) && (
+                  <div>
+                    <div className="flex items-center gap-4">
+                      <div className="w-60 shrink-0">
+                        <Label className="text-sm font-medium">Taille des chunks (chars)</Label>
+                        <p className="text-xs text-muted-foreground">actuel : {data.map_reduce_chunk_size.toLocaleString()}</p>
+                      </div>
+                      <Input
+                        className="flex-1 font-mono text-sm"
+                        type="number"
+                        value={mapReduceChunkSize ?? String(data.map_reduce_chunk_size)}
+                        onChange={(e) => { setMapReduceChunkSize(e.target.value); setLongCtxSaved(false); }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                      Taille de chaque morceau de transcription pour la passe 1. ~4 000 chars ≈ 3 min de réunion. Plus petit = résumés plus précis mais plus d'appels au modèle.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     ollama_default_model: str = "llama3.1:8b"
     ollama_long_context_model: str = ""  # modèle pour longs contextes (>20k chars), ex: qwen2.5:32b
     ollama_long_context_threshold: int = 20000  # seuil en chars pour basculer sur le modèle long contexte
+    ollama_map_reduce: bool = True  # résumé en 2 passes pour les longs contextes
+    ollama_map_reduce_chunk_size: int = 4000  # taille des chunks en chars pour la passe 1
     ai_docs_path: str = "/data/ai_docs"
 
     # ── RAG / ChromaDB ──────────────────────────────────────────────────────────

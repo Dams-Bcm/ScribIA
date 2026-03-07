@@ -1043,6 +1043,8 @@ def get_ai_settings(
         "ollama_url": settings.ollama_url,
         "long_context_model": settings.ollama_long_context_model,
         "long_context_threshold": settings.ollama_long_context_threshold,
+        "map_reduce": settings.ollama_map_reduce,
+        "map_reduce_chunk_size": settings.ollama_map_reduce_chunk_size,
     }
 
 
@@ -1054,6 +1056,8 @@ class AISettingUpdate(BaseModel):
 class LongContextUpdate(BaseModel):
     long_context_model: str | None = None
     long_context_threshold: int | None = None
+    map_reduce: bool | None = None
+    map_reduce_chunk_size: int | None = None
 
 
 @router.put("/ai-settings")
@@ -1085,14 +1089,20 @@ def update_long_context_settings(
     body: LongContextUpdate,
     _: User = Depends(require_super_admin),
 ):
-    """Met à jour les paramètres du modèle long contexte."""
+    """Met à jour les paramètres du modèle long contexte et map-reduce."""
     if body.long_context_model is not None:
         settings.ollama_long_context_model = body.long_context_model
     if body.long_context_threshold is not None:
         settings.ollama_long_context_threshold = max(1000, body.long_context_threshold)
+    if body.map_reduce is not None:
+        settings.ollama_map_reduce = body.map_reduce
+    if body.map_reduce_chunk_size is not None:
+        settings.ollama_map_reduce_chunk_size = max(1000, body.map_reduce_chunk_size)
     return {
         "long_context_model": settings.ollama_long_context_model,
         "long_context_threshold": settings.ollama_long_context_threshold,
+        "map_reduce": settings.ollama_map_reduce,
+        "map_reduce_chunk_size": settings.ollama_map_reduce_chunk_size,
     }
 
 
