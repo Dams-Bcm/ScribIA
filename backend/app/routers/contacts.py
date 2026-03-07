@@ -212,6 +212,8 @@ def delete_group(
     db: Session = Depends(get_db),
 ):
     g = _get_group(db, group_id, user.tenant_id)
+    # Clean junction table before deleting group (MSSQL NO ACTION)
+    db.execute(contact_group_members.delete().where(contact_group_members.c.group_id == group_id))
     db.delete(g)
     db.commit()
 
@@ -286,7 +288,8 @@ def delete_contact(
     if not c or not any(g.id == group_id for g in c.groups):
         raise HTTPException(status_code=404, detail="Contact introuvable")
 
-    # Clear FK references before deleting
+    # Clean junction table + FK references before deleting
+    db.execute(contact_group_members.delete().where(contact_group_members.c.contact_id == contact_id))
     from app.models.consent import ConsentRequest, ConsentDetection
     db.query(ConsentRequest).filter(ConsentRequest.contact_id == contact_id).delete(
         synchronize_session=False)

@@ -255,8 +255,8 @@ def _add_missing_columns():
                         contact_id VARCHAR(36) NOT NULL,
                         group_id VARCHAR(36) NOT NULL,
                         PRIMARY KEY (contact_id, group_id),
-                        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
-                        FOREIGN KEY (group_id) REFERENCES contact_groups(id) ON DELETE CASCADE
+                        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE NO ACTION,
+                        FOREIGN KEY (group_id) REFERENCES contact_groups(id) ON DELETE NO ACTION
                     )
                 """))
                 conn.execute(text("""
