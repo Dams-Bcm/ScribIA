@@ -96,6 +96,7 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
     )
 
     user_prompt = f"Analyse cette transcription :\n\n{transcript_text}"
+    logger.info(f"[CONSENT] Sending {len(analysis_segments)} segments to LLM for job {job.id}. First 300 chars: {transcript_text[:300]}")
 
     try:
         resp = http_requests.post(
@@ -157,6 +158,8 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
     if result is None:
         logger.warning(f"[CONSENT] LLM response not parseable for job {job.id}: {llm_response[:200]}")
         return {"detected": False, "explanation": "Reponse LLM non exploitable."}
+
+    logger.info(f"[CONSENT] Parsed LLM result for job {job.id}: {json.dumps(result, ensure_ascii=False)[:500]}")
 
     if not result.get("detected"):
         return {
