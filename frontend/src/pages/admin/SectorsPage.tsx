@@ -250,7 +250,9 @@ export function SectorsPage() {
               </div>
 
               {/* Procedure templates */}
-              <SectorTemplateManager sector={selected.key} />
+              <div className="bg-background rounded-xl border border-border p-6">
+                <SectorTemplateManager sector={selected.key} />
+              </div>
 
               {/* Document templates */}
               <SectorDocTemplateManager sector={selected.key} />
