@@ -268,7 +268,7 @@ function AutoDetectionBanner({ resultJson }: { resultJson: string }) {
             <p className="text-xs text-green-600 mt-1 opacity-75">{result.explanation}</p>
           )}
           <p className="text-xs text-green-600 mt-2">
-            Confirmez le consentement dans le panneau RGPD ci-dessous pour valider.
+            Les participants en attente de consentement oral ont été automatiquement validés.
           </p>
         </div>
       );
