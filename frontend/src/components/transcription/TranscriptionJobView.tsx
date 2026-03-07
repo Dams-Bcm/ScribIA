@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Loader2, ShieldCheck, Play } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldCheck, Play, Users } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { api } from "@/api/client";
-import { useTranscriptionJob, useProceedToFullTranscription } from "@/api/hooks/useTranscription";
+import {
+  useTranscriptionJob,
+  useStartProcessing,
+  useStartPartialAnalysis,
+  useProceedToFullTranscription,
+} from "@/api/hooks/useTranscription";
+import { useAttendees } from "@/api/hooks/useConsent";
 import type { TranscriptionSSEEvent } from "@/api/types";
 import { TranscriptionResult } from "./TranscriptionResult";
+import { ConsentPanel } from "@/components/diarisation/ConsentPanel";
 
 interface TranscriptionJobViewProps {
   jobId: string;
@@ -21,8 +28,12 @@ export function TranscriptionJobView({ jobId, onBack }: TranscriptionJobViewProp
   const [liveStatus, setLiveStatus] = useState(job?.status ?? "queued");
   const sseRef = useRef<AbortController | null>(null);
 
+  const startProcessing = useStartProcessing();
+  const startPartialAnalysis = useStartPartialAnalysis();
   const proceedMutation = useProceedToFullTranscription();
-  const isProcessing = ["queued", "converting", "transcribing"].includes(liveStatus);
+  const { data: attendeesData } = useAttendees(jobId);
+  const isProcessing = ["queued", "converting", "transcribing"].includes(liveStatus) && (job?.progress ?? 0) > 0;
+  const isWaitingForAttendees = liveStatus === "queued" && (job?.progress ?? 0) === 0;
 
   // Connect to SSE when job is processing
   useEffect(() => {
@@ -79,6 +90,98 @@ export function TranscriptionJobView({ jobId, onBack }: TranscriptionJobViewProp
         <h2 className="text-lg font-semibold mb-1">{job?.title ?? "Transcription"}</h2>
         {job?.original_filename && (
           <p className="text-sm text-muted-foreground mb-4">{job.original_filename}</p>
+        )}
+
+        {isWaitingForAttendees && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 dark:bg-blue-950 dark:border-blue-800">
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="w-5 h-5 text-blue-600" />
+                <h3 className="font-semibold text-blue-800 dark:text-blue-200">
+                  Sélection des participants
+                </h3>
+              </div>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                Avant de lancer la transcription, renseignez les participants présents lors de cet enregistrement
+                pour vérifier leur consentement RGPD.
+              </p>
+            </div>
+
+            <ConsentPanel jobId={jobId} />
+
+            <div className="flex gap-3">
+              {(() => {
+                const attendees = attendeesData?.attendees ?? [];
+                const hasPendingOral = attendees.some((a) => a.status === "pending_oral");
+                const hasRefused = attendees.some((a) => a.status === "refused" || a.status === "withdrawn");
+                const allAccepted = attendees.length > 0 && attendees.every((a) =>
+                  a.status === "accepted_email" || a.status === "accepted_oral"
+                );
+
+                if (hasRefused) {
+                  return (
+                    <p className="text-sm text-red-600">
+                      Un ou plusieurs participants ont refusé. La transcription est bloquée.
+                    </p>
+                  );
+                }
+
+                if (allAccepted) {
+                  return (
+                    <Button
+                      onClick={async () => {
+                        await startProcessing.mutateAsync(jobId);
+                        refetch();
+                      }}
+                      disabled={startProcessing.isPending}
+                    >
+                      {startProcessing.isPending ? (
+                        <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Lancement…</>
+                      ) : (
+                        <><Play className="w-4 h-4 mr-1" /> Lancer la transcription</>
+                      )}
+                    </Button>
+                  );
+                }
+
+                if (hasPendingOral) {
+                  return (
+                    <Button
+                      onClick={async () => {
+                        await startPartialAnalysis.mutateAsync(jobId);
+                        refetch();
+                      }}
+                      disabled={startPartialAnalysis.isPending}
+                    >
+                      {startPartialAnalysis.isPending ? (
+                        <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Lancement…</>
+                      ) : (
+                        <><ShieldCheck className="w-4 h-4 mr-1" /> Analyser les 60 premières secondes (vérification consentement oral)</>
+                      )}
+                    </Button>
+                  );
+                }
+
+                // No attendees yet — allow starting without (backward compat)
+                return (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      await startProcessing.mutateAsync(jobId);
+                      refetch();
+                    }}
+                    disabled={startProcessing.isPending}
+                  >
+                    {startProcessing.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Lancement…</>
+                    ) : (
+                      <><Play className="w-4 h-4 mr-1" /> Lancer sans sélectionner de participants</>
+                    )}
+                  </Button>
+                );
+              })()}
+            </div>
+          </div>
         )}
 
         {isProcessing && (

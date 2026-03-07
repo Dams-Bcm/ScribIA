@@ -36,14 +36,14 @@ export function TranscriptionPage() {
         );
         setUploadProgress(null);
         qc.invalidateQueries({ queryKey: ["transcription"] });
-        await startProcessing.mutateAsync(result.id);
+        // Don't auto-start: show job view for attendee selection first
         setSelectedJobId(result.id);
       } catch (err) {
         setUploadProgress(null);
         setUploadError(err instanceof Error ? err.message : "Une erreur est survenue");
       }
     },
-    [qc, startProcessing],
+    [qc],
   );
 
   const handleProcess = useCallback(
