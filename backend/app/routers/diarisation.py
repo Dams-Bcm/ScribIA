@@ -27,7 +27,7 @@ from app.schemas.diarisation import (
 )
 from app.deps import require_admin as require_admin_dep
 from app.services.event_bus import event_bus
-from app.services.transcription import get_audio_duration
+from app.services.transcription import get_audio_duration, run_partial_analysis_in_thread
 from app.services.diarisation import run_diarisation_job_in_thread
 
 router = APIRouter(prefix="/diarisation", tags=["diarisation"])
@@ -165,6 +165,102 @@ def start_processing(
     return job
 
 
+# ── Partial analysis (consent check before full diarisation) ──────────────
+
+@router.post("/{job_id}/partial-analysis", response_model=DiarisationJobResponse)
+def start_partial_analysis(
+    job_id: str,
+    user: User = Depends(get_current_user),
+    _mod: bool = Depends(require_module("transcription_diarisation")),
+    db: Session = Depends(get_db),
+):
+    """Run partial analysis (~60s) to check for oral consent before full diarisation."""
+    job = (
+        db.query(TranscriptionJob)
+        .filter(
+            TranscriptionJob.id == job_id,
+            TranscriptionJob.tenant_id == user.tenant_id,
+            TranscriptionJob.mode == "diarisation",
+        )
+        .first()
+    )
+    if not job:
+        raise HTTPException(404, "Job introuvable")
+
+    if job.status not in (TranscriptionJobStatus.QUEUED, TranscriptionJobStatus.ERROR):
+        raise HTTPException(400, f"Le job ne peut pas être analysé (statut: {job.status})")
+
+    # RGPD: verify attendees exist
+    attendees = []
+    if job.attendees:
+        try:
+            attendees = json.loads(job.attendees)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if not attendees:
+        raise HTTPException(
+            400,
+            "Aucun participant défini. Veuillez sélectionner les participants avant de lancer le traitement.",
+        )
+
+    refused = [a for a in attendees if a.get("status") in ("refused", "withdrawn")]
+    if refused:
+        raise HTTPException(
+            400,
+            "Un ou plusieurs participants ont refusé le consentement. Le traitement est bloqué.",
+        )
+
+    job.status = TranscriptionJobStatus.QUEUED
+    job.progress = 5
+    job.progress_message = "Analyse partielle en file d'attente..."
+    job.error_message = None
+    db.commit()
+    db.refresh(job)
+
+    run_partial_analysis_in_thread(job.id)
+
+    return job
+
+
+@router.post("/{job_id}/proceed", response_model=DiarisationJobResponse)
+def proceed_to_full_diarisation(
+    job_id: str,
+    user: User = Depends(get_current_user),
+    _mod: bool = Depends(require_module("transcription_diarisation")),
+    db: Session = Depends(get_db),
+):
+    """After consent is confirmed on partial analysis, proceed to full diarisation."""
+    job = (
+        db.query(TranscriptionJob)
+        .filter(
+            TranscriptionJob.id == job_id,
+            TranscriptionJob.tenant_id == user.tenant_id,
+            TranscriptionJob.mode == "diarisation",
+        )
+        .first()
+    )
+    if not job:
+        raise HTTPException(404, "Job introuvable")
+
+    if job.status != TranscriptionJobStatus.CONSENT_CHECK:
+        raise HTTPException(400, f"Le job n'est pas en attente de consentement (statut: {job.status})")
+
+    # Clear partial segments — full diarisation will recreate them
+    db.query(TranscriptionSegment).filter_by(job_id=job.id).delete()
+
+    job.status = TranscriptionJobStatus.QUEUED
+    job.progress = 5
+    job.progress_message = "Consentement confirmé — transcription + diarisation en file d'attente..."
+    job.error_message = None
+    db.commit()
+    db.refresh(job)
+
+    run_diarisation_job_in_thread(job.id)
+
+    return job
+
+
 # ── Job detail ───────────────────────────────────────────────────────────────
 
 @router.get("/{job_id}", response_model=DiarisationJobDetailResponse)
@@ -275,7 +371,7 @@ async def stream_events(
             "error_message": job.error_message,
         }
         yield f"data: {json.dumps(initial, default=str)}\n\n"
-        if job.status in (TranscriptionJobStatus.COMPLETED, TranscriptionJobStatus.ERROR):
+        if job.status in (TranscriptionJobStatus.COMPLETED, TranscriptionJobStatus.ERROR, TranscriptionJobStatus.CONSENT_CHECK):
             return
 
         queue = event_bus.subscribe(job_id)
@@ -284,7 +380,7 @@ async def stream_events(
                 try:
                     data = await asyncio.wait_for(queue.get(), timeout=30)
                     yield f"data: {json.dumps(data, default=str)}\n\n"
-                    if data.get("status") in ("completed", "error"):
+                    if data.get("status") in ("completed", "error", "consent_check"):
                         break
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"

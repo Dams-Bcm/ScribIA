@@ -161,6 +161,7 @@ export type DiarisationJobStatus =
   | "diarizing"
   | "transcribing"
   | "aligning"
+  | "consent_check"
   | "completed"
   | "error";
 

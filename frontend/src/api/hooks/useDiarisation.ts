@@ -47,6 +47,26 @@ export function useStartDiarisationProcessing() {
   });
 }
 
+export function useStartDiarisationPartialAnalysis() {
+  const qc = useQueryClient();
+  return useMutation<DiarisationJob, Error, string>({
+    mutationFn: (jobId) => api.post<DiarisationJob>(`/diarisation/${jobId}/partial-analysis`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.list });
+    },
+  });
+}
+
+export function useProceedToFullDiarisation() {
+  const qc = useQueryClient();
+  return useMutation<DiarisationJob, Error, string>({
+    mutationFn: (jobId) => api.post<DiarisationJob>(`/diarisation/${jobId}/proceed`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.list });
+    },
+  });
+}
+
 export function useDeleteDiarisationJob() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({

@@ -323,7 +323,7 @@ async def stream_events(
             "error_message": job.error_message,
         }
         yield f"data: {json.dumps(initial, default=str)}\n\n"
-        if job.status in (TranscriptionJobStatus.COMPLETED, TranscriptionJobStatus.ERROR):
+        if job.status in (TranscriptionJobStatus.COMPLETED, TranscriptionJobStatus.ERROR, TranscriptionJobStatus.CONSENT_CHECK):
             return
 
         queue = event_bus.subscribe(job_id)
@@ -332,7 +332,7 @@ async def stream_events(
                 try:
                     data = await asyncio.wait_for(queue.get(), timeout=30)
                     yield f"data: {json.dumps(data, default=str)}\n\n"
-                    if data.get("status") in ("completed", "error"):
+                    if data.get("status") in ("completed", "error", "consent_check"):
                         break
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
