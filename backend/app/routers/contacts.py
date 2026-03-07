@@ -4,9 +4,13 @@ Préfixe : /contacts
 Module requis : contacts
 """
 
+import io
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from sqlalchemy.orm import Session, joinedload, subqueryload
 
 from app.database import get_db
@@ -354,3 +358,150 @@ def remove_contact_from_group(
     if g in c.groups:
         c.groups.remove(g)
         db.commit()
+
+
+# ── Excel import / export ────────────────────────────────────────────────────
+
+_XLSX_COLUMNS = ["Nom", "Prénom", "Email", "Téléphone", "Rôle"]
+
+
+def _build_xlsx_workbook(contacts: list[Contact], sheet_title: str = "Contacts") -> Workbook:
+    """Create a styled workbook from a list of contacts."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet_title
+
+    # Header style
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        bottom=Side(style="thin", color="B4C6E7"),
+    )
+
+    for col_idx, col_name in enumerate(_XLSX_COLUMNS, 1):
+        cell = ws.cell(row=1, column=col_idx, value=col_name)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+
+    for row_idx, c in enumerate(contacts, 2):
+        ws.cell(row=row_idx, column=1, value=c.name)
+        ws.cell(row=row_idx, column=2, value=c.first_name or "")
+        ws.cell(row=row_idx, column=3, value=c.email or "")
+        ws.cell(row=row_idx, column=4, value=c.phone or "")
+        ws.cell(row=row_idx, column=5, value=c.role or "")
+        for col_idx in range(1, 6):
+            ws.cell(row=row_idx, column=col_idx).border = thin_border
+
+    # Auto-width
+    ws.column_dimensions["A"].width = 25
+    ws.column_dimensions["B"].width = 20
+    ws.column_dimensions["C"].width = 30
+    ws.column_dimensions["D"].width = 18
+    ws.column_dimensions["E"].width = 20
+
+    return wb
+
+
+def _wb_to_response(wb: Workbook, filename: str) -> StreamingResponse:
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/export")
+def export_contacts(
+    group_id: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Export contacts to XLSX. If group_id is provided, export only that group."""
+    if group_id and group_id != "__all__":
+        g = _get_group(db, group_id, user.tenant_id)
+        contacts = g.contacts
+        filename = f"contacts_{g.name}.xlsx"
+        sheet_title = g.name
+    else:
+        contacts = (
+            db.query(Contact)
+            .filter(Contact.tenant_id == user.tenant_id)
+            .order_by(Contact.name)
+            .all()
+        )
+        filename = "contacts.xlsx"
+        sheet_title = "Tous les contacts"
+
+    wb = _build_xlsx_workbook(contacts, sheet_title)
+    return _wb_to_response(wb, filename)
+
+
+@router.get("/template")
+def download_template(user: User = Depends(get_current_user)):
+    """Download an empty XLSX template for import."""
+    wb = _build_xlsx_workbook([], "Modèle")
+    return _wb_to_response(wb, "modele_contacts.xlsx")
+
+
+@router.post("/import")
+def import_contacts(
+    group_id: str,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Import contacts from an XLSX file into a group."""
+    if group_id == "__all__":
+        raise HTTPException(status_code=400, detail="Sélectionnez un groupe spécifique pour l'import")
+
+    g = _get_group(db, group_id, user.tenant_id)
+
+    if not file.filename or not file.filename.endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Le fichier doit être au format .xlsx")
+
+    try:
+        wb = load_workbook(io.BytesIO(file.file.read()), read_only=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Fichier Excel invalide")
+
+    ws = wb.active
+    rows = list(ws.iter_rows(min_row=2, values_only=True))
+    wb.close()
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="Le fichier ne contient aucun contact")
+
+    created = 0
+    errors = []
+    for i, row in enumerate(rows, 2):
+        # Pad row to 5 columns
+        padded = list(row) + [None] * (5 - len(row)) if len(row) < 5 else list(row)
+        name = str(padded[0]).strip() if padded[0] else ""
+        if not name:
+            errors.append(f"Ligne {i}: nom manquant")
+            continue
+
+        first_name = str(padded[1]).strip() if padded[1] else None
+        email = str(padded[2]).strip() if padded[2] else None
+        phone = str(padded[3]).strip() if padded[3] else None
+        role = str(padded[4]).strip() if padded[4] else None
+
+        c = Contact(
+            tenant_id=user.tenant_id,
+            name=name,
+            first_name=first_name,
+            email=email,
+            phone=phone,
+            role=role,
+        )
+        c.groups.append(g)
+        db.add(c)
+        created += 1
+
+    db.commit()
+    return {"created": created, "errors": errors}

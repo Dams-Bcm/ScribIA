@@ -106,31 +106,42 @@ export function DiarisationResult({ segments, speakers, jobId, title, onRenameSp
 
     const range = sel.getRangeAt(0);
     const segElements = container.querySelectorAll("[data-seg-id]");
-    const intersecting: { el: Element; seg: DiarisationSegment }[] = [];
 
+    // Find which segment div contains the selection start/end
+    let startSegEl: Element | null = null;
+    let endSegEl: Element | null = null;
     for (const el of segElements) {
-      if (range.intersectsNode(el)) {
-        const segId = (el as HTMLElement).dataset.segId;
-        const seg = segId ? segments.find((s) => s.id === segId) : undefined;
-        if (seg) intersecting.push({ el, seg });
-      }
+      if (el.contains(range.startContainer)) startSegEl = el;
+      if (el.contains(range.endContainer)) endSegEl = el;
     }
 
-    if (intersecting.length === 0) return;
+    if (!startSegEl && !endSegEl) return;
 
-    const newIds = intersecting.map((x) => x.seg.id);
+    // Collect all segment IDs between start and end (inclusive)
+    const newIds: string[] = [];
+    let inside = false;
+    for (const el of segElements) {
+      if (el === startSegEl || el === endSegEl) inside = true;
+      if (inside) {
+        const segId = (el as HTMLElement).dataset.segId;
+        if (segId) newIds.push(segId);
+      }
+      if (el === endSegEl) break;
+    }
 
-    // Compute proportional start time from first segment
-    const first = intersecting[0]!;
-    const startTime = computeProportionalTime(
-      first.el, first.seg, range.startContainer, range.startOffset, true,
-    );
+    // Compute proportional time from character position within the <p>
+    const startSeg = segments.find((s) => s.id === (startSegEl as HTMLElement)?.dataset.segId);
+    const endSeg = segments.find((s) => s.id === (endSegEl as HTMLElement)?.dataset.segId);
 
-    // Compute proportional end time from last segment
-    const last = intersecting[intersecting.length - 1]!;
-    const endTime = computeProportionalTime(
-      last.el, last.seg, range.endContainer, range.endOffset, false,
-    );
+    let startTime = startSeg?.start_time ?? 0;
+    let endTime = endSeg?.end_time ?? 0;
+
+    if (startSegEl && startSeg) {
+      startTime = computeProportionalTime(startSegEl, startSeg, range.startContainer, range.startOffset, true);
+    }
+    if (endSegEl && endSeg) {
+      endTime = computeProportionalTime(endSegEl, endSeg, range.endContainer, range.endOffset, false);
+    }
 
     const newRange = { start: startTime, end: endTime };
 

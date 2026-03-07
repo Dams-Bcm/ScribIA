@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import {
   Plus,
   Trash2,
@@ -12,6 +12,9 @@ import {
   Search,
   X,
   UserMinus,
+  Download,
+  Upload,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -28,6 +31,9 @@ import {
   useUpdateContact,
   useDeleteContact,
   useResetEnrollment,
+  useImportContacts,
+  downloadContactsExport,
+  downloadContactsTemplate,
 } from "@/api/hooks/useContacts";
 import { useSendConsentRequest } from "@/api/hooks/useConsent";
 import type { ContactGroupCreate, ContactCreate, Contact } from "@/api/types";
@@ -318,6 +324,88 @@ function AddExistingPicker({ groupId, currentContactIds, onClose }: {
   );
 }
 
+// ── Import dialog ─────────────────────────────────────────────────────────────
+
+function ImportDialog({ groupId, onClose }: { groupId: string; onClose: () => void }) {
+  const importContacts = useImportContacts();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [result, setResult] = useState<{ created: number; errors: string[] } | null>(null);
+
+  function handleImport() {
+    if (!file) return;
+    importContacts.mutate(
+      { groupId, file },
+      {
+        onSuccess: (data) => {
+          setResult(data);
+          setFile(null);
+          if (fileRef.current) fileRef.current.value = "";
+        },
+      },
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-background rounded-xl border border-border shadow-lg w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold">Importer des contacts</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <p className="text-sm text-muted-foreground">
+          Importez un fichier Excel (.xlsx) avec les colonnes : Nom, Prénom, Email, Téléphone, Rôle.
+        </p>
+
+        <button
+          onClick={() => downloadContactsTemplate()}
+          className="flex items-center gap-2 text-sm text-primary hover:underline"
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          Télécharger le modèle
+        </button>
+
+        <div className="space-y-3">
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx"
+            onChange={(e) => { setFile(e.target.files?.[0] ?? null); setResult(null); }}
+            className="block w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 file:cursor-pointer"
+          />
+
+          {result && (
+            <div className="text-sm space-y-1">
+              <p className="text-green-600 font-medium">{result.created} contact{result.created !== 1 ? "s" : ""} importé{result.created !== 1 ? "s" : ""}</p>
+              {result.errors.length > 0 && (
+                <div className="text-destructive text-xs space-y-0.5">
+                  {result.errors.map((err, i) => <p key={i}>{err}</p>)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={onClose}>
+            {result ? "Fermer" : "Annuler"}
+          </Button>
+          {!result && (
+            <Button size="sm" onClick={handleImport} disabled={!file || importContacts.isPending}>
+              {importContacts.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Upload className="w-3.5 h-3.5 mr-1" />}
+              Importer
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Detail panel ─────────────────────────────────────────────────────────────
 
 function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?: { id: string; name: string }[] }) {
@@ -330,6 +418,7 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
   const sendConsent = useSendConsentRequest();
   const [showAdd, setShowAdd] = useState(false);
   const [showExisting, setShowExisting] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingGroupName, setEditingGroupName] = useState(false);
   const [groupNameDraft, setGroupNameDraft] = useState("");
@@ -408,6 +497,16 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {group.contacts.length > 0 && (
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => downloadContactsExport(groupId)}>
+              <Download className="w-3.5 h-3.5" /> Exporter
+            </Button>
+          )}
+          {!isAllView && (
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowImport(true)}>
+              <Upload className="w-3.5 h-3.5" /> Importer
+            </Button>
+          )}
           {!isAllView && group.contacts.some((c) => !c.consent_status && c.email) && (
             <Button
               size="sm"
@@ -623,6 +722,7 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
 
       {/* Stats */}
       {group.contacts.length > 0 && <StatsBar contacts={group.contacts} />}
+      {showImport && !isAllView && <ImportDialog groupId={groupId} onClose={() => setShowImport(false)} />}
       {confirmDialog}
     </div>
   );

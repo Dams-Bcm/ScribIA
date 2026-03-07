@@ -46,16 +46,12 @@ export function ReunionPage() {
     [qc],
   );
 
+  // Don't auto-start: open detail view for attendee/consent check first
   const handleProcess = useCallback(
-    async (jobId: string) => {
-      try {
-        await startProcessing.mutateAsync(jobId);
-        setSelectedJobId(jobId);
-      } catch {
-        // error handled
-      }
+    (jobId: string) => {
+      setSelectedJobId(jobId);
     },
-    [startProcessing],
+    [],
   );
 
   const handleDelete = useCallback(
