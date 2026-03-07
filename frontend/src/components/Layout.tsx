@@ -69,7 +69,7 @@ export function Layout() {
     { to: "/", label: "Tableau de bord", icon: LayoutDashboard, visible: true, section: "Général" },
 
     // ── Modules ──
-    { to: "/transcription", label: "Dictée vocale", icon: Mic, visible: hasModule("transcription"), section: "Modules" },
+    { to: "/dictee", label: "Dictée vocale", icon: Mic, visible: hasModule("transcription"), section: "Modules" },
     { to: "/reunion", label: "Réunion", icon: FileText, visible: hasModule("transcription_diarisation"), section: "Modules" },
     { to: "/phases-preparatoires", label: "Phases prép.", icon: FolderOpen, visible: hasModule("preparatory_phases"), section: "Modules" },
     { to: "/rgpd", label: "RGPD", icon: Shield, visible: hasModule("rgpd"), section: "Modules" },

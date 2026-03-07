@@ -14,7 +14,7 @@ const DashboardPage = lazy(() => import("./pages/DashboardPage").then(m => ({ de
 const PrivacyPage = lazy(() => import("./pages/PrivacyPage").then(m => ({ default: m.PrivacyPage })));
 
 // Module pages
-const TranscriptionPage = lazy(() => import("./pages/modules/TranscriptionPage").then(m => ({ default: m.TranscriptionPage })));
+const DicteePage = lazy(() => import("./pages/modules/DicteePage").then(m => ({ default: m.DicteePage })));
 const ReunionPage = lazy(() => import("./pages/modules/ReunionPage").then(m => ({ default: m.ReunionPage })));
 const RGPDPage = lazy(() => import("./pages/modules/RGPDPage").then(m => ({ default: m.RGPDPage })));
 const AIDocumentsPage = lazy(() => import("./pages/modules/AIDocumentsPage").then(m => ({ default: m.AIDocumentsPage })));
@@ -91,7 +91,7 @@ function AppRoutes() {
             <Route index element={<DashboardPage />} />
 
             {/* Modules */}
-            <Route path="transcription" element={<TranscriptionPage />} />
+            <Route path="dictee" element={<DicteePage />} />
             <Route path="reunion" element={<ReunionPage />} />
             <Route path="phases-preparatoires" element={<PreparatoryPhasesPage />} />
             <Route path="rgpd" element={<RGPDPage />} />

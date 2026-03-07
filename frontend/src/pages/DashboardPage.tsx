@@ -10,7 +10,7 @@ const modules = [
     description: "Transcrivez vos enregistrements mono-locuteur",
     icon: Mic,
     color: "bg-blue-50 text-blue-600",
-    to: "/transcription",
+    to: "/dictee",
   },
   {
     key: "transcription_diarisation",

@@ -106,21 +106,21 @@ function InlineAddRow({ groupId, onClose }: { groupId: string; onClose: () => vo
     <form onSubmit={handleSubmit} className="flex items-start gap-2 px-4 py-3 bg-accent/30 border-b border-border">
       <div className="flex-[1.5] min-w-0">
         <input
-          className={`w-full px-2.5 py-1.5 border rounded-md text-sm bg-background ${errors.name ? "border-destructive" : "border-input"}`}
-          value={name}
-          onChange={(e) => { setName(e.target.value); if (errors.name) setErrors((p) => ({ ...p, name: undefined })); }}
-          placeholder="Nom *"
-          autoFocus
-        />
-        {errors.name && <p className="text-[11px] text-destructive mt-0.5">{errors.name}</p>}
-      </div>
-      <div className="flex-[1.5] min-w-0">
-        <input
           className="w-full px-2.5 py-1.5 border border-input rounded-md text-sm bg-background"
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
           placeholder="Prénom"
+          autoFocus
         />
+      </div>
+      <div className="flex-[1.5] min-w-0">
+        <input
+          className={`w-full px-2.5 py-1.5 border rounded-md text-sm bg-background ${errors.name ? "border-destructive" : "border-input"}`}
+          value={name}
+          onChange={(e) => { setName(e.target.value); if (errors.name) setErrors((p) => ({ ...p, name: undefined })); }}
+          placeholder="Nom *"
+        />
+        {errors.name && <p className="text-[11px] text-destructive mt-0.5">{errors.name}</p>}
       </div>
       <div className="flex-[2] min-w-0">
         <input
@@ -203,10 +203,10 @@ function EditContactRow({ contact, groupId, onDone }: { contact: Contact; groupI
   return (
     <tr className="border-b border-border bg-accent/30">
       <td className="px-2 py-1.5">
-        <input className="w-full px-2 py-1 border border-input rounded text-sm bg-background" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        <input className="w-full px-2 py-1 border border-input rounded text-sm bg-background" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus />
       </td>
       <td className="px-2 py-1.5">
-        <input className="w-full px-2 py-1 border border-input rounded text-sm bg-background" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+        <input className="w-full px-2 py-1 border border-input rounded text-sm bg-background" value={name} onChange={(e) => setName(e.target.value)} />
       </td>
       <td className="px-2 py-1.5 hidden sm:table-cell">
         <input className="w-full px-2 py-1 border border-input rounded text-sm bg-background" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -472,15 +472,15 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50 sticky top-0 z-[1]">
-                <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide">Nom</th>
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide">Prénom</th>
+                <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide">Nom</th>
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Email</th>
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden md:table-cell">Téléphone</th>
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Rôle</th>
                 {isAllView && (
                   <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden md:table-cell">Groupes</th>
                 )}
-                <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide">Consentement</th>
+                <th className="text-center px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide">Consentement</th>
                 <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Enrollment</th>
                 <th className="px-4 py-2.5 w-16" />
               </tr>
@@ -496,8 +496,8 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
                   />
                 ) : (
                 <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30 group/row">
-                  <td className="px-4 py-2.5 font-medium">{c.name}</td>
                   <td className="px-4 py-2.5">{c.first_name ?? ""}</td>
+                  <td className="px-4 py-2.5 font-medium">{c.name}</td>
                   <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{c.email ?? ""}</td>
                   <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{c.phone ?? ""}</td>
                   <td className="px-4 py-2.5 text-muted-foreground hidden lg:table-cell">{c.role ?? ""}</td>
@@ -512,8 +512,8 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
                       </div>
                     </td>
                   )}
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-1.5">
+                  <td className="px-4 py-2.5 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
                       <ConsentBadge status={c.consent_status} type={c.consent_type} />
                       {!c.consent_status && c.email && !sentIds.has(c.id) && (
                         <button

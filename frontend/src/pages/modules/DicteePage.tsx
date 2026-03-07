@@ -13,7 +13,7 @@ import { AudioRecorder } from "@/components/transcription/AudioRecorder";
 import { JobList } from "@/components/transcription/JobList";
 import { TranscriptionJobView } from "@/components/transcription/TranscriptionJobView";
 
-export function TranscriptionPage() {
+export function DicteePage() {
   const qc = useQueryClient();
   const { data: jobs = [], isLoading } = useTranscriptionJobs();
   const startProcessing = useStartProcessing();
@@ -86,7 +86,7 @@ export function TranscriptionPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Transcription simple</h1>
+      <h1 className="text-2xl font-bold mb-1">Dictée vocale</h1>
       <p className="text-muted-foreground mb-6">Convertissez vos fichiers audio en texte</p>
 
       <div className="space-y-6">
