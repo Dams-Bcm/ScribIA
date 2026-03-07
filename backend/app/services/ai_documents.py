@@ -285,6 +285,9 @@ def _run_generation(doc_id: str):
         temperature = float(template_data.get("temperature", 0.3))
 
         # Génération en streaming
+        logger.info(f"[AI] Model: {model}, Temperature: {temperature}")
+        logger.info(f"[AI] System prompt ({len(system_prompt)} chars): {system_prompt[:200]}...")
+        logger.info(f"[AI] User prompt ({len(user_prompt)} chars): {user_prompt[:300]}...")
         event_bus.publish(doc_id, {"status": "generating", "step": "llm"})
         result_parts = []
         for chunk in _call_ollama(model, system_prompt, user_prompt, temperature):
