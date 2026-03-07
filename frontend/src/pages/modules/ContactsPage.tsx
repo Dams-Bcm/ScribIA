@@ -20,6 +20,7 @@ import {
   useContactGroup,
   useCreateContactGroup,
   useDeleteContactGroup,
+  useUpdateContactGroup,
   useAddContact,
   useAddContactToGroup,
   useUpdateContact,
@@ -216,7 +217,13 @@ function EditContactRow({ contact, groupId, onDone }: { contact: Contact; groupI
       <td className="px-2 py-1.5 hidden lg:table-cell">
         <input className="w-full px-2 py-1 border border-input rounded text-sm bg-background" value={role} onChange={(e) => setRole(e.target.value)} />
       </td>
-      <td colSpan={3} className="px-2 py-1.5">
+      <td className="px-2 py-1.5">
+        <ConsentBadge status={contact.consent_status} type={contact.consent_type} />
+      </td>
+      <td className="px-2 py-1.5 hidden lg:table-cell">
+        <EnrollmentBadge status={contact.enrollment_status} />
+      </td>
+      <td className="px-2 py-1.5">
         <div className="flex items-center gap-1">
           <Button size="sm" className="h-6 px-2 text-xs" onClick={handleSubmit} disabled={!name.trim() || update.isPending}>
             {update.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "OK"}
@@ -315,11 +322,14 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
   const isAllView = groupId === "__all__";
   const { data: group, isLoading } = useContactGroup(groupId);
   const deleteContact = useDeleteContact();
+  const updateGroup = useUpdateContactGroup();
   const resetEnrollment = useResetEnrollment();
   const sendConsent = useSendConsentRequest();
   const [showAdd, setShowAdd] = useState(false);
   const [showExisting, setShowExisting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState(false);
+  const [groupNameDraft, setGroupNameDraft] = useState("");
   const [search, setSearch] = useState("");
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -359,7 +369,35 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
         <div>
-          <h2 className="text-base font-semibold">{group.name}</h2>
+          {editingGroupName && !isAllView ? (
+            <form
+              className="flex items-center gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (groupNameDraft.trim() && groupNameDraft.trim() !== group.name) {
+                  updateGroup.mutate({ id: groupId, name: groupNameDraft.trim() }, { onSuccess: () => setEditingGroupName(false) });
+                } else {
+                  setEditingGroupName(false);
+                }
+              }}
+            >
+              <input
+                autoFocus
+                className="text-base font-semibold bg-transparent border border-input rounded-md px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-ring"
+                value={groupNameDraft}
+                onChange={(e) => setGroupNameDraft(e.target.value)}
+                onBlur={() => setEditingGroupName(false)}
+                onKeyDown={(e) => { if (e.key === "Escape") setEditingGroupName(false); }}
+              />
+            </form>
+          ) : (
+            <h2
+              className={`text-base font-semibold${!isAllView ? " cursor-pointer hover:text-primary" : ""}`}
+              onClick={() => { if (!isAllView) { setGroupNameDraft(group.name); setEditingGroupName(true); } }}
+            >
+              {group.name} {!isAllView && <Pencil className="inline w-3 h-3 text-muted-foreground" />}
+            </h2>
+          )}
           <p className="text-xs text-muted-foreground mt-0.5">
             {group.contacts.length} contact{group.contacts.length !== 1 ? "s" : ""}
             {consented > 0 && <> &middot; {consented} consentement{consented !== 1 ? "s" : ""}</>}
@@ -486,7 +524,7 @@ function GroupDetailPanel({ groupId, allGroups }: { groupId: string; allGroups?:
                             );
                           }}
                           disabled={sendConsent.isPending}
-                          className="text-blue-600 hover:text-blue-800 transition-colors opacity-0 group-hover/row:opacity-100"
+                          className="text-blue-600 hover:text-blue-800 transition-colors"
                           title="Envoyer demande de consentement"
                         >
                           <Send className="w-3.5 h-3.5" />

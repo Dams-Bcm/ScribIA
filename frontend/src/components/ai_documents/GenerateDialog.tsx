@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { useTemplates, useGenerateDocument } from "@/api/hooks/useAIDocuments";
 import { useDossiers } from "@/api/hooks/usePreparatoryPhases";
+import { useAuth } from "@/stores/auth";
 import type { AIDocument } from "@/api/types";
 
 import { useQuery } from "@tanstack/react-query";
@@ -44,6 +45,8 @@ export function GenerateDialog({ onGenerated }: Props) {
   const [title, setTitle] = useState("");
   const [dossierId, setDossierId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const { hasModule } = useAuth();
+  const hasPrepModule = hasModule("preparatory_phases");
   const { data: templates = [] } = useTemplates();
   const { data: dossiers = [] } = useDossiers();
   const { data: sessions = [] } = useTranscriptionSessions();
@@ -112,6 +115,7 @@ export function GenerateDialog({ onGenerated }: Props) {
                 Sources (optionnelles)
               </p>
 
+              {hasPrepModule && (
               <div className="space-y-1">
                 <Label>Dossier préparatoire</Label>
                 <Select
@@ -136,6 +140,7 @@ export function GenerateDialog({ onGenerated }: Props) {
                   </SelectContent>
                 </Select>
               </div>
+              )}
 
               <div className="space-y-1">
                 <Label>Session de transcription</Label>

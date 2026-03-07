@@ -70,7 +70,7 @@ export function Layout() {
 
     // ── Modules ──
     { to: "/transcription", label: "Dictée vocale", icon: Mic, visible: hasModule("transcription"), section: "Modules" },
-    { to: "/transcription-diarisation", label: "T + Diarisation", icon: FileText, visible: hasModule("transcription_diarisation"), section: "Modules" },
+    { to: "/transcription-diarisation", label: "Réunion", icon: FileText, visible: hasModule("transcription_diarisation"), section: "Modules" },
     { to: "/phases-preparatoires", label: "Phases prép.", icon: FolderOpen, visible: hasModule("preparatory_phases"), section: "Modules" },
     { to: "/rgpd", label: "RGPD", icon: Shield, visible: hasModule("rgpd"), section: "Modules" },
     { to: "/documents-ia", label: "Documents IA", icon: Sparkles, visible: hasModule("ai_documents"), section: "Modules" },
