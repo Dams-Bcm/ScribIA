@@ -59,8 +59,8 @@ def enqueue_generation(doc_id: str):
 # ── Extraction du contexte ────────────────────────────────────────────────────
 
 def _extract_transcription_context(session_id: str, db) -> dict:
-    """Retourne le texte complet et la durée formatée d'une session de transcription."""
-    from app.models.transcription import TranscriptionJob, TranscriptionSegment
+    """Retourne le texte complet, la durée, la date et les participants d'une session."""
+    from app.models.transcription import TranscriptionJob, TranscriptionSegment, DiarisationSpeaker
     job = db.query(TranscriptionJob).filter_by(id=session_id).first()
     segments = (
         db.query(TranscriptionSegment)
@@ -86,7 +86,27 @@ def _extract_transcription_context(session_id: str, db) -> dict:
         else:
             duree = f"{s}s"
 
-    return {"text": text, "duree": duree}
+    # Date de la session (created_at du job)
+    date_str = ""
+    if job and job.created_at:
+        date_str = job.created_at.strftime("%d/%m/%Y")
+
+    # Participants depuis la diarisation (display_name ou profil)
+    participants_list = []
+    speakers = db.query(DiarisationSpeaker).filter_by(job_id=session_id).all()
+    for spk in speakers:
+        name = spk.display_name or spk.speaker_id
+        fonction = ""
+        if spk.profile:
+            name = spk.profile.display_name or name
+            fonction = spk.profile.fonction or ""
+        entry = name
+        if fonction:
+            entry += f" ({fonction})"
+        participants_list.append(entry)
+    participants = ", ".join(participants_list) if participants_list else ""
+
+    return {"text": text, "duree": duree, "date": date_str, "participants": participants}
 
 
 def _extract_dossier_context(dossier_id: str, db) -> dict:
@@ -182,6 +202,7 @@ def _build_prompt(
         "transcription": context.get("transcription", ""),
         "documents":     context.get("documents_text", ""),
         "duree":         context.get("duree", ""),
+        "participants":  context.get("participants", ""),
     }
     user_prompt = template_data["user_prompt_template"]
     for key, value in builtin.items():
@@ -305,6 +326,7 @@ def _map_reduce_generate(
         "transcription": f"(Résumés des {len(chunks)} parties de la transcription)\n\n{combined_summaries}",
         "documents":     context.get("documents_text", ""),
         "duree":         context.get("duree", ""),
+        "participants":  context.get("participants", ""),
     }
     for key, value in builtin.items():
         reduce_user = reduce_user.replace("{" + key + "}", value or "(non disponible)")
@@ -390,6 +412,10 @@ def _run_generation(doc_id: str):
             transcription_ctx = _extract_transcription_context(doc.source_session_id, db)
             context["transcription"] = transcription_ctx["text"]
             context["duree"] = transcription_ctx["duree"]
+            if transcription_ctx.get("date"):
+                context.setdefault("date", transcription_ctx["date"])
+            if transcription_ctx.get("participants"):
+                context["participants"] = transcription_ctx["participants"]
 
         if doc.source_dossier_id:
             event_bus.publish(doc_id, {"status": "generating", "step": "dossier"})
