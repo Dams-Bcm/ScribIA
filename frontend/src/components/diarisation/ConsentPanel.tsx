@@ -22,6 +22,8 @@ import type { OralConsentDetection, Contact, ContactGroupDetail, AttendeeEntry }
 
 interface ConsentPanelProps {
   jobId: string;
+  /** Hide oral consent detection section (e.g. when transcription is not yet completed) */
+  hideOralDetection?: boolean;
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -33,7 +35,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   withdrawn: { label: "Retiré", color: "text-red-600" },
 };
 
-export function ConsentPanel({ jobId }: ConsentPanelProps) {
+export function ConsentPanel({ jobId, hideOralDetection }: ConsentPanelProps) {
   const detectConsent = useDetectOralConsent();
   const validateConsent = useValidateCollectiveConsent();
   const { data: groups = [] } = useContactGroups();
@@ -319,7 +321,7 @@ export function ConsentPanel({ jobId }: ConsentPanelProps) {
       </div>
 
       {/* ── Section 2: Oral consent detection ───────────────────────────── */}
-      <div className="border-t border-border pt-3 space-y-3">
+      {!hideOralDetection && <div className="border-t border-border pt-3 space-y-3">
         <div className="flex items-center gap-2">
           <Mic className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium">Consentement oral</span>
@@ -480,7 +482,7 @@ export function ConsentPanel({ jobId }: ConsentPanelProps) {
             </Button>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* ── Error / Success ──────────────────────────────────────────────── */}
       {error && <p className="text-sm text-destructive">{error}</p>}

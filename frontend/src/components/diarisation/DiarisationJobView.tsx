@@ -117,7 +117,7 @@ export function DiarisationJobView({ jobId, onBack }: DiarisationJobViewProps) {
               </p>
             </div>
 
-            <ConsentPanel jobId={jobId} />
+            <ConsentPanel jobId={jobId} hideOralDetection />
 
             <div className="flex gap-3">
               {(() => {

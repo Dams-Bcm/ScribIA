@@ -107,7 +107,7 @@ export function TranscriptionJobView({ jobId, onBack }: TranscriptionJobViewProp
               </p>
             </div>
 
-            <ConsentPanel jobId={jobId} />
+            <ConsentPanel jobId={jobId} hideOralDetection />
 
             <div className="flex gap-3">
               {(() => {
