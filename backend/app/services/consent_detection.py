@@ -106,6 +106,7 @@ def detect_oral_consent(db: Session, job: TranscriptionJob) -> dict | None:
                 "prompt": user_prompt,
                 "stream": False,
                 "keep_alive": 0,
+                "format": "json",
                 "options": {"temperature": 0.1},
             },
             timeout=120,
