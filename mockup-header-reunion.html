@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ScribIA — Mockup Header Réunion (Avant / Après)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 40px 20px;
+    }
+
+    .page-header {
+      max-width: 900px;
+      margin: 0 auto 48px;
+      text-align: center;
+    }
+    .page-header h1 { font-size: 24px; font-weight: 700; color: #f8fafc; margin-bottom: 6px; }
+    .page-header p { color: #94a3b8; font-size: 14px; }
+
+    .comparison { max-width: 900px; margin: 0 auto; }
+
+    .version-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 8px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+    .version-label.before { background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
+    .version-label.after { background: #14532d; color: #86efac; border: 1px solid #166534; }
+    .version-label .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* ── Shared card frame ── */
+    .frame {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 56px;
+    }
+    .frame-topbar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px;
+      background: #0f172a;
+      border-bottom: 1px solid #334155;
+    }
+    .frame-topbar .dots { display: flex; gap: 5px; }
+    .frame-topbar .dots span { width: 10px; height: 10px; border-radius: 50%; background: #334155; }
+    .frame-topbar .title { flex: 1; text-align: center; font-size: 11px; color: #64748b; }
+
+    .frame-body {
+      background: #0f172a;
+      padding: 20px 24px;
+    }
+
+    /* ── Back button ── */
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 13px; color: #94a3b8;
+      background: none; border: none; cursor: pointer;
+      padding: 6px 10px; border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .back-btn:hover { background: #1e293b; color: #e2e8f0; }
+    .back-btn svg { width: 14px; height: 14px; }
+
+    /* ══════════════════════════════════════════════════════
+       VERSION ACTUELLE (AVANT)
+    ══════════════════════════════════════════════════════ */
+
+    .old-header {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+    .old-header .title-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 4px;
+    }
+    .old-header h2 {
+      font-size: 18px; font-weight: 600; color: #f1f5f9;
+    }
+    .old-header .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; color: #94a3b8;
+      background: #334155; padding: 3px 10px; border-radius: 99px;
+    }
+    .old-header .badge svg { width: 12px; height: 12px; }
+    .old-header .filename {
+      font-size: 13px; color: #64748b; margin-bottom: 16px;
+    }
+
+    /* Old consent bar */
+    .old-consent {
+      border-top: 1px solid #334155;
+      padding-top: 14px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .old-consent .icon-box {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(16,185,129,0.12); color: #10b981;
+      flex-shrink: 0;
+    }
+    .old-consent .icon-box svg { width: 16px; height: 16px; }
+    .old-consent .text { flex: 1; min-width: 0; }
+    .old-consent .text .main { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+    .old-consent .text .sub { font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .old-consent .consent-badges { display: flex; gap: 6px; flex-shrink: 0; }
+    .old-consent .consent-badges span {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 500;
+    }
+    .old-consent .consent-badges .ok { background: rgba(16,185,129,0.1); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
+    .old-consent .consent-badges .pending { background: rgba(245,158,11,0.1); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
+    .old-consent .toggle-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 500; color: #94a3b8;
+      background: none; border: none; cursor: pointer;
+      padding: 6px 10px; border-radius: 8px; flex-shrink: 0;
+    }
+    .old-consent .toggle-btn:hover { background: #334155; }
+    .old-consent .toggle-btn svg { width: 14px; height: 14px; }
+
+    /* ══════════════════════════════════════════════════════
+       VERSION PROPOSEE (APRES)
+    ══════════════════════════════════════════════════════ */
+
+    .new-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 0 12px;
+      margin-bottom: 0;
+    }
+    .new-header h2 {
+      font-size: 15px; font-weight: 600; color: #f1f5f9;
+      white-space: nowrap;
+    }
+    .new-header .sep {
+      width: 1px; height: 16px; background: #334155; flex-shrink: 0;
+    }
+    .new-header .filename {
+      font-size: 12px; color: #64748b;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .new-header .meta-right {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    }
+    .new-header .badge-sm {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 500; color: #94a3b8;
+      background: #1e293b; padding: 3px 8px; border-radius: 99px;
+      border: 1px solid #334155;
+    }
+    .new-header .badge-sm svg { width: 11px; height: 11px; }
+
+    /* New inline consent chip */
+    .new-consent-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 99px;
+      font-size: 10px; font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .new-consent-chip.ok {
+      background: rgba(16,185,129,0.1); color: #34d399;
+      border: 1px solid rgba(16,185,129,0.2);
+    }
+    .new-consent-chip.ok:hover { background: rgba(16,185,129,0.18); }
+    .new-consent-chip svg { width: 12px; height: 12px; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex; gap: 0;
+      border-bottom: 2px solid #1e293b;
+    }
+    .tabs button {
+      display: flex; align-items: center; gap: 6px;
+      padding: 10px 16px;
+      font-size: 13px; font-weight: 500;
+      color: #64748b;
+      background: none; border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .tabs button:hover { color: #94a3b8; }
+    .tabs button.active {
+      color: #818cf8; border-bottom-color: #818cf8;
+    }
+    .tabs button svg { width: 15px; height: 15px; }
+    .tabs .count {
+      font-size: 10px; font-weight: 600;
+      background: rgba(129,140,248,0.12); color: #818cf8;
+      padding: 1px 6px; border-radius: 99px;
+    }
+
+    /* ── Transcription content ── */
+    .transcript {
+      padding: 20px 0 0;
+    }
+    .transcript .line {
+      display: flex; gap: 12px;
+      padding: 8px 0;
+    }
+    .transcript .line + .line {
+      border-top: 1px solid #1e293b;
+    }
+    .transcript .time {
+      font-size: 11px; color: #475569; font-family: 'SF Mono', Menlo, monospace;
+      min-width: 40px; padding-top: 2px; text-align: right;
+      flex-shrink: 0;
+    }
+    .transcript .speaker {
+      font-size: 12px; font-weight: 600; min-width: 110px; flex-shrink: 0;
+      padding-top: 2px;
+    }
+    .transcript .speaker.s0 { color: #60a5fa; }
+    .transcript .speaker.s1 { color: #f472b6; }
+    .transcript .speaker.s2 { color: #34d399; }
+    .transcript .speaker.s3 { color: #fbbf24; }
+    .transcript .text {
+      font-size: 13px; color: #cbd5e1; line-height: 1.6;
+    }
+
+    /* ── Annotation arrow ── */
+    .annotation {
+      max-width: 900px; margin: -40px auto 56px;
+      display: flex; justify-content: center;
+    }
+    .annotation .arrow-box {
+      display: flex; align-items: center; gap: 12px;
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 10px; padding: 12px 20px;
+    }
+    .annotation .arrow-box svg { width: 20px; height: 20px; color: #818cf8; flex-shrink: 0; }
+    .annotation .arrow-box p { font-size: 13px; color: #94a3b8; line-height: 1.5; }
+    .annotation .arrow-box strong { color: #e2e8f0; }
+
+    /* ── Design notes ── */
+    .notes {
+      max-width: 900px; margin: 0 auto;
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 12px; padding: 24px 28px;
+    }
+    .notes h3 { font-size: 15px; font-weight: 600; color: #f8fafc; margin-bottom: 14px; }
+    .notes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .note-item {
+      background: #0f172a; border: 1px solid #334155;
+      border-radius: 8px; padding: 12px 14px;
+    }
+    .note-item .label {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+      color: #64748b; margin-bottom: 4px;
+    }
+    .note-item .value { font-size: 12px; color: #e2e8f0; line-height: 1.5; }
+    .note-item .before { color: #ef4444; text-decoration: line-through; margin-right: 6px; }
+    .note-item .after { color: #22c55e; }
+
+    @media (max-width: 700px) {
+      .notes-grid { grid-template-columns: 1fr; }
+      .old-consent .consent-badges { display: none; }
+      .new-header { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page-header">
+    <h1>ScribIA — Header Réunion</h1>
+    <p>Comparaison avant / après : rendre le header plus discret</p>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       AVANT — Version actuelle
+  ════════════════════════════════════════════════════════════════════ -->
+  <div class="comparison">
+    <div class="version-label before">
+      <span class="dot" style="background:#ef4444;"></span>
+      Avant — Header actuel (imposant)
+    </div>
+
+    <div class="frame">
+      <div class="frame-topbar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="title">ScribIA — Réunion</div>
+      </div>
+      <div class="frame-body">
+
+        <button class="back-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5m0 0 7 7m-7-7 7-7"/></svg>
+          Retour
+        </button>
+
+        <!-- OLD: gros bloc encadré -->
+        <div class="old-header">
+          <div class="title-row">
+            <h2>Réunion BCM</h2>
+            <span class="badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              3 intervenants
+            </span>
+          </div>
+          <div class="filename">2026_03_09_reunion_bcm.webm</div>
+
+          <div class="old-consent">
+            <div class="icon-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            </div>
+            <div class="text">
+              <div class="main">Consentement oral détecté automatiquement</div>
+              <div class="sub">« Ok, bon du coup la réunion va être enregistrée. Vous n'avez rien contre ? » — 0:05</div>
+            </div>
+            <div class="consent-badges">
+              <span class="ok">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                3 oral
+              </span>
+            </div>
+            <button class="toggle-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Participants
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+            Transcription
+          </button>
+          <button>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+            Documents IA
+            <span class="count">2</span>
+          </button>
+          <button>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Participants
+            <span class="count">3</span>
+          </button>
+        </div>
+
+        <!-- Transcript preview -->
+        <div class="transcript">
+          <div class="line">
+            <span class="time">0:12</span>
+            <span class="speaker s0">Gilles</span>
+            <span class="text">Bien, il y avait plusieurs points à voir. Premier point, Thomas.</span>
+          </div>
+          <div class="line">
+            <span class="time">0:28</span>
+            <span class="speaker s1">Damien</span>
+            <span class="text">Moi, télétravail, je pense que ça serait cool de lui demander. Mais plus le vendredi.</span>
+          </div>
+          <div class="line">
+            <span class="time">0:45</span>
+            <span class="speaker s2">Alban</span>
+            <span class="text">Mais après, si on le prend sur le truc perso, à la base, c'est justement pour couper la semaine.</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       TRANSITION
+  ════════════════════════════════════════════════════════════════════ -->
+  <div class="annotation">
+    <div class="arrow-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14m0 0 7-7m-7 7-7-7"/></svg>
+      <p><strong>Header réduit de ~120px à ~40px.</strong> Le titre, le fichier et le consentement tiennent sur une seule ligne. Toute l'attention va au contenu.</p>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       APRES — Version proposée
+  ════════════════════════════════════════════════════════════════════ -->
+  <div class="comparison">
+    <div class="version-label after">
+      <span class="dot" style="background:#22c55e;"></span>
+      Après — Header discret (proposé)
+    </div>
+
+    <div class="frame">
+      <div class="frame-topbar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="title">ScribIA — Réunion</div>
+      </div>
+      <div class="frame-body">
+
+        <button class="back-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5m0 0 7 7m-7-7 7-7"/></svg>
+          Retour
+        </button>
+
+        <!-- NEW: header compact, une seule ligne -->
+        <div class="new-header">
+          <h2>Réunion BCM</h2>
+          <div class="sep"></div>
+          <span class="filename">2026_03_09_reunion_bcm.webm</span>
+
+          <div class="meta-right">
+            <span class="badge-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              3
+            </span>
+            <span class="new-consent-chip ok" title="Consentement oral détecté — Cliquez pour gérer les participants">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+              3/3 oral
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;opacity:0.6;"><path d="m6 9 6 6 6-6"/></svg>
+            </span>
+          </div>
+        </div>
+
+        <!-- Tabs (collés juste dessous) -->
+        <div class="tabs">
+          <button class="active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+            Transcription
+          </button>
+          <button>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+            Documents IA
+            <span class="count">2</span>
+          </button>
+          <button>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Participants
+            <span class="count">3</span>
+          </button>
+        </div>
+
+        <!-- Transcript preview (plus de place visible !) -->
+        <div class="transcript">
+          <div class="line">
+            <span class="time">0:12</span>
+            <span class="speaker s0">Gilles</span>
+            <span class="text">Bien, il y avait plusieurs points à voir. Premier point, Thomas.</span>
+          </div>
+          <div class="line">
+            <span class="time">0:28</span>
+            <span class="speaker s1">Damien</span>
+            <span class="text">Moi, télétravail, je pense que ça serait cool de lui demander. Mais plus le vendredi.</span>
+          </div>
+          <div class="line">
+            <span class="time">0:45</span>
+            <span class="speaker s2">Alban</span>
+            <span class="text">Mais après, si on le prend sur le truc perso, à la base, c'est justement pour couper la semaine.</span>
+          </div>
+          <div class="line">
+            <span class="time">1:03</span>
+            <span class="speaker s0">Gilles</span>
+            <span class="text">Oui, il faut lui en parler. Peut-être qu'il a demandé le mercredi pour une raison précise.</span>
+          </div>
+          <div class="line">
+            <span class="time">1:18</span>
+            <span class="speaker s1">Damien</span>
+            <span class="text">Demander si le mercredi, c'est quelque chose qui lui tient à coeur.</span>
+          </div>
+          <div class="line">
+            <span class="time">1:32</span>
+            <span class="speaker s0">Gilles</span>
+            <span class="text">Du coup, tu préfères quoi ? Le vendredi ou... Parce que le lundi, avec toutes les demandes, c'est bien d'avoir quelqu'un.</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       DESIGN NOTES
+  ════════════════════════════════════════════════════════════════════ -->
+  <div class="notes">
+    <h3>Notes de design</h3>
+    <div class="notes-grid">
+      <div class="note-item">
+        <div class="label">Hauteur header</div>
+        <div class="value">
+          <span class="before">~120px (bloc encadré + consentement)</span><br/>
+          <span class="after">~40px (une seule ligne, pas de bordure)</span>
+        </div>
+      </div>
+      <div class="note-item">
+        <div class="label">Titre</div>
+        <div class="value">
+          <span class="before">text-lg (18px) + bloc dédié</span><br/>
+          <span class="after">text-[15px] inline, même ligne que le fichier</span>
+        </div>
+      </div>
+      <div class="note-item">
+        <div class="label">Consentement</div>
+        <div class="value">
+          <span class="before">Barre dédiée avec icône 32px + texte + badges + bouton</span><br/>
+          <span class="after">Chip compact "3/3 oral" cliquable (ouvre l'accordéon)</span>
+        </div>
+      </div>
+      <div class="note-item">
+        <div class="label">Encadrement</div>
+        <div class="value">
+          <span class="before">bg-background rounded-xl border p-6</span><br/>
+          <span class="after">Aucun — le header se fond dans le fond de page</span>
+        </div>
+      </div>
+      <div class="note-item">
+        <div class="label">Gain espace</div>
+        <div class="value">
+          <span class="after">~80px de contenu en plus visible au-dessus du fold. 2 lignes de transcription supplémentaires affichées.</span>
+        </div>
+      </div>
+      <div class="note-item">
+        <div class="label">Interaction consentement</div>
+        <div class="value">
+          <span class="after">Le chip vert "3/3 oral" est cliquable : il ouvre le même accordéon participants que le bouton actuel. Le chevron indique l'action.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

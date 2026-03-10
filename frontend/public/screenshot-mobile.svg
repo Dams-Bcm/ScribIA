@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 844">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e3a5f"/>
+    </linearGradient>
+  </defs>
+  <rect width="390" height="844" fill="url(#bg)"/>
+  <text x="195" y="380" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="700" font-size="48" fill="white">Scrib' IA</text>
+  <text x="195" y="440" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="400" font-size="18" fill="#94a3b8">Transcription intelligente</text>
+</svg>

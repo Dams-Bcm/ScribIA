@@ -13,7 +13,7 @@ export function LegalCompliancePage() {
           </div>
           <h2 className="text-lg font-semibold mb-2">Module conformité</h2>
           <p className="text-sm text-muted-foreground max-w-md">
-            Configurez les règles de conformité pour votre organisation
+            Configurez les règles de conformité pour votre tenant
           </p>
         </div>
       </div>

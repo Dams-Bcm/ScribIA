@@ -1,0 +1,697 @@
+"""AI Documents service — génération de documents via LLM (LiteLLM Proxy).
+
+Pipeline pour chaque document :
+  1. Extraction du contexte (transcription et/ou dossier préparatoire)
+  2. Construction du prompt depuis le template
+  3. Appel LLM en streaming via LiteLLM Proxy
+  4. Sauvegarde progressive + événements SSE
+"""
+
+import json
+import logging
+import os
+import queue
+import threading
+from datetime import datetime, timezone
+from typing import Generator
+
+from app.config import settings
+from app.services.llm_client import llm_generate_stream, resolve_model
+
+logger = logging.getLogger(__name__)
+
+# File de travaux (un seul job à la fois, comme la transcription)
+_job_queue: queue.Queue = queue.Queue()
+_worker_started = False
+_worker_lock = threading.Lock()
+
+
+# ── Worker thread ─────────────────────────────────────────────────────────────
+
+def _start_worker():
+    global _worker_started
+    with _worker_lock:
+        if _worker_started:
+            return
+        _worker_started = True
+        t = threading.Thread(target=_worker_loop, daemon=True)
+        t.start()
+
+
+def _worker_loop():
+    while True:
+        doc_id = _job_queue.get()
+        try:
+            _run_generation(doc_id)
+        except Exception as exc:
+            logger.exception(f"[AI] Erreur inattendue pour le document {doc_id}: {exc}")
+        finally:
+            _job_queue.task_done()
+
+
+def enqueue_generation(doc_id: str):
+    """Ajoute un job de génération dans la file et démarre le worker si nécessaire."""
+    _start_worker()
+    _job_queue.put(doc_id)
+
+
+# ── Extraction du contexte ────────────────────────────────────────────────────
+
+def _extract_transcription_context(session_id: str, db) -> dict:
+    """Retourne le texte complet, la durée, la date et les participants d'une session."""
+    from app.models.transcription import TranscriptionJob, TranscriptionSegment, DiarisationSpeaker
+    job = db.query(TranscriptionJob).filter_by(id=session_id).first()
+    segments = (
+        db.query(TranscriptionSegment)
+        .filter_by(job_id=session_id)
+        .order_by(TranscriptionSegment.start_time)
+        .all()
+    )
+    # Build speaker_label → display_name mapping for readable transcription
+    speakers = db.query(DiarisationSpeaker).filter_by(job_id=session_id).all()
+    speaker_names: dict[str, str] = {}
+    for spk in speakers:
+        name = spk.display_name or spk.speaker_id
+        if spk.profile:
+            name = spk.profile.display_name or name
+        speaker_names[spk.speaker_id] = name
+
+    lines = []
+    for seg in segments:
+        if seg.speaker_label:
+            resolved = speaker_names.get(seg.speaker_label, seg.speaker_label)
+            speaker = f"[{resolved}] "
+        else:
+            speaker = ""
+        lines.append(f"{speaker}{seg.text.strip()}")
+    text = "\n".join(lines)
+
+    duree = ""
+    if job and job.duration_seconds:
+        total = int(job.duration_seconds)
+        h, rem = divmod(total, 3600)
+        m, s = divmod(rem, 60)
+        if h:
+            duree = f"{h}h{m:02d}min{s:02d}s"
+        elif m:
+            duree = f"{m}min{s:02d}s"
+        else:
+            duree = f"{s}s"
+
+    # Date de la session (created_at du job)
+    date_str = ""
+    if job and job.created_at:
+        date_str = job.created_at.strftime("%d/%m/%Y")
+
+    # Participants — prefer attendees[] (consent-based) over diarisation speakers
+    participants_list = []
+
+    if job and job.attendees:
+        try:
+            import json as _json
+            from app.models.contacts import Contact
+            attendees = _json.loads(job.attendees)
+            for att in attendees:
+                att_status = att.get("status", "")
+                if att_status.startswith("accepted_") or att_status == "pending_oral":
+                    contact = db.query(Contact).filter_by(id=att["contact_id"]).first()
+                    if contact:
+                        entry = f"{contact.first_name} {contact.name}".strip() if contact.first_name else contact.name
+                        if contact.role:
+                            entry += f" ({contact.role})"
+                        participants_list.append(entry)
+        except (ValueError, TypeError, KeyError):
+            pass
+
+    # Fallback to diarisation speakers if no attendees (reuse speakers query from above)
+    if not participants_list:
+        for spk in speakers:
+            name = speaker_names.get(spk.speaker_id, spk.speaker_id)
+            fonction = ""
+            if spk.profile:
+                fonction = spk.profile.fonction or ""
+            entry = name
+            if fonction:
+                entry += f" ({fonction})"
+            participants_list.append(entry)
+
+    participants = ", ".join(participants_list) if participants_list else ""
+
+    # Build SPEAKER_XX → Name mapping for LLM prompt (helps resolve any
+    # unresolved speaker labels remaining in the transcription text)
+    speaker_mapping_lines = []
+    for spk_id, display in speaker_names.items():
+        if display != spk_id:  # only include if we have a real name
+            speaker_mapping_lines.append(f"- {spk_id} = {display}")
+    speaker_mapping = "\n".join(speaker_mapping_lines)
+
+    # Enrich with planned meeting metadata (location, description) if available
+    lieu = ""
+    description = ""
+    if job:
+        from app.models.planned_meeting import PlannedMeeting
+        planned = db.query(PlannedMeeting).filter_by(job_id=session_id).first()
+        if planned:
+            lieu = planned.location or ""
+            description = planned.description or ""
+            # Use planned meeting date if available (more accurate than job.created_at)
+            if planned.meeting_date:
+                date_str = planned.meeting_date.strftime("%d/%m/%Y")
+
+    return {"text": text, "duree": duree, "date": date_str, "participants": participants, "lieu": lieu, "description": description, "speaker_mapping": speaker_mapping}
+
+
+def _extract_dossier_context(dossier_id: str, db) -> dict:
+    """Retourne agenda (str) et texte des documents (str) d'un dossier."""
+    from app.models.preparatory import PreparatoryDossier, AgendaPoint, DossierDocument
+    dossier = db.query(PreparatoryDossier).filter_by(id=dossier_id).first()
+    if not dossier:
+        return {"agenda": "", "documents_text": "", "title": "", "date": ""}
+
+    # Ordre du jour
+    points = (
+        db.query(AgendaPoint)
+        .filter_by(dossier_id=dossier_id)
+        .order_by(AgendaPoint.order_index)
+        .all()
+    )
+    agenda_lines = []
+    for i, p in enumerate(points, 1):
+        line = f"{i}. {p.title}"
+        if p.description:
+            line += f" — {p.description}"
+        agenda_lines.append(line)
+    agenda_str = "\n".join(agenda_lines) if agenda_lines else "(aucun point enregistré)"
+
+    # Texte des documents uploadés
+    docs = db.query(DossierDocument).filter_by(dossier_id=dossier_id).all()
+    doc_texts = []
+    for doc in docs:
+        text = _extract_file_text(doc)
+        if text:
+            doc_texts.append(f"--- {doc.original_filename} ---\n{text}")
+    documents_text = "\n\n".join(doc_texts) if doc_texts else "(aucun document fourni)"
+
+    date_str = ""
+    if dossier.meeting_date:
+        date_str = dossier.meeting_date.strftime("%d/%m/%Y")
+
+    return {
+        "agenda": agenda_str,
+        "documents_text": documents_text,
+        "title": dossier.title,
+        "date": date_str,
+    }
+
+
+def _extract_file_text(doc) -> str:
+    """Extrait le texte d'un fichier selon son type."""
+    file_path = os.path.join(
+        settings.prep_docs_path,
+        doc.dossier_id,  # stored under dossier_id
+        doc.stored_filename,
+    )
+    if not os.path.exists(file_path):
+        return ""
+
+    ct = (doc.content_type or "").lower()
+    try:
+        if "text" in ct or doc.original_filename.endswith(".txt"):
+            with open(file_path, encoding="utf-8", errors="ignore") as f:
+                return f.read()[:8000]
+
+        if "docx" in ct or doc.original_filename.endswith(".docx"):
+            try:
+                import docx
+                d = docx.Document(file_path)
+                return "\n".join(p.text for p in d.paragraphs if p.text.strip())[:8000]
+            except Exception:
+                return ""
+
+        if "pdf" in ct or doc.original_filename.endswith(".pdf"):
+            try:
+                from pdfminer.high_level import extract_text
+                return extract_text(file_path)[:8000]
+            except Exception:
+                return ""
+    except Exception as exc:
+        logger.warning(f"[AI] Impossible d'extraire le texte de {doc.original_filename}: {exc}")
+    return ""
+
+
+# ── Construction du prompt ────────────────────────────────────────────────────
+
+def _build_prompt(
+    template_data: dict,
+    context: dict,
+) -> tuple[str, str]:
+    """Remplace les placeholders du template et retourne (system, user)."""
+    builtin = {
+        "titre":         context.get("title", ""),
+        "date":          context.get("date", ""),
+        "tenant":        context.get("tenant_name", ""),
+        "points":        context.get("agenda", ""),
+        "transcription": context.get("transcription", ""),
+        "documents":     context.get("documents_text", ""),
+        "duree":         context.get("duree", ""),
+        "participants":  context.get("participants", ""),
+        "lieu":          context.get("lieu", ""),
+        "description":   context.get("description", ""),
+        "speaker_mapping": context.get("speaker_mapping", ""),
+    }
+    user_prompt = template_data["user_prompt_template"]
+    for key, value in builtin.items():
+        user_prompt = user_prompt.replace("{" + key + "}", value or "(non disponible)")
+
+    return template_data["system_prompt"], user_prompt
+
+
+# ── Map-Reduce pour longs contextes ──────────────────────────────────────────
+
+def _split_transcription(text: str, chunk_size: int, overlap_lines: int = 3) -> list[str]:
+    """Découpe la transcription en chunks respectant les sauts de ligne.
+
+    Ajoute un chevauchement de `overlap_lines` lignes entre chaque chunk
+    pour préserver le contexte aux frontières.
+    """
+    chunks = []
+    lines = text.split("\n")
+    current_chunk: list[str] = []
+    current_len = 0
+
+    for line in lines:
+        line_len = len(line) + 1  # +1 for \n
+        if current_len + line_len > chunk_size and current_chunk:
+            chunks.append("\n".join(current_chunk))
+            # Garder les dernières lignes comme overlap pour le chunk suivant
+            overlap = current_chunk[-overlap_lines:] if overlap_lines > 0 else []
+            current_chunk = list(overlap)
+            current_len = sum(len(l) + 1 for l in current_chunk)
+        current_chunk.append(line)
+        current_len += line_len
+
+    if current_chunk:
+        chunks.append("\n".join(current_chunk))
+
+    return chunks
+
+
+_DEFAULT_MAP_SYSTEM_PROMPT = (
+    "Tu es un assistant qui extrait les faits d'une transcription de réunion. "
+    "Tu produis une liste de faits en bullet points (5 à 8 points maximum). "
+    "RÈGLES STRICTES :\n"
+    "- Chaque point fait UNE phrase maximum\n"
+    "- Note UNIQUEMENT ce qui est explicitement dit dans le texte\n"
+    "- N'invente JAMAIS d'information absente du texte\n"
+    "- Conserve les noms, chiffres, dates et décisions tels quels\n"
+    "- Sois CONCIS : 400 à 600 caractères maximum pour toute la liste\n"
+    "- Réponds en français"
+)
+
+
+def _map_reduce_generate(
+    model: str,
+    system_prompt: str,
+    user_prompt_template: str,
+    transcription: str,
+    context: dict,
+    temperature: float,
+    chunk_size: int,
+    event_bus,
+    doc_id: str,
+    map_system_prompt: str | None = None,
+) -> str:
+    """Génère un document en deux passes pour les longs contextes.
+
+    Passe 1 (map) : résume chaque chunk de transcription
+    Passe 2 (reduce) : synthèse finale à partir de tous les résumés
+    """
+    chunks = _split_transcription(transcription, chunk_size)
+    logger.info(f"[AI] Map-Reduce: {len(chunks)} chunks de ~{chunk_size} chars")
+
+    # ── Passe 1 : résumer chaque chunk ──
+    map_system = map_system_prompt or _DEFAULT_MAP_SYSTEM_PROMPT
+
+    summaries = []
+    map_temperature = min(temperature, 0.1)  # très bas pour éviter les inventions
+    for i, chunk in enumerate(chunks):
+        event_bus.publish(doc_id, {
+            "status": "generating",
+            "step": f"map_{i+1}_{len(chunks)}",
+            "progress": int((i / len(chunks)) * 80),
+        })
+        logger.info(f"[AI] Map-Reduce passe 1: chunk {i+1}/{len(chunks)} ({len(chunk)} chars)")
+
+        # Build map user prompt with optional speaker mapping
+        speaker_map = context.get("speaker_mapping", "")
+        speaker_section = ""
+        if speaker_map:
+            speaker_section = f"Correspondance intervenants :\n{speaker_map}\n\n"
+
+        map_prompt = (
+            f"{speaker_section}"
+            f"Extrait {i+1}/{len(chunks)} d'une transcription de réunion :\n\n"
+            f"{chunk}\n\n"
+            "Liste les faits importants de cet extrait (5-8 points max). "
+            "Ne mentionne QUE ce qui est dit dans le texte ci-dessus. "
+            "Utilise les vrais noms des participants, pas les identifiants SPEAKER_XX."
+        )
+
+        parts = []
+        for text in _call_llm(model, map_system, map_prompt, map_temperature, num_predict=512, keep_alive="10m"):
+            parts.append(text)
+        summary = "".join(parts)
+        summaries.append(f"[Partie {i+1}/{len(chunks)}]\n{summary}")
+        logger.info(f"[AI] Map-Reduce chunk {i+1}: résumé de {len(summary)} chars")
+
+    # ── Passe 2 : synthèse finale ──
+    event_bus.publish(doc_id, {
+        "status": "generating",
+        "step": "reduce",
+        "progress": 85,
+    })
+
+    combined_summaries = "\n\n".join(summaries)
+    logger.info(f"[AI] Map-Reduce passe 2: {len(combined_summaries)} chars de résumés combinés")
+
+    # Construire un prompt reduce dédié qui explique clairement le contexte
+    reduce_system = (
+        f"{system_prompt}\n\n"
+        "CONTEXTE IMPORTANT : La transcription originale était trop longue pour être traitée en une fois. "
+        "Elle a été découpée en plusieurs parties, chacune résumée individuellement. "
+        "Tu reçois maintenant ces résumés partiels. Tu dois les utiliser pour rédiger le document final "
+        "comme si tu avais lu la transcription complète. "
+        "RÈGLES :\n"
+        "- Utilise UNIQUEMENT les informations présentes dans les résumés\n"
+        "- Ne génère JAMAIS de placeholders comme [nom], [date], ... — si une info manque, omets-la\n"
+        "- Rédige un document COMPLET et FINALISÉ, prêt à l'emploi"
+    )
+
+    # Remplacer {transcription} par les résumés avec un label clair
+    reduce_user = user_prompt_template
+    builtin = {
+        "titre":         context.get("title", ""),
+        "date":          context.get("date", ""),
+        "tenant":        context.get("tenant_name", ""),
+        "points":        context.get("agenda", ""),
+        "transcription": f"(Résumés des {len(chunks)} parties de la transcription)\n\n{combined_summaries}",
+        "documents":     context.get("documents_text", ""),
+        "duree":         context.get("duree", ""),
+        "participants":  context.get("participants", ""),
+        "lieu":          context.get("lieu", ""),
+        "description":   context.get("description", ""),
+        "speaker_mapping": context.get("speaker_mapping", ""),
+    }
+    for key, value in builtin.items():
+        reduce_user = reduce_user.replace("{" + key + "}", value or "(non disponible)")
+
+    logger.info(f"[AI] Map-Reduce passe 2: user prompt final {len(reduce_user)} chars")
+
+    parts = []
+    for text in _call_llm(model, reduce_system, reduce_user, temperature, num_predict=4096):
+        parts.append(text)
+    return "".join(parts)
+
+
+# ── Appel LLM (via LiteLLM Proxy) ─────────────────────────────────────────────
+
+def _call_llm(model: str, system_prompt: str, user_prompt: str, temperature: float, num_predict: int = 4096, keep_alive: int | str = 0) -> Generator[str, None, None]:
+    """Appelle le LLM en streaming via LiteLLM Proxy et yield les chunks de texte."""
+    extra_params = {
+        "repeat_penalty": 1.2,
+        "repeat_last_n": 256,
+    }
+    if keep_alive:
+        extra_params["keep_alive"] = keep_alive
+
+    yield from llm_generate_stream(
+        model=model,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        temperature=temperature,
+        max_tokens=num_predict,
+        extra_params=extra_params,
+    )
+
+
+# ── Pipeline principal ────────────────────────────────────────────────────────
+
+def _run_generation(doc_id: str):
+    from app.database import SessionLocal
+    from app.models.ai_documents import AIDocument
+    from app.services.event_bus import event_bus
+
+    db = SessionLocal()
+    try:
+        doc = db.query(AIDocument).filter_by(id=doc_id).first()
+        if not doc:
+            logger.error(f"[AI] Document introuvable : {doc_id}")
+            return
+
+        # Chargement du snapshot template
+        if not doc.template_snapshot:
+            logger.error(f"[AI] Pas de snapshot template pour {doc_id}")
+            _fail(db, doc, event_bus, "Template introuvable")
+            return
+
+        template_data = json.loads(doc.template_snapshot)
+
+        # Mise à jour statut → generating
+        doc.status = "generating"
+        doc.generation_started_at = datetime.now(timezone.utc)
+        db.commit()
+        event_bus.publish(doc_id, {"status": "generating", "progress": 0})
+
+        # Extraction du contexte
+        context: dict = {}
+
+        if doc.source_session_id:
+            event_bus.publish(doc_id, {"status": "generating", "step": "transcription"})
+            transcription_ctx = _extract_transcription_context(doc.source_session_id, db)
+            context["transcription"] = transcription_ctx["text"]
+            context["duree"] = transcription_ctx["duree"]
+            if transcription_ctx.get("date"):
+                context.setdefault("date", transcription_ctx["date"])
+            if transcription_ctx.get("participants"):
+                context["participants"] = transcription_ctx["participants"]
+            if transcription_ctx.get("lieu"):
+                context["lieu"] = transcription_ctx["lieu"]
+            if transcription_ctx.get("description"):
+                context["description"] = transcription_ctx["description"]
+            if transcription_ctx.get("speaker_mapping"):
+                context["speaker_mapping"] = transcription_ctx["speaker_mapping"]
+
+        if doc.source_dossier_id:
+            event_bus.publish(doc_id, {"status": "generating", "step": "dossier"})
+            dossier_ctx = _extract_dossier_context(doc.source_dossier_id, db)
+            context.update(dossier_ctx)
+
+        # Extra context injected at creation time (e.g. from procedure convocation)
+        if doc.extra_context:
+            try:
+                context.update(json.loads(doc.extra_context))
+            except Exception:
+                pass
+
+        # Nom de la collectivité depuis le tenant
+        from app.models.tenant import Tenant
+        tenant = db.query(Tenant).filter_by(id=doc.tenant_id).first()
+        context["tenant_name"] = tenant.name if tenant else ""
+        context.setdefault("title", doc.title)
+
+        # Construction du prompt
+        system_prompt, user_prompt = _build_prompt(template_data, context)
+
+        from app.services.ai_config import get_model_for_usage
+        base_model = template_data.get("ollama_model") or get_model_for_usage("ai_documents")
+        temperature = float(template_data.get("temperature", 0.3))
+
+        # Sélection auto : si le user prompt dépasse le seuil, utiliser le modèle long contexte
+        model = base_model
+        if (len(user_prompt) > settings.ollama_long_context_threshold
+                and settings.ollama_long_context_model):
+            model = settings.ollama_long_context_model
+            logger.info(f"[AI] Context trop long ({len(user_prompt)} chars > {settings.ollama_long_context_threshold}), "
+                        f"bascule vers modèle long contexte: {model}")
+
+        # Résolution du nom de modèle pour LiteLLM
+        model = resolve_model(model)
+
+        # Génération
+        logger.info(f"[AI] Model: {model}, Temperature: {temperature}")
+        logger.info(f"[AI] System prompt ({len(system_prompt)} chars): {system_prompt[:200]}...")
+        logger.info(f"[AI] User prompt ({len(user_prompt)} chars): {user_prompt[:300]}...")
+
+        # Map-Reduce si activé et contexte long
+        transcription_text = context.get("transcription", "")
+        use_map_reduce = (
+            settings.ollama_map_reduce
+            and len(user_prompt) > settings.ollama_long_context_threshold
+            and len(transcription_text) > settings.ollama_map_reduce_chunk_size
+        )
+
+        if use_map_reduce:
+            logger.info(f"[AI] Mode Map-Reduce activé (transcription: {len(transcription_text)} chars)")
+            event_bus.publish(doc_id, {"status": "generating", "step": "map_reduce"})
+            result_text = _map_reduce_generate(
+                model=model,
+                system_prompt=system_prompt,
+                user_prompt_template=template_data["user_prompt_template"],
+                transcription=transcription_text,
+                context=context,
+                temperature=temperature,
+                chunk_size=settings.ollama_map_reduce_chunk_size,
+                event_bus=event_bus,
+                doc_id=doc_id,
+                map_system_prompt=template_data.get("map_system_prompt"),
+            )
+        else:
+            event_bus.publish(doc_id, {"status": "generating", "step": "llm"})
+            result_parts = []
+            for chunk in _call_llm(model, system_prompt, user_prompt, temperature):
+                result_parts.append(chunk)
+                if sum(len(p) for p in result_parts) % 200 < len(chunk):
+                    event_bus.publish(doc_id, {
+                        "status": "generating",
+                        "partial": "".join(result_parts[-5:]),
+                    })
+            result_text = "".join(result_parts)
+        doc.status = "completed"
+        doc.result_text = result_text
+        doc.generation_completed_at = datetime.now(timezone.utc)
+        db.commit()
+        event_bus.publish(doc_id, {"status": "completed"})
+        logger.info(f"[AI] Document {doc_id} généré ({len(result_text)} chars)")
+
+        # Indexation RAG automatique
+        try:
+            from app.services.indexer import index_ai_document
+            index_ai_document(doc.tenant_id, doc.id, doc.title, result_text)
+        except Exception as exc:
+            logger.warning(f"[AI] Indexation RAG échouée pour {doc_id}: {exc}")
+
+    except Exception as exc:
+        logger.exception(f"[AI] Erreur génération {doc_id}: {exc}")
+        try:
+            doc = db.query(AIDocument).filter_by(id=doc_id).first()
+            if doc:
+                _fail(db, doc, event_bus, str(exc))
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
+def _fail(db, doc, event_bus, message: str):
+    doc.status = "error"
+    doc.error_message = message
+    doc.generation_completed_at = datetime.now(timezone.utc)
+    db.commit()
+    event_bus.publish(doc.id, {"status": "error", "error": message})
+
+
+# ── Templates par défaut ──────────────────────────────────────────────────────
+
+DEFAULT_TEMPLATES = [
+    {
+        "name": "Procès-verbal",
+        "description": "PV complet d'une séance à partir de la transcription et de l'ordre du jour",
+        "document_type": "pv",
+        "system_prompt": (
+            "Tu es un rédacteur spécialisé dans la rédaction de procès-verbaux de réunions. "
+            "Tu rédiges des documents clairs, formels et précis en français.\n"
+            "RÈGLES STRICTES :\n"
+            "- N'invente JAMAIS d'information absente des données fournies\n"
+            "- N'utilise JAMAIS de crochets ou de placeholders comme [nom], [date], [à compléter]\n"
+            "- Si une information manque, omets simplement la section concernée\n"
+            "- Utilise UNIQUEMENT les informations fournies dans le prompt"
+        ),
+        "user_prompt_template": (
+            "Rédige le procès-verbal de la séance suivante.\n\n"
+            "Tenant : {tenant}\n"
+            "Date : {date}\n"
+            "Titre : {titre}\n"
+            "Durée : {duree}\n"
+            "Participants présents : {participants}\n"
+            "Contexte / sujet de la réunion : {description}\n\n"
+            "ORDRE DU JOUR :\n{points}\n\n"
+            "TRANSCRIPTION DE LA SÉANCE :\n{transcription}\n\n"
+            "Rédige un procès-verbal complet et structuré, en respectant l'ordre du jour. "
+            "Pour chaque point, résume les discussions et les décisions prises. "
+            "Le contexte ci-dessus t'aide à comprendre le sujet principal, mais tu dois couvrir l'intégralité des échanges. "
+            "Utilise les noms des participants tels que fournis ci-dessus."
+        ),
+        "temperature": 0.3,
+    },
+    {
+        "name": "Résumé exécutif",
+        "description": "Synthèse courte et structurée d'une séance",
+        "document_type": "summary",
+        "system_prompt": (
+            "Tu es un assistant spécialisé dans la rédaction de synthèses de réunions en français. "
+            "Tu rédiges des résumés concis, clairs et structurés.\n"
+            "RÈGLES STRICTES :\n"
+            "- N'invente JAMAIS d'information absente des données fournies\n"
+            "- N'utilise JAMAIS de crochets ou de placeholders comme [nom], [date], [à compléter]\n"
+            "- Si une information manque, omets simplement la section concernée\n"
+            "- Utilise UNIQUEMENT les informations fournies dans le prompt"
+        ),
+        "user_prompt_template": (
+            "Rédige un résumé exécutif de la réunion suivante.\n\n"
+            "Tenant : {tenant}\n"
+            "Date : {date}\n"
+            "Participants : {participants}\n"
+            "Durée : {duree}\n"
+            "Contexte / sujet de la réunion : {description}\n"
+            "Points abordés : {points}\n\n"
+            "TRANSCRIPTION :\n{transcription}\n\n"
+            "Produis un résumé en bullet points (5 à 10 points maximum), "
+            "en mettant en avant les décisions prises et les points importants abordés. "
+            "Le contexte ci-dessus t'aide à comprendre le sujet principal, mais couvre l'intégralité des échanges."
+        ),
+        "temperature": 0.4,
+    },
+    {
+        "name": "Compte-rendu de réunion",
+        "description": "Compte-rendu structuré à partir de la transcription et des documents fournis",
+        "document_type": "custom",
+        "system_prompt": (
+            "Tu es un assistant spécialisé dans la rédaction de comptes-rendus de réunions en français. "
+            "Tu rédiges des documents structurés, fidèles aux échanges et accessibles.\n"
+            "RÈGLES STRICTES :\n"
+            "- N'invente JAMAIS d'information absente des données fournies\n"
+            "- N'utilise JAMAIS de crochets ou de placeholders comme [nom], [date], [à compléter]\n"
+            "- Si une information manque, omets simplement la section concernée\n"
+            "- Utilise UNIQUEMENT les informations fournies dans le prompt"
+        ),
+        "user_prompt_template": (
+            "Rédige un compte-rendu de la réunion suivante.\n\n"
+            "Tenant : {tenant}\n"
+            "Date : {date}\n"
+            "Titre : {titre}\n"
+            "Durée : {duree}\n"
+            "Participants présents : {participants}\n"
+            "Contexte / sujet de la réunion : {description}\n\n"
+            "ORDRE DU JOUR :\n{points}\n\n"
+            "TRANSCRIPTION :\n{transcription}\n\n"
+            "DOCUMENTS FOURNIS :\n{documents}\n\n"
+            "Rédige un compte-rendu clair et structuré par point à l'ordre du jour. "
+            "Mentionne les participants par leur nom quand ils interviennent, "
+            "les échanges principaux et les décisions ou actions à suivre. "
+            "Le contexte ci-dessus t'aide à comprendre le sujet principal, mais couvre l'intégralité des échanges."
+        ),
+        "temperature": 0.3,
+    },
+]
+
+
+def seed_default_templates(tenant_id: str, db) -> None:
+    """Crée les templates par défaut pour un tenant s'il n'en a pas."""
+    from app.models.ai_documents import AIDocumentTemplate
+    existing = db.query(AIDocumentTemplate).filter_by(tenant_id=tenant_id).count()
+    if existing > 0:
+        return
+    for tpl in DEFAULT_TEMPLATES:
+        db.add(AIDocumentTemplate(tenant_id=tenant_id, **tpl))
+    db.commit()
+    logger.info(f"[AI] Templates par défaut créés pour tenant {tenant_id}")

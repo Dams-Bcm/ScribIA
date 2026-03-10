@@ -1,18 +1,17 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { Link } from "react-router";
 import { useLogin } from "../api/hooks/useAuth";
 
 export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const login = useLogin();
-  const navigate = useNavigate();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     try {
       await login.mutateAsync({ username, password });
-      navigate("/", { replace: true });
+      window.location.href = "/";
     } catch {
       // error handled by mutation state
     }
@@ -24,7 +23,7 @@ export function LoginPage() {
         <div className="bg-background rounded-xl border border-border p-8 shadow-sm">
           <h1 className="text-2xl font-bold text-center mb-1">Scrib' IA</h1>
           <p className="text-sm text-muted-foreground text-center mb-6">
-            Connectez-vous pour continuer
+            Optimisez votre travail par l'écoute
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -71,6 +70,13 @@ export function LoginPage() {
             >
               {login.isPending ? "Connexion..." : "Se connecter"}
             </button>
+
+            <Link
+              to="/forgot-password"
+              className="block text-center text-sm text-muted-foreground hover:text-foreground"
+            >
+              Mot de passe oublié ?
+            </Link>
           </form>
         </div>
       </div>

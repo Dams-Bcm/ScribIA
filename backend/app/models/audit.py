@@ -47,3 +47,21 @@ class DataRetentionPolicy(UUIDMixin, Base):
     retention_days  = Column(String(10), nullable=False)   # number of days, or 'indefinite'
     auto_delete     = Column(String(5), nullable=False, default="false")  # 'true' | 'false'
     description     = Column(Text, nullable=True)
+
+
+class RGPDRequest(UUIDMixin, Base):
+    """
+    RGPD Articles 15-20 — Suivi des demandes formelles.
+    Types : access (Art.15), rectification (Art.16), deletion (Art.17), portability (Art.20).
+    """
+    __tablename__ = "rgpd_requests"
+
+    tenant_id    = Column(String(36), nullable=False, index=True)
+    user_id      = Column(String(36), nullable=False)
+    request_type = Column(String(20), nullable=False)   # access | rectification | deletion | portability
+    status       = Column(String(20), nullable=False, default="pending")  # pending | in_progress | completed | rejected
+    notes        = Column(Text, nullable=True)           # demandeur
+    admin_notes  = Column(Text, nullable=True)           # réponse admin
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at   = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at   = Column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)

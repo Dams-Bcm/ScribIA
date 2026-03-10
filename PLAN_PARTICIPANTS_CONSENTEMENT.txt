@@ -1,0 +1,520 @@
+================================================================================
+        PLAN D'EVOLUTION — PARTICIPANTS & CONSENTEMENT (RGPD)
+================================================================================
+
+PRINCIPE FONDAMENTAL
+=====================
+Dans ScribIA, par politique de conformité produit, aucun enregistrement ou
+traitement documentaire n'est autorisé sans preuve traçable d'une base
+d'autorisation retenue par le client. Par défaut, ScribIA n'ouvre que le
+mode consentement explicite.
+
+Cette politique distingue la conformité produit de la qualification juridique
+finale, qui appartient au client en tant que responsable de traitement.
+
+Deux modes de preuve acceptés par ScribIA :
+  - Consentement par email (envoyé et accepté via ScribIA)
+  - Consentement oral (détecté par l'IA dans l'audio, confirmé par
+    l'utilisateur — jamais d'auto-accept)
+
+PAS d'attestation administrateur ni de mode dégradé sans preuve.
+
+Le consentement couvre son cycle de vie complet : recueil, preuve,
+retrait (aussi simple que le recueil), et conséquences du retrait.
+
+
+PHASE 1 — PARTICIPANTS & PREUVES SUR TRANSCRIPTION JOB
+=========================================================
+
+1.1 Séparation des responsabilités
+------------------------------------
+  Quatre concepts distincts :
+
+  a) participants[]    — qui était censé être présent (contacts sélectionnés)
+  b) consent_events    — les preuves horodatées (table dédiée ou JSON riche)
+  c) attendance_outcome — qui a effectivement participé et sous quel régime
+  d) recording_validity — verdict global de la session
+
+  attendees[] reste en UX pour l'affichage, mais N'EST PAS la source de
+  vérité unique. La preuve est portée par les consent_events.
+
+1.2 Nouveau champ : TranscriptionJob.attendees (JSON)
+------------------------------------------------------
+  Structure enrichie avec pointeur vers la preuve :
+
+  Pour un consentement email :
+    {
+      "contact_id": "uuid-xxx",
+      "status": "accepted_email",
+      "evidence_type": "email",
+      "evidence_id": "consent_request_uuid",
+      "decided_at": "2026-03-07T10:12:00Z",
+      "decided_by": "system"
+    }
+
+  Pour un consentement oral :
+    {
+      "contact_id": "uuid-yyy",
+      "status": "accepted_oral",
+      "evidence_type": "oral",
+      "evidence_id": "consent_detection_uuid",
+      "segment_start_ms": 92000,
+      "segment_end_ms": 108000,
+      "decided_at": "2026-03-07T10:44:00Z",
+      "decided_by": "user_confirmed"
+    }
+
+  Pour un en-attente :
+    {
+      "contact_id": "uuid-zzz",
+      "status": "pending_oral",
+      "evidence_type": null,
+      "evidence_id": null,
+      "decided_at": null,
+      "decided_by": null
+    }
+
+  Pour un consentement retiré :
+    {
+      "contact_id": "uuid-aaa",
+      "status": "withdrawn",
+      "evidence_type": "email",
+      "evidence_id": "consent_request_uuid",
+      "decided_at": "2026-03-07T10:12:00Z",
+      "decided_by": "system",
+      "withdrawn_at": "2026-03-15T14:30:00Z",
+      "withdrawn_via": "email_link"
+    }
+
+1.3 Statuts de consentement
+-----------------------------
+  - "pending"          → aucun mode de consentement choisi
+  - "pending_oral"     → consentement oral prévu, à valider après diarisation
+  - "accepted_email"   → consentement donné par email via ScribIA
+  - "accepted_oral"    → consentement oral détecté par l'IA et confirmé
+  - "refused"          → consentement refusé par email
+  - "withdrawn"        → consentement retiré après avoir été donné
+
+1.4 Points de blocage
+-----------------------
+  | Action                        | Condition requise                              |
+  |-------------------------------|------------------------------------------------|
+  | Démarrer un enregistrement    | Tous en accepted_email ou pending_oral         |
+  | Lancer transcription (LIVE)   | Tous en accepted_email ou pending_oral         |
+  | Lancer transcription (IMPORT) | Voir Phase 4 (analyse partielle préalable)     |
+  | Générer un document IA        | Tous en accepted_email ou accepted_oral        |
+  | Exporter un document          | Idem génération                                |
+
+  → "pending" pur bloque enregistrement/transcription
+  → "pending_oral" bloque génération de documents IA
+  → "refused" bloque tout
+  → "withdrawn" bloque tout + invalide les documents existants
+
+1.5 Migration DB
+-----------------
+  ALTER TABLE transcription_jobs ADD attendees NVARCHAR(MAX) NULL
+  ALTER TABLE transcription_jobs ADD recording_validity VARCHAR(20) NULL
+  (dans _add_missing_columns() de main.py)
+
+  recording_validity : "pending" | "valid" | "invalidated" | "blocked"
+    - "pending"      → en attente de validation des consentements
+    - "valid"        → tous les consentements validés
+    - "invalidated"  → invalidé (retrait de consentement, refus)
+    - "blocked"      → bloqué (aucun consentement détecté, import sans preuve)
+
+
+PHASE 2 — CONSENTEMENT PAR EMAIL + VÉRIFICATION AUTOMATIQUE
+==============================================================
+
+2.1 Flux
+---------
+  1. L'utilisateur crée une session et sélectionne les contacts attendus
+  2. Le système vérifie AUTOMATIQUEMENT pour chaque contact :
+     - A-t-il déjà un consentement email valide (ConsentRequest accepté) ?
+       → OUI : statut "accepted_email" automatiquement, rien à faire
+       → NON : statut "pending_oral" (consentement oral attendu dans l'audio)
+  3. L'utilisateur voit le résumé :
+     "6 consentements email validés, 4 consentements oraux à valider"
+  4. Pour les contacts sans consentement email, l'utilisateur peut
+     optionnellement envoyer une demande email maintenant :
+     → "Ce contact n'a pas consenti par email. Envoyer une demande ?"
+     → Si oui : envoi et attente de réponse → accepted_email ou refused
+     → Si non : reste en pending_oral
+  5. L'enregistrement ne peut démarrer que quand TOUS les participants
+     ont un statut accepted_email ou pending_oral (aucun pending pur, aucun refused)
+
+2.2 Modèle : ConsentRequest (nouvelle table)
+----------------------------------------------
+  id                UUID (PK)
+  tenant_id         FK → tenants.id
+  job_id            FK → transcription_jobs.id (nullable si pré-session)
+  contact_id        FK → contacts.id
+  token             String unique (lien de validation)
+  status            "pending" | "accepted" | "refused" | "withdrawn"
+  notice_version    String — version de la notice d'information affichée
+  notice_hash       String (nullable) — hash du contenu exact de la notice
+  sent_at           DateTime
+  responded_at      DateTime (nullable)
+  withdrawn_at      DateTime (nullable)
+  withdrawn_via     String (nullable) — "email_link" | "manual_request"
+  withdrawn_by      FK → users.id (nullable, si retrait manuel par admin)
+  withdrawn_reason  Text (nullable, commentaire libre si retrait manuel)
+  ip_address        String (nullable, preuve)
+  user_agent        String (nullable, preuve)
+
+  Cette table sert de source de vérité pour les consentements email.
+  Le evidence_id dans attendees[] pointe vers l'id de cette table.
+
+2.3 Routes
+-----------
+  POST   /consent/send             Envoie un email de consentement
+  GET    /consent/respond/{token}  Page publique accepter/refuser
+  POST   /consent/withdraw/{token} Page publique retrait de consentement
+  GET    /consent/status/{job_id}  Statut de tous les consentements d'une session
+
+
+PHASE 3 — CONSENTEMENT ORAL (DÉTECTION IA)
+=============================================
+
+3.1 Principe
+-------------
+  Après transcription + diarisation, l'IA analyse automatiquement la
+  transcription pour détecter le consentement oral.
+
+  ATTENTION : un "consentement collectif détecté" par l'IA ne suffit pas
+  à attribuer le consentement à chaque personne individuellement. Cas
+  problématiques :
+    - Personnes silencieuses (présentes mais n'ont pas parlé)
+    - Arrivées tardives (après le moment du consentement)
+    - Identité incertaine d'un locuteur
+    - Voix non diarisée / chevauchement de paroles
+
+  L'utilisateur DOIT toujours confirmer. Pas d'auto-accept, sans exception.
+
+3.2 Flux complet
+-----------------
+
+  Transcription + Diarisation terminées
+                ↓
+      IA analyse la transcription
+      Recherche de consentement oral
+                ↓
+       ┌────────┼──────────────────┐
+       ▼        ▼                  ▼
+  CONSENTEMENT     REFUS          AUCUN CONSENTEMENT
+  COLLECTIF        DÉTECTÉ        DÉTECTÉ
+  DÉTECTÉ               │                │
+       │                 │                ▼
+       ▼                 │          ENREGISTREMENT
+  "Consentement          │          BLOQUÉ
+  oral détecté           │          "Aucun consentement
+  à 00:01:32.            │          oral détecté dans
+  Confirmez-vous ?"      │          l'enregistrement."
+       │                 │
+    ┌──┴──┐              ▼
+    ▼     ▼        Locuteur
+   Oui   Non       identifiable ?
+    │     │              │
+    │     ▼         ┌────┴────┐
+    │  L'utilisateur▼         ▼
+    │  réécoute   Oui        Non
+    │  et corrige   │         │
+    │               ▼         ▼
+    │         "[Nom] a     "Un refus détecté
+    │         refusé.       à 00:03:15 mais
+    │         A-t-il        locuteur non
+    │         quitté la     identifiable."
+    │         salle ?"            │
+    │              │         ┌────┴─────┐
+    │         ┌────┴────┐    ▼          ▼
+    │         ▼         ▼  "Identifier  "Invalider"
+    │        Oui       Non  manuellement"    │
+    │         │         │       │            ▼
+    │         ▼         ▼       ▼       ENREGISTREMENT
+    │    Retirer de  ENREG.  L'utilisateur   INVALIDÉ
+    │    attendees[] INVALIDÉ réécoute,
+    │    → valide            identifie
+    │                             │
+    │                             ▼
+    │                      Retour au flux :
+    │                      "A-t-il quitté
+    │                       la salle ?"
+    │                        ┌────┴────┐
+    │                        ▼         ▼
+    │                       Oui       Non
+    │                        │         │
+    │                        ▼         ▼
+    │                   Retirer    ENREGISTREMENT
+    │                   → valide   INVALIDÉ
+    │
+    ▼
+  L'utilisateur confirme que le
+  consentement couvre bien TOUS
+  les participants listés
+  (vérification individuelle)
+       ↓
+  accepted_oral pour tous
+  les attendees[] confirmés
+  (avec evidence_id, segment, horodatage)
+       ↓
+  Génération de documents IA DÉBLOQUÉE
+
+3.3 Tableau récapitulatif des issues
+--------------------------------------
+  | Résultat IA                                      | Action                      | Issue                    |
+  |--------------------------------------------------|-----------------------------|--------------------------|
+  | Consentement collectif détecté + confirmé         | Confirmation individuelle   | accepted_oral pour tous  |
+  | Consentement détecté + non confirmé               | Utilisateur réécoute        | Selon correction         |
+  | Refus + locuteur identifié + a quitté la salle    | Retiré des attendees        | Enregistrement valide    |
+  | Refus + locuteur identifié + resté dans la salle  | —                           | ENREGISTREMENT INVALIDÉ  |
+  | Refus + locuteur non identifiable + id. manuelle  | Retour flux "a-t-il quitté" | Selon réponse            |
+  | Refus + locuteur non identifiable + non résolu    | —                           | ENREGISTREMENT INVALIDÉ  |
+  | Aucun consentement détecté                        | —                           | ENREGISTREMENT BLOQUÉ    |
+
+3.4 Détection IA — Implémentation
+-----------------------------------
+  - Recherche dans la transcription de phrases type :
+    "est-ce que tout le monde consent", "vous acceptez l'enregistrement",
+    "quelqu'un s'oppose", "pas d'objection", etc.
+  - L'IA retourne : position temporelle, type (consentement/refus),
+    locuteur si identifiable
+  - L'utilisateur DOIT toujours confirmer (pas d'auto-accept)
+
+3.5 Modèle : ConsentDetection (nouvelle table, source de vérité oral)
+-----------------------------------------------------------------------
+  id                UUID (PK)
+  tenant_id         FK → tenants.id
+  job_id            FK → transcription_jobs.id
+  detection_type    "collective_consent" | "individual_refusal"
+  segment_start_ms  Integer (position dans l'audio)
+  segment_end_ms    Integer
+  transcript_text   Text (texte du segment détecté)
+  speaker_id        String (nullable, SPEAKER_XX si identifiable)
+  contact_id        FK → contacts.id (nullable, si locuteur identifié)
+  covered_contacts  JSON — liste des contact_id couverts par ce segment
+                    (rempli lors de la confirmation utilisateur)
+                    NOTE : transitoire. À terme, remplacer par une table
+                    de liaison (voir 3.6).
+  ai_confidence     Float (confiance de l'IA, 0-1)
+  notice_version    String — version de la notice d'information contextuelle
+  user_confirmed    Boolean (défaut false)
+  confirmed_by      FK → users.id (nullable)
+  confirmed_at      DateTime (nullable)
+
+  Le evidence_id dans attendees[] pointe vers l'id de cette table
+  pour les consentements oraux. covered_contacts permet de savoir
+  explicitement quels participants sont couverts par ce consentement
+  collectif (plutôt que de l'inférer implicitement).
+
+3.6 Table de liaison (évolution de covered_contacts)
+------------------------------------------------------
+  À terme, remplacer le JSON covered_contacts par une table relationnelle
+  pour requêter, auditer, filtrer et garantir l'intégrité référentielle :
+
+  Table : consent_detection_covered_contacts
+    consent_detection_id   FK → consent_detections.id
+    contact_id             FK → contacts.id
+    coverage_status        "covered" | "excluded" | "uncertain"
+    confirmed_by           FK → users.id
+    confirmed_at           DateTime
+
+
+PHASE 4 — CAS DU FICHIER AUDIO IMPORTÉ (ANALYSE PARTIELLE)
+==============================================================
+
+4.1 Principe
+-------------
+  Un fichier importé a les MÊMES exigences de consentement qu'un
+  enregistrement live. Pas de passe-droit.
+
+  DIFFÉRENCE CLÉ AVEC LE LIVE :
+  Pour le live, pending_oral suffit pour démarrer l'enregistrement car
+  le consentement oral sera recueilli au début de la réunion.
+  Pour l'import, on ne peut PAS lancer une transcription complète sur
+  un fichier dont on ne sait pas s'il contient un consentement. Le
+  consentement est en principe préalable au traitement (minimisation).
+
+4.2 Flux — Analyse partielle préalable
+-----------------------------------------
+  1. L'utilisateur importe le fichier audio
+  2. Il renseigne les participants attendus (contacts)
+  3. Le système vérifie automatiquement pour chaque contact :
+     → Consentement email existant ? → accepted_email
+     → Sinon → pending_oral
+  4. L'utilisateur peut optionnellement envoyer des demandes email
+     aux contacts sans consentement (même logique que Phase 2)
+
+  5. SI des participants sont en pending_oral :
+     → Le système ne lance PAS la transcription complète
+     → Il effectue une ANALYSE PARTIELLE :
+       a) Transcription limitée aux ~60 premières secondes du fichier
+       b) L'IA recherche un consentement oral dans ce segment initial
+       c) Si consentement détecté → l'utilisateur confirme →
+          transcription complète débloquée
+       d) Si aucun consentement détecté → BLOQUÉ
+          "Aucun consentement oral détecté dans le début du fichier.
+           Veuillez obtenir le consentement par email de tous les
+           participants avant de lancer la transcription."
+
+  6. SI tous les participants sont en accepted_email :
+     → Transcription complète directe (pas besoin d'analyse partielle)
+
+  7. Après transcription complète + diarisation :
+     → Flux Phase 3 normal pour confirmer le consentement oral
+     → Le document IA ne peut être généré que si TOUS les participants
+       ont un consentement validé (accepted_email ou accepted_oral)
+
+4.3 Cas mixte (email + oral dans la même session)
+---------------------------------------------------
+  Certains participants ont donné leur consentement par email en amont,
+  d'autres le donnent oralement au début de la réunion.
+  → Chaque participant a son propre statut dans attendees[]
+  → Dès qu'un seul participant est pending_oral dans un import,
+    l'analyse partielle est requise
+  → Le système vérifie que TOUS ont un statut accepted_* avant
+    de permettre la génération de documents IA
+
+
+PHASE 5 — RETRAIT DU CONSENTEMENT
+=====================================
+
+5.1 Principe
+-------------
+  Le retrait du consentement doit être aussi simple que le recueil.
+  Il peut intervenir à tout moment, même après la génération de documents.
+
+5.2 Modes de retrait
+----------------------
+  - Via le même lien email (bouton "Retirer mon consentement" sur la
+    page de réponse au consentement)
+  - Via demande manuelle au responsable de traitement (l'admin ScribIA
+    enregistre le retrait dans le système)
+
+5.3 Effets du retrait
+-----------------------
+  Quand un participant retire son consentement :
+
+  a) Sur le consentement :
+     - ConsentRequest.status → "withdrawn"
+     - ConsentRequest.withdrawn_at → horodatage
+     - ConsentRequest.withdrawn_via → "email_link" ou "manual_request"
+     - attendees[].status → "withdrawn"
+     - attendees[].withdrawn_at → horodatage
+
+  b) Sur la session :
+     - recording_validity → "invalidated"
+     - La transcription est bloquée (plus consultable)
+     - Les segments du locuteur concerné sont anonymisés lorsque
+       cela est techniquement possible et juridiquement requis,
+       sinon l'accès est bloqué et le traitement limité
+
+  c) Sur les documents IA déjà générés :
+     - Tous les documents générés depuis cette session sont marqués
+       "invalidated" (nouveau statut sur AIDocument)
+     - Les documents invalidés ne sont plus exportables
+     - Un bandeau d'avertissement s'affiche :
+       "Ce document a été invalidé suite au retrait du consentement
+        de [Nom] le [date]."
+
+  d) Sur les futurs traitements :
+     - Toute nouvelle génération de document IA depuis cette session
+       est bloquée définitivement
+
+5.4 Droit à l'effacement (cas par cas)
+-----------------------------------------
+  Le droit à l'effacement n'est pas absolu. Il existe des exceptions,
+  notamment la conservation nécessaire pour une obligation légale ou
+  pour la constatation, l'exercice ou la défense de droits en justice.
+
+  Sur demande explicite du participant, selon le contexte juridique :
+
+  a) Si effacement requis ET techniquement possible :
+     - Anonymisation ou suppression des segments audio du locuteur
+     - Anonymisation ou suppression du texte transcrit du locuteur
+     - Anonymisation de l'entrée dans attendees[]
+     - Documents IA invalidés avec mention "[Données effacées sur demande]"
+
+  b) Si conservation résiduelle nécessaire (obligation légale, preuve) :
+     - Limitation du traitement (blocage d'accès)
+     - Invalidation documentaire
+     - Conservation résiduelle strictement nécessaire aux fins légales
+     - Journalisation de la demande d'effacement et du motif de refus
+
+  Le système doit gérer les deux cas. Le responsable de traitement
+  (client) décide de l'issue, ScribIA fournit les outils pour exécuter.
+
+5.5 Routes
+-----------
+  POST   /consent/withdraw/{token}   Retrait via lien email
+  POST   /consent/withdraw-manual    Retrait par l'admin
+           Body : { contact_id, job_id, reason (optionnel) }
+           → trace withdrawn_by (user admin) et withdrawn_reason
+
+
+PHASE 6 — INTÉGRATION AVEC DOCUMENTS IA
+=========================================
+
+6.1 Résolution de {participants}
+---------------------------------
+  Le placeholder {participants} est résolu depuis attendees[] :
+    - Pour chaque contact_id dans attendees[] avec status accepted_*
+    - Récupère le contact (nom, prénom, fonction)
+    - Format : "Jean Dupont (Maire), Marie Martin (DGS)"
+    - Les participants withdrawn sont exclus
+
+  Avantage : on a TOUS les participants consentants, pas seulement
+  ceux qui parlent.
+
+6.2 Garde-fou consentement
+----------------------------
+  Avant génération d'un document IA :
+    - Vérifier que recording_validity == "valid"
+    - Vérifier que tous les attendees[] ont status en accepted_*
+    - Si pending ou pending_oral → bloquer avec message explicite
+    - Si refused, withdrawn ou invalidé → bloquer définitivement
+
+  Pour les documents invalidés (retrait post-génération) :
+    - Filtrage côté API : les documents invalidés ne sont PAS retournés
+      par défaut dans GET /ai-documents/documents
+    - Paramètre ?include_invalidated=true pour les admins uniquement
+    - Export bloqué côté API (pas seulement côté UI)
+    - Bandeau d'avertissement en consultation admin
+
+6.3 Audit trail
+----------------
+  Chaque document généré conserve dans template_snapshot ou extra_context :
+    - Liste complète des participants avec leur type de consentement
+    - Pour chaque participant : evidence_type, evidence_id, decided_at
+    - Référence au segment de consentement oral (si applicable)
+    - Identité du confirmateur (confirmed_by) et horodatage
+    - Verdict recording_validity de la session
+
+  En cas d'audit CNIL, on peut retracer pour chaque document :
+    - Qui a participé
+    - Comment chacun a consenti (email ou oral)
+    - Où est la preuve (ConsentRequest ou ConsentDetection)
+    - Qui a validé et quand
+    - Si un retrait a eu lieu : quand, par qui, via quel canal
+
+
+ORDRE D'IMPLÉMENTATION SUGGÉRÉ
+================================
+
+  Étape 1 : Phase 1 (attendees JSON enrichi + tables ConsentRequest
+            et ConsentDetection + recording_validity) + UI sélection contacts
+  Étape 2 : Phase 2 (consentement email — envoi, lien, réponse,
+            vérification automatique)
+  Étape 3 : Phase 3 (détection IA du consentement oral + flux
+            confirmation avec vérification individuelle)
+  Étape 4 : Phase 4 (flux import — analyse partielle préalable)
+  Étape 5 : Phase 5 (retrait du consentement + invalidation en cascade)
+  Étape 6 : Phase 6 (intégration Documents IA + garde-fous + audit trail)
+
+
+QUICK WIN IMMÉDIAT
+===================
+  En attendant l'implémentation complète, récupérer les participants
+  depuis les SpeakerProfile identifiés (contacts liés aux locuteurs
+  via diarisation) pour alimenter {participants} dans les documents IA.
+  Cela fonctionne déjà via _extract_transcription_context() mais
+  nécessite que les locuteurs soient identifiés dans la diarisation.

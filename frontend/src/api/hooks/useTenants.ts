@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../client";
-import type { Tenant, TenantCreate, TenantUpdate, TenantModule, ModuleDefinition } from "../types";
+import type { Tenant, TenantCreate, TenantUpdate, ModuleDefinition, ProvisionResult } from "../types";
 
 export function useTenants() {
   return useQuery<Tenant[]>({
@@ -46,6 +46,30 @@ export function useUpdateTenantModules() {
   return useMutation({
     mutationFn: ({ tenantId, modules }: { tenantId: string; modules: { module_key: string; enabled: boolean }[] }) =>
       api.put(`/admin/tenants/${tenantId}/modules`, modules),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "tenants"] }),
+  });
+}
+
+export function useProvisionTenant() {
+  return useMutation({
+    mutationFn: (tenantId: string) => api.post<ProvisionResult>(`/admin/tenants/${tenantId}/provision`, {}),
+  });
+}
+
+export function useProvisionDedicatedDb() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tenantId: string) =>
+      api.post<{ message: string; db_name: string }>(`/admin/tenants/${tenantId}/provision-db`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "tenants"] }),
+  });
+}
+
+export function useDeprovisionDedicatedDb() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tenantId: string) =>
+      api.post<{ message: string }>(`/admin/tenants/${tenantId}/deprovision-db`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "tenants"] }),
   });
 }

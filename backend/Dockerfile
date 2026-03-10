@@ -1,10 +1,26 @@
-FROM python:3.12-slim
+FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Europe/Paris
+
+# Install Python 3.12 + system deps
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        software-properties-common && \
+    add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.12 python3.12-venv python3.12-dev \
+        curl gnupg2 unixodbc-dev ffmpeg && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Create venv with pip included
+RUN python3.12 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Install ODBC Driver 17 for SQL Server
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl gnupg2 unixodbc-dev && \
-    curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list && \
+RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/22.04/prod jammy main" > /etc/apt/sources.list.d/mssql-release.list && \
     apt-get update && \
     ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql17 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -18,5 +34,4 @@ COPY . .
 
 EXPOSE 8000
 
-# Wait for MSSQL + create DB if needed, then start uvicorn
 CMD ["sh", "-c", "python wait-for-db.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]

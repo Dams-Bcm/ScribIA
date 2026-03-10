@@ -1,0 +1,11 @@
+== Idées à implémenter ==
+
+1. Bouton "Envoyer par email" sur les documents IA générés
+   - Endpoint backend POST /diarisation/{job_id}/documents/{doc_id}/send-email
+   - Utilise send_generic_email() existant (backend/app/services/email.py)
+   - Enrichir _send_email pour supporter les pièces jointes (MIMEApplication)
+   - Récupère les emails des participants de la réunion
+   - Bouton frontend à côté de chaque document généré avec dialog de confirmation des destinataires
+   - Header Reply-To avec l'email de l'utilisateur connecté (pas noreply@scribia.fr)
+     → Le destinataire qui clique "Répondre" écrit directement à l'utilisateur qui a envoyé le document
+     → msg["Reply-To"] = user_email

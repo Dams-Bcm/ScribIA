@@ -1,0 +1,33 @@
+# ============================================================================
+#  LiteLLM Proxy — Configuration
+#
+#  Point d'entrée unique pour tous les appels LLM.
+#  Les clients utilisent l'API OpenAI standard via http://litellm:4000/v1
+# ============================================================================
+
+model_list:
+  # ── Modèle par défaut (rapide) ──────────────────────────────────────────────
+  - model_name: "default"
+    litellm_params:
+      model: "ollama/llama3.1:8b"
+      api_base: "http://ollama:11434"
+
+  # ── Tous les modèles Ollama (wildcard) ──────────────────────────────────────
+  # Permet d'appeler n'importe quel modèle Ollama via ollama/<model_name>
+  - model_name: "ollama/*"
+    litellm_params:
+      model: "ollama/*"
+      api_base: "http://ollama:11434"
+
+litellm_settings:
+  drop_params: true          # ignore les paramètres non supportés par le provider
+  request_timeout: 600       # timeout global en secondes
+
+general_settings:
+  master_key: "sk-scribia-litellm"
+
+router_settings:
+  num_retries: 2
+  timeout: 600
+  allowed_fails: 3
+  cooldown_time: 30

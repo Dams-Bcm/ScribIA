@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup — Résultat diarisation (redesign v2)</title>
+<style>
+  :root {
+    --bg: #f8f9fb;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --text: #1a1a2e;
+    --muted: #6b7280;
+    --primary: #6d28d9;
+    --primary-light: #ede9fe;
+    --primary-fg: #ffffff;
+    --accent: #f3f4f6;
+    --green-bg: #ecfdf5;
+    --green-border: #86efac;
+    --green-text: #166534;
+    --amber-bg: #fef3c7;
+    --amber-text: #92400e;
+    --blue-bg: #eff6ff;
+    --blue-text: #1e40af;
+    --tab-active: var(--primary);
+    --tab-inactive: var(--muted);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+
+  .page { max-width: 1280px; margin: 0 auto; padding: 16px 20px; }
+
+  .back-btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+    border-radius: 8px; font-size: 13px; color: var(--muted); background: transparent;
+    border: none; cursor: pointer; margin-bottom: 12px;
+  }
+  .back-btn:hover { background: var(--accent); }
+
+  /* ── Header card ── */
+  .header-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px; margin-bottom: 12px;
+  }
+  .header-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .header-top h2 { font-size: 17px; font-weight: 600; }
+  .badge {
+    font-size: 11px; padding: 3px 8px; border-radius: 99px; display: inline-flex;
+    align-items: center; gap: 4px; white-space: nowrap;
+  }
+  .badge-speakers { background: var(--accent); color: var(--muted); }
+  .badge-consent { background: var(--green-bg); color: var(--green-text); border: 1px solid var(--green-border); }
+  .badge-oral { background: #fefce8; color: #854d0e; }
+  .badge-email { background: var(--blue-bg); color: var(--blue-text); }
+  .badge-conf { background: var(--primary-light); color: var(--primary); font-weight: 500; }
+  .filename { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .consent-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-left: auto;
+  }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex; gap: 0; border-bottom: 2px solid var(--border);
+    margin-bottom: 0;
+  }
+  .tab {
+    padding: 10px 18px; font-size: 13px; font-weight: 500; cursor: pointer;
+    border: none; background: none; color: var(--tab-inactive);
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    display: flex; align-items: center; gap: 6px;
+    transition: all .15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--tab-active); border-bottom-color: var(--tab-active); }
+  .tab .count {
+    font-size: 10px; background: var(--primary-light); color: var(--primary);
+    padding: 1px 6px; border-radius: 99px; font-weight: 600;
+  }
+
+  /* ── Tab panels ── */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Transcription panel ── */
+  .transcription-layout {
+    display: flex; gap: 16px; margin-top: 12px;
+  }
+
+  /* Speakers sidebar */
+  .speakers-panel {
+    width: 200px; flex-shrink: 0;
+  }
+  .speakers-panel h4 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); font-weight: 600; margin-bottom: 8px;
+  }
+  .speaker-card {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    border-radius: 8px; margin-bottom: 4px; cursor: pointer;
+    transition: background .15s;
+  }
+  .speaker-card:hover { background: var(--accent); }
+  .speaker-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .speaker-info { min-width: 0; }
+  .speaker-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .speaker-meta { font-size: 10px; color: var(--muted); }
+  .speaker-actions { margin-left: auto; display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+  .speaker-card:hover .speaker-actions { opacity: 1; }
+  .speaker-actions button {
+    background: none; border: none; cursor: pointer; color: var(--muted);
+    padding: 2px; border-radius: 4px;
+  }
+  .speaker-actions button:hover { background: var(--accent); color: var(--text); }
+
+  /* Segments */
+  .segments-panel {
+    flex: 1; min-width: 0;
+    max-height: calc(100vh - 260px);
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+  }
+
+  /* Toolbar inside segments panel */
+  .segments-toolbar {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--card); border-bottom: 1px solid var(--border);
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .toolbar-btn {
+    display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px;
+    font-size: 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--card); cursor: pointer; color: var(--text);
+    transition: all .15s;
+  }
+  .toolbar-btn:hover { background: var(--accent); }
+  .toolbar-btn.active { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+  .toolbar-btn.primary-outline {
+    border-color: var(--primary); color: var(--primary); background: var(--primary-light);
+    font-weight: 500;
+  }
+  .toolbar-btn.primary-outline:hover { background: var(--primary); color: var(--primary-fg); }
+  .toolbar-sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+  .toolbar-spacer { flex: 1; }
+
+  .segment {
+    display: flex; gap: 10px; padding: 10px 14px;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background .1s;
+  }
+  .segment:hover { background: #fafbfc; }
+  .segment:last-child { border-bottom: none; }
+  .seg-play {
+    flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+    border: none; background: transparent; cursor: pointer; color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 2px;
+  }
+  .seg-play:hover { background: var(--primary-light); color: var(--primary); }
+  .seg-body { flex: 1; min-width: 0; }
+  .seg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .seg-speaker {
+    font-size: 11px; font-weight: 600; padding: 1px 7px;
+    border-radius: 4px;
+  }
+  .seg-time { font-size: 11px; color: var(--muted); font-family: monospace; }
+  .seg-text { font-size: 13.5px; line-height: 1.6; color: var(--text); }
+
+  /* Speaker colors */
+  .spk-0 { background: #dbeafe; color: #1e40af; }
+  .spk-0-dot { background: #3b82f6; }
+  .spk-0-border { border-left: 3px solid #3b82f6; }
+  .spk-1 { background: #fef3c7; color: #92400e; }
+  .spk-1-dot { background: #f59e0b; }
+  .spk-1-border { border-left: 3px solid #f59e0b; }
+  .spk-2 { background: #dcfce7; color: #166534; }
+  .spk-2-dot { background: #22c55e; }
+  .spk-2-border { border-left: 3px solid #22c55e; }
+  .spk-3 { background: #fce7f3; color: #9d174d; }
+  .spk-3-dot { background: #ec4899; }
+  .spk-3-border { border-left: 3px solid #ec4899; }
+  .spk-4 { background: #fde2e2; color: #991b1b; }
+  .spk-4-dot { background: #ef4444; }
+  .spk-4-border { border-left: 3px solid #ef4444; }
+  .spk-5 { background: #e0e7ff; color: #3730a3; }
+  .spk-5-dot { background: #6366f1; }
+  .spk-5-border { border-left: 3px solid #6366f1; }
+
+  /* ── Documents IA panel ── */
+  .docs-layout {
+    display: flex; gap: 16px; margin-top: 12px;
+  }
+  .docs-list {
+    width: 320px; flex-shrink: 0;
+  }
+  .docs-list-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .docs-list-header h4 { font-size: 13px; font-weight: 600; }
+  .new-doc-btn {
+    display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px;
+    font-size: 12px; border-radius: 6px; border: none;
+    background: var(--primary); color: var(--primary-fg); cursor: pointer;
+    font-weight: 500;
+  }
+  .new-doc-btn:hover { opacity: .9; }
+
+  .doc-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 8px; cursor: pointer;
+    transition: all .15s;
+  }
+  .doc-card:hover { border-color: #c4b5fd; }
+  .doc-card.selected { border-color: var(--primary); background: var(--primary-light); }
+  .doc-card-top { display: flex; align-items: center; gap: 8px; }
+  .doc-icon { color: var(--muted); flex-shrink: 0; }
+  .doc-title { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .doc-status {
+    font-size: 10px; padding: 2px 7px; border-radius: 99px; white-space: nowrap;
+  }
+  .doc-status.done { background: #ecfdf5; color: #166534; }
+  .doc-status.gen { background: #fef3c7; color: #92400e; }
+  .doc-date { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .doc-delete {
+    padding: 2px; border: none; background: none; cursor: pointer;
+    color: var(--muted); border-radius: 4px;
+  }
+  .doc-delete:hover { background: #fde2e2; color: #dc2626; }
+
+  .doc-viewer {
+    flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 24px;
+    max-height: calc(100vh - 260px); overflow-y: auto;
+  }
+  .doc-viewer h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .doc-viewer .doc-meta { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+  .doc-viewer .doc-generating {
+    text-align: center; padding: 40px 0; color: var(--muted); font-size: 14px;
+  }
+  .doc-viewer .doc-content { font-size: 14px; line-height: 1.7; }
+  .doc-viewer .doc-content h4 { font-size: 14px; font-weight: 600; margin: 16px 0 6px; }
+  .doc-viewer .doc-content ul { padding-left: 20px; margin-bottom: 10px; }
+  .doc-viewer .doc-content li { margin-bottom: 4px; }
+  .doc-viewer .doc-empty {
+    text-align: center; padding: 60px 20px; color: var(--muted);
+  }
+  .doc-viewer .doc-empty svg { margin: 0 auto 10px; opacity: .4; }
+  .doc-viewer .doc-empty p { font-size: 13px; }
+
+  /* ── Participants tab ── */
+  .participants-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px; margin-top: 12px;
+  }
+  .participant-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .participant-name { font-size: 14px; font-weight: 600; }
+  .participant-email { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .participant-badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .transcription-layout, .docs-layout { flex-direction: column; }
+    .speakers-panel { width: 100%; display: flex; gap: 6px; flex-wrap: wrap; }
+    .speakers-panel h4 { width: 100%; }
+    .docs-list { width: 100%; }
+    .segments-panel { max-height: 60vh; }
+    .doc-viewer { max-height: 50vh; }
+  }
+
+  /* Annotation */
+  .annotation {
+    position: fixed; bottom: 16px; right: 16px; background: #fef3c7; border: 1px solid #fbbf24;
+    border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #92400e;
+    max-width: 400px; line-height: 1.5; box-shadow: 0 4px 12px rgba(0,0,0,.08); z-index: 100;
+  }
+  .annotation strong { font-weight: 600; }
+
+  /* Sparkle icon for the doc IA button */
+  .sparkle-icon {
+    display: inline-block; width: 12px; height: 12px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Pulse animation for the Documents IA shortcut button */
+  @keyframes gentle-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(109, 40, 217, 0); }
+    50% { box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.15); }
+  }
+  .toolbar-btn.primary-outline {
+    animation: gentle-pulse 2.5s ease-in-out infinite;
+  }
+  .toolbar-btn.primary-outline:hover {
+    animation: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <!-- Back -->
+  <button class="back-btn">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Retour
+  </button>
+
+  <!-- Header card -->
+  <div class="header-card">
+    <div class="header-top">
+      <h2>2026_10_37_audio</h2>
+      <span class="badge badge-speakers">
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        6 intervenants
+      </span>
+      <div class="consent-row">
+        <span class="badge badge-consent">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+          Consentement oral detecte
+        </span>
+        <span class="badge badge-oral">2 oral</span>
+        <span class="badge badge-email">1 email</span>
+        <span class="badge badge-conf">medium</span>
+      </div>
+    </div>
+    <p class="filename">2026_10_37_audio.weba</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('transcription', this)">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+      Transcription
+    </button>
+    <button class="tab" id="tab-documents" onclick="switchTab('documents', this)">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      Documents IA
+      <span class="count">1</span>
+    </button>
+    <button class="tab" onclick="switchTab('participants', this)">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      Participants
+    </button>
+  </div>
+
+  <!-- ════════ TAB: Transcription ════════ -->
+  <div id="panel-transcription" class="tab-panel active">
+    <div class="transcription-layout">
+      <!-- Speakers sidebar -->
+      <div class="speakers-panel">
+        <h4>Intervenants (6)</h4>
+
+        <div class="speaker-card">
+          <span class="speaker-dot spk-0-dot"></span>
+          <div class="speaker-info">
+            <div class="speaker-name">SPEAKER_02</div>
+            <div class="speaker-meta">110 seg. &middot; 7m19s</div>
+          </div>
+          <div class="speaker-actions">
+            <button title="Renommer">&#9998;</button>
+            <button title="Profil">&#128279;</button>
+          </div>
+        </div>
+
+        <div class="speaker-card">
+          <span class="speaker-dot spk-1-dot"></span>
+          <div class="speaker-info">
+            <div class="speaker-name">SPEAKER_04</div>
+            <div class="speaker-meta">131 seg. &middot; 12m57s</div>
+          </div>
+          <div class="speaker-actions">
+            <button title="Renommer">&#9998;</button>
+            <button title="Profil">&#128279;</button>
+          </div>
+        </div>
+
+        <div class="speaker-card">
+          <span class="speaker-dot spk-2-dot"></span>
+          <div class="speaker-info">
+            <div class="speaker-name">SPEAKER_01</div>
+            <div class="speaker-meta">94 seg. &middot; 5m49s</div>
+          </div>
+          <div class="speaker-actions">
+            <button title="Renommer">&#9998;</button>
+            <button title="Profil">&#128279;</button>
+          </div>
+        </div>
+
+        <div class="speaker-card">
+          <span class="speaker-dot spk-3-dot"></span>
+          <div class="speaker-info">
+            <div class="speaker-name">SPEAKER_03</div>
+            <div class="speaker-meta">17 seg. &middot; 0m51s</div>
+          </div>
+          <div class="speaker-actions">
+            <button title="Renommer">&#9998;</button>
+            <button title="Profil">&#128279;</button>
+          </div>
+        </div>
+
+        <div class="speaker-card">
+          <span class="speaker-dot spk-4-dot"></span>
+          <div class="speaker-info">
+            <div class="speaker-name">SPEAKER_00</div>
+            <div class="speaker-meta">16 seg. &middot; 0m29s</div>
+          </div>
+          <div class="speaker-actions">
+            <button title="Renommer">&#9998;</button>
+            <button title="Profil">&#128279;</button>
+          </div>
+        </div>
+
+        <div class="speaker-card">
+          <span class="speaker-dot spk-5-dot"></span>
+          <div class="speaker-info">
+            <div class="speaker-name">SPEAKER_UNKNOWN</div>
+            <div class="speaker-meta">3 seg. &middot; 0m07s</div>
+          </div>
+          <div class="speaker-actions">
+            <button title="Renommer">&#9998;</button>
+            <button title="Profil">&#128279;</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Segments -->
+      <div class="segments-panel">
+        <div class="segments-toolbar">
+          <button class="toolbar-btn">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            Copier
+          </button>
+          <button class="toolbar-btn">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+            Audio
+          </button>
+          <div class="toolbar-sep"></div>
+          <button class="toolbar-btn">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            TXT
+          </button>
+          <button class="toolbar-btn">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            SRT
+          </button>
+          <button class="toolbar-btn">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            VTT
+          </button>
+          <div class="toolbar-sep"></div>
+          <button class="toolbar-btn">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+            Dictionnaire
+          </button>
+          <button class="toolbar-btn">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+            Enrollment
+          </button>
+
+          <!-- Spacer pushes Documents IA button to the right -->
+          <div class="toolbar-spacer"></div>
+
+          <!-- Documents IA shortcut button -->
+          <button class="toolbar-btn primary-outline" onclick="switchTab('documents', document.getElementById('tab-documents'))">
+            <svg class="sparkle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"/>
+            </svg>
+            Documents IA
+            <span style="font-size:10px; background: var(--primary-light); color: var(--primary); padding: 1px 5px; border-radius: 99px; font-weight: 600;">1</span>
+          </button>
+        </div>
+
+        <!-- Sample segments -->
+        <div class="segment spk-1-border">
+          <button class="seg-play">&#9654;</button>
+          <div class="seg-body">
+            <div class="seg-header">
+              <span class="seg-speaker spk-1">SPEAKER_04</span>
+              <span class="seg-time">0:28</span>
+            </div>
+            <p class="seg-text">Quel connard.</p>
+          </div>
+        </div>
+
+        <div class="segment spk-0-border">
+          <button class="seg-play">&#9654;</button>
+          <div class="seg-body">
+            <div class="seg-header">
+              <span class="seg-speaker spk-0">SPEAKER_02</span>
+              <span class="seg-time">0:31</span>
+            </div>
+            <p class="seg-text">Allez, c'est le Bon ok, note a moi-meme. Ah non, t'es un connard.</p>
+          </div>
+        </div>
+
+        <div class="segment spk-1-border">
+          <button class="seg-play">&#9654;</button>
+          <div class="seg-body">
+            <div class="seg-header">
+              <span class="seg-speaker spk-1">SPEAKER_04</span>
+              <span class="seg-time">0:41</span>
+            </div>
+            <p class="seg-text">Bien, il y avait plusieurs points a avoir.</p>
+          </div>
+        </div>
+
+        <div class="segment spk-1-border">
+          <button class="seg-play">&#9654;</button>
+          <div class="seg-body">
+            <div class="seg-header">
+              <span class="seg-speaker spk-1">SPEAKER_04</span>
+              <span class="seg-time">0:45</span>
+            </div>
+            <p class="seg-text">Premier point, pour moi, il y a Thomas.</p>
+          </div>
+        </div>
+
+        <div class="segment spk-1-border">
+          <button class="seg-play">&#9654;</button>
+          <div class="seg-body">
+            <div class="seg-header">
+              <span class="seg-speaker spk-1">SPEAKER_04</span>
+              <span class="seg-time">0:52</span>
+            </div>
+            <p class="seg-text">Premier point, Thomas.</p>
+          </div>
+        </div>
+
+        <div class="segment spk-1-border">
+          <button class="seg-play">&#9654;</button>
+          <div class="seg-body">
+            <div class="seg-header">
+              <span class="seg-speaker spk-1">SPEAKER_04</span>
+              <span class="seg-time">0:54</span>
+            </div>
+            <p class="seg-text">Je ne sais pas comment il va faire le test.</p>
+          </div>
+        </div>
+
+        <div class="segment spk-2-border">
+          <button class="seg-play">&#9654;</button>
+          <div class="seg-body">
+            <div class="seg-header">
+              <span class="seg-speaker spk-2">SPEAKER_01</span>
+              <span class="seg-time">0:57</span>
+            </div>
+            <p class="seg-text">Comme ca, c'est un venu.</p>
+          </div>
+        </div>
+
+        <div class="segment spk-1-border">
+          <button class="seg-play">&#9654;</button>
+          <div class="seg-body">
+            <div class="seg-header">
+              <span class="seg-speaker spk-1">SPEAKER_04</span>
+              <span class="seg-time">1:00</span>
+            </div>
+            <p class="seg-text">RGPD. J'appelle Thomas.</p>
+          </div>
+        </div>
+
+        <div class="segment spk-1-border">
+          <button class="seg-play">&#9654;</button>
+          <div class="seg-body">
+            <div class="seg-header">
+              <span class="seg-speaker spk-1">SPEAKER_04</span>
+              <span class="seg-time">1:04</span>
+            </div>
+            <p class="seg-text">Thomas, bon la, pour moi, il y en a Est-ce qu'il y en a un ? Oui, il y en a une. C'est pour moi la voiture.</p>
+          </div>
+        </div>
+
+        <div class="segment spk-1-border">
+          <button class="seg-play">&#9654;</button>
+          <div class="seg-body">
+            <div class="seg-header">
+              <span class="seg-speaker spk-1">SPEAKER_04</span>
+              <span class="seg-time">1:11</span>
+            </div>
+            <p class="seg-text">Ok. Qu'est-ce qu'on dessine ? De reste, je n'attends pas trop de problemes parce qu'au final, il fait un teletravail mercredi.</p>
+          </div>
+        </div>
+
+        <div class="segment spk-0-border">
+          <button class="seg-play">&#9654;</button>
+          <div class="seg-body">
+            <div class="seg-header">
+              <span class="seg-speaker spk-0">SPEAKER_02</span>
+              <span class="seg-time">1:19</span>
+            </div>
+            <p class="seg-text">Je ne sais pas si c'est grave. Moi, teletravail, je pense que ca serait cool de lui demander a la limite. Moi, ca ne me derange pas de lui filer une journee. Mais plus le style de vendredi ou comme ca. Que ca ne coupe pas la semaine.</p>
+          </div>
+        </div>
+
+        <div class="segment spk-2-border">
+          <button class="seg-play">&#9654;</button>
+          <div class="seg-body">
+            <div class="seg-header">
+              <span class="seg-speaker spk-2">SPEAKER_01</span>
+              <span class="seg-time">1:36</span>
+            </div>
+            <p class="seg-text">Mais apres, si on le prend sur le truc perso, a la base, c'est justement pour couper la semaine.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ TAB: Documents IA ════════ -->
+  <div id="panel-documents" class="tab-panel">
+    <div class="docs-layout">
+      <!-- Documents list -->
+      <div class="docs-list">
+        <div class="docs-list-header">
+          <h4>Documents</h4>
+          <button class="new-doc-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"/>
+            </svg>
+            Nouveau document
+          </button>
+        </div>
+
+        <div class="doc-card selected">
+          <div class="doc-card-top">
+            <svg class="doc-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+            <span class="doc-title">2026_10_37_audio</span>
+            <span class="doc-status gen">En cours...</span>
+          </div>
+          <div class="doc-date">09/03/2026</div>
+        </div>
+
+        <div class="doc-card">
+          <div class="doc-card-top">
+            <svg class="doc-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+            <span class="doc-title">Synthese rapide</span>
+            <span class="doc-status done">Termine</span>
+          </div>
+          <div class="doc-date">09/03/2026</div>
+        </div>
+      </div>
+
+      <!-- Document viewer -->
+      <div class="doc-viewer">
+        <h3>2026_10_37_audio</h3>
+        <p class="doc-meta">Cree le 09 mars 2026</p>
+        <div class="doc-generating">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="animation: spin 1s linear infinite; display: inline-block;"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+          <p style="margin-top: 8px;">Generation en cours...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ TAB: Participants ════════ -->
+  <div id="panel-participants" class="tab-panel">
+    <div class="participants-grid">
+      <div class="participant-card">
+        <div class="participant-name">Thomas Dupont</div>
+        <div class="participant-email">thomas.dupont@exemple.fr</div>
+        <div class="participant-badges">
+          <span class="badge badge-oral">Consentement oral</span>
+          <span class="badge badge-consent">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+            Enregistre
+          </span>
+        </div>
+      </div>
+      <div class="participant-card">
+        <div class="participant-name">Marie Martin</div>
+        <div class="participant-email">marie.martin@exemple.fr</div>
+        <div class="participant-badges">
+          <span class="badge badge-email">Consentement email</span>
+          <span class="badge badge-consent">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+            Accepte
+          </span>
+        </div>
+      </div>
+      <div class="participant-card">
+        <div class="participant-name">Pierre Leroy</div>
+        <div class="participant-email">pierre.leroy@exemple.fr</div>
+        <div class="participant-badges">
+          <span class="badge badge-oral">Consentement oral</span>
+        </div>
+      </div>
+      <div class="participant-card">
+        <div class="participant-name">Sophie Bernard</div>
+        <div class="participant-email">&mdash;</div>
+        <div class="participant-badges">
+          <span class="badge" style="background: #fee2e2; color: #991b1b;">En attente</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Annotation -->
+<div class="annotation">
+  <strong>v2 - Changements :</strong><br>
+  &#10102; Bouton <b>&laquo; Documents IA &raquo;</b> dans la toolbar transcription (a droite, style violet outline + badge compteur) &rarr; bascule directement sur l'onglet Documents IA<br>
+  &#10103; Pulse subtil sur le bouton pour attirer l'attention<br>
+  &#10104; Les 3 onglets restent en place pour la navigation principale<br>
+  &#10105; Double acces : onglet OU bouton toolbar
+</div>
+
+<script>
+function switchTab(name, tabEl) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  if (tabEl) tabEl.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ScribIA — Mockup Templates Email</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 40px 20px;
+    }
+
+    .page-header {
+      max-width: 1100px;
+      margin: 0 auto 48px;
+      text-align: center;
+    }
+    .page-header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 8px;
+    }
+    .page-header p { color: #94a3b8; font-size: 15px; }
+
+    .email-section {
+      max-width: 680px;
+      margin: 0 auto 56px;
+    }
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .section-label .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+
+    /* ── Email preview frame ── */
+    .email-frame {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .email-topbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: #0f172a;
+      border-bottom: 1px solid #334155;
+    }
+    .email-topbar .dots {
+      display: flex; gap: 6px;
+    }
+    .email-topbar .dots span {
+      width: 10px; height: 10px; border-radius: 50%; background: #334155;
+    }
+    .email-topbar .subject {
+      flex: 1; text-align: center;
+      font-size: 12px; color: #64748b; font-weight: 500;
+    }
+
+    /* ── The actual email card (what the recipient sees) ── */
+    .email-body {
+      background: #f0f2f5;
+      padding: 32px 24px;
+    }
+    .email-card {
+      max-width: 580px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    /* Accent top bar */
+    .accent-bar {
+      height: 4px;
+      background: linear-gradient(90deg, #2563eb, #7c3aed);
+    }
+
+    .card-inner {
+      padding: 28px 40px 24px;
+    }
+
+    /* Logo row */
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: #2563eb;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 18px; font-weight: 700;
+    }
+    .logo-text {
+      font-size: 20px; font-weight: 700; color: #1f2937;
+      letter-spacing: -0.3px;
+    }
+
+    .divider {
+      height: 1px;
+      background: #e5e7eb;
+      margin: 0 0 24px;
+    }
+
+    /* Title with SVG icon */
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .title-icon {
+      width: 42px; height: 42px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .title-icon svg {
+      width: 22px; height: 22px;
+    }
+    .title-icon.consent { background: #eff6ff; }
+    .title-icon.consent svg { color: #2563eb; }
+    .title-icon.withdrawal { background: #f0fdf4; }
+    .title-icon.withdrawal svg { color: #16a34a; }
+    .title-icon.generic { background: #fef3c7; }
+    .title-icon.generic svg { color: #d97706; }
+    .title-icon.invite { background: #f5f3ff; }
+    .title-icon.invite svg { color: #7c3aed; }
+
+    .title-text {
+      font-size: 18px; font-weight: 700; color: #1f2937;
+    }
+
+    /* Body text */
+    .email-text {
+      color: #374151;
+      font-size: 15px;
+      line-height: 26px;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .email-text p {
+      margin: 0 0 14px;
+    }
+    .email-text strong {
+      color: #1f2937;
+    }
+
+    /* Info box */
+    .info-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: #475569;
+      line-height: 20px;
+      margin: 20px 0 0;
+    }
+    .info-box.success {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+      color: #166534;
+    }
+    .info-box strong {
+      color: #334155;
+      font-weight: 600;
+    }
+    .info-box.success strong {
+      color: #166534;
+    }
+
+    /* Buttons */
+    .btn-row {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 36px;
+      text-decoration: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: Arial, sans-serif;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-accept {
+      background: #16a34a;
+      color: #ffffff;
+      border: none;
+    }
+    .btn-refuse {
+      background: #ffffff;
+      color: #6b7280;
+      border: 1px solid #d1d5db;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: #ffffff;
+      border: none;
+    }
+
+    /* Footer */
+    .email-footer {
+      border-top: 1px solid #e5e7eb;
+      padding: 16px 40px 0;
+      margin-top: 28px;
+    }
+    .email-footer p {
+      font-size: 12px;
+      color: #9ca3af;
+      line-height: 18px;
+      margin: 0 0 8px;
+    }
+    .email-footer a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+
+    /* ── Design notes ── */
+    .notes {
+      max-width: 680px;
+      margin: 56px auto 0;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 28px 32px;
+    }
+    .notes h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f8fafc;
+      margin-bottom: 16px;
+    }
+    .notes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .note-item {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .note-item .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+    .note-item .value {
+      font-size: 13px;
+      color: #e2e8f0;
+      line-height: 1.5;
+    }
+    .note-item .before {
+      color: #ef4444;
+      text-decoration: line-through;
+      margin-right: 8px;
+    }
+    .note-item .after {
+      color: #22c55e;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .card-inner { padding: 24px 20px 20px; }
+      .email-footer { padding: 16px 20px 0; }
+      .notes-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Page header ── -->
+  <div class="page-header">
+    <h1>ScribIA — Templates Email</h1>
+    <p>Mockup des 4 templates email &mdash; Design moderne sans emojis</p>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- EMAIL 1 : Demande de consentement -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <div class="email-section">
+    <div class="section-label">
+      <span class="dot" style="background:#2563eb;"></span>
+      1. Demande de consentement
+    </div>
+
+    <div class="email-frame">
+      <div class="email-topbar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="subject">Demande de consentement &mdash; Administration</div>
+      </div>
+
+      <div class="email-body">
+        <div class="email-card">
+          <div class="accent-bar"></div>
+          <div class="card-inner">
+
+            <!-- Logo -->
+            <div class="logo-row">
+              <div class="logo-icon">S</div>
+              <span class="logo-text">ScribIA</span>
+            </div>
+            <div class="divider"></div>
+
+            <!-- Title -->
+            <div class="title-row">
+              <div class="title-icon consent">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <path d="m9 12 2 2 4-4"/>
+                </svg>
+              </div>
+              <span class="title-text">Demande de consentement</span>
+            </div>
+
+            <!-- Content -->
+            <div class="email-text">
+              <p>Bonjour <strong>Caumont</strong>,</p>
+              <p>
+                Dans le cadre d'une r&eacute;union organis&eacute;e par <strong>Administration</strong>,
+                nous souhaitons proc&eacute;der &agrave; un enregistrement audio &agrave; des fins de
+                transcription et de g&eacute;n&eacute;ration de comptes rendus.
+              </p>
+              <p>
+                Conform&eacute;ment au RGPD, nous avons besoin de votre <strong>consentement
+                explicite</strong> avant de proc&eacute;der.
+              </p>
+
+              <div class="info-box">
+                <strong>Ce que cela implique :</strong><br/>
+                Votre voix sera enregistr&eacute;e, transcrite puis utilis&eacute;e pour g&eacute;n&eacute;rer
+                un compte rendu. Vous pouvez retirer votre consentement &agrave; tout moment.
+              </div>
+
+              <div class="btn-row">
+                <a href="#" class="btn btn-accept">Accepter</a>
+                <a href="#" class="btn btn-refuse">Refuser</a>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="email-footer">
+              <p>
+                Vous pouvez retirer votre consentement &agrave; tout moment via le lien
+                qui vous sera communiqu&eacute; apr&egrave;s acceptation.
+              </p>
+              <p>
+                Ce message a &eacute;t&eacute; envoy&eacute; par ScribIA. Si vous n'&ecirc;tes pas concern&eacute;(e),
+                vous pouvez ignorer cet email.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- EMAIL 2 : Confirmation de retrait -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <div class="email-section">
+    <div class="section-label">
+      <span class="dot" style="background:#16a34a;"></span>
+      2. Confirmation de retrait
+    </div>
+
+    <div class="email-frame">
+      <div class="email-topbar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="subject">Confirmation de retrait de consentement &mdash; ScribIA</div>
+      </div>
+
+      <div class="email-body">
+        <div class="email-card">
+          <div class="accent-bar"></div>
+          <div class="card-inner">
+
+            <div class="logo-row">
+              <div class="logo-icon">S</div>
+              <span class="logo-text">ScribIA</span>
+            </div>
+            <div class="divider"></div>
+
+            <div class="title-row">
+              <div class="title-icon withdrawal">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="m9 12 2 2 4-4"/>
+                </svg>
+              </div>
+              <span class="title-text">Retrait confirm&eacute;</span>
+            </div>
+
+            <div class="email-text">
+              <p>Bonjour <strong>Caumont</strong>,</p>
+              <p>
+                Votre retrait de consentement a bien &eacute;t&eacute; enregistr&eacute;.
+              </p>
+              <p>
+                Vos donn&eacute;es vocales associ&eacute;es ont &eacute;t&eacute; <strong>supprim&eacute;es ou
+                anonymis&eacute;es</strong> conform&eacute;ment &agrave; notre politique de protection des donn&eacute;es.
+              </p>
+
+              <div class="info-box success">
+                <strong>Aucune action requise de votre part.</strong><br/>
+                Ce message est une simple confirmation. Vous n'avez rien d'autre &agrave; faire.
+              </div>
+            </div>
+
+            <div class="email-footer">
+              <p>
+                Si vous n'&ecirc;tes pas &agrave; l'origine de cette demande,
+                contactez votre administrateur.
+              </p>
+              <p>
+                Ce message a &eacute;t&eacute; envoy&eacute; par ScribIA. Si vous n'&ecirc;tes pas concern&eacute;(e),
+                vous pouvez ignorer cet email.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- EMAIL 3 : Email générique / notification -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <div class="email-section">
+    <div class="section-label">
+      <span class="dot" style="background:#d97706;"></span>
+      3. Email g&eacute;n&eacute;rique (notification / proc&eacute;dure)
+    </div>
+
+    <div class="email-frame">
+      <div class="email-topbar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="subject">Nouvelle t&acirc;che assign&eacute;e &mdash; ScribIA</div>
+      </div>
+
+      <div class="email-body">
+        <div class="email-card">
+          <div class="accent-bar"></div>
+          <div class="card-inner">
+
+            <div class="logo-row">
+              <div class="logo-icon">S</div>
+              <span class="logo-text">ScribIA</span>
+            </div>
+            <div class="divider"></div>
+
+            <div class="title-row">
+              <div class="title-icon generic">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+                </svg>
+              </div>
+              <span class="title-text">Nouvelle notification</span>
+            </div>
+
+            <div class="email-text">
+              <p>Bonjour <strong>Jean Dupont</strong>,</p>
+              <p>
+                Une nouvelle t&acirc;che vous a &eacute;t&eacute; assign&eacute;e dans le cadre de la proc&eacute;dure
+                <strong>&laquo; Compte rendu r&eacute;union du 8 mars &raquo;</strong>.
+              </p>
+              <p>
+                Veuillez consulter les d&eacute;tails et effectuer les actions n&eacute;cessaires
+                en cliquant sur le bouton ci-dessous.
+              </p>
+
+              <div class="btn-row">
+                <a href="#" class="btn btn-primary">Voir la t&acirc;che</a>
+              </div>
+            </div>
+
+            <div class="email-footer">
+              <p>
+                Ce message a &eacute;t&eacute; envoy&eacute; par ScribIA. Si vous n'&ecirc;tes pas concern&eacute;(e),
+                vous pouvez ignorer cet email.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- EMAIL 4 : Invitation à une réunion planifiée -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <div class="email-section">
+    <div class="section-label">
+      <span class="dot" style="background:#7c3aed;"></span>
+      4. Invitation r&eacute;union planifi&eacute;e
+    </div>
+
+    <div class="email-frame">
+      <div class="email-topbar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="subject">Invitation &mdash; R&eacute;union du 12 mars 2026</div>
+      </div>
+
+      <div class="email-body">
+        <div class="email-card">
+          <div class="accent-bar"></div>
+          <div class="card-inner">
+
+            <div class="logo-row">
+              <div class="logo-icon">S</div>
+              <span class="logo-text">ScribIA</span>
+            </div>
+            <div class="divider"></div>
+
+            <div class="title-row">
+              <div class="title-icon invite">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              </div>
+              <span class="title-text">Invitation &agrave; une r&eacute;union</span>
+            </div>
+
+            <div class="email-text">
+              <p>Bonjour <strong>Marie Martin</strong>,</p>
+              <p>
+                Vous &ecirc;tes invit&eacute;(e) &agrave; participer &agrave; la r&eacute;union suivante :
+              </p>
+
+              <!-- Meeting details card -->
+              <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:18px 20px; margin:16px 0 0;">
+                <table style="width:100%; font-size:14px; color:#374151;" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding:4px 0; vertical-align:top; width:24px;">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                    </td>
+                    <td style="padding:4px 0 4px 8px;">
+                      <strong style="color:#1f2937;">R&eacute;union budget Q2 2026</strong>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:4px 0; vertical-align:top; width:24px;">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </td>
+                    <td style="padding:4px 0 4px 8px;">
+                      Mercredi 12 mars 2026 &mdash; 14h00 &agrave; 15h30
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:4px 0; vertical-align:top; width:24px;">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                    </td>
+                    <td style="padding:4px 0 4px 8px;">
+                      Salle de conf&eacute;rence A3
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:4px 0; vertical-align:top; width:24px;">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </td>
+                    <td style="padding:4px 0 4px 8px;">
+                      Organis&eacute;e par <strong style="color:#1f2937;">Administration</strong>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <div class="info-box" style="margin-top:16px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline; vertical-align:-2px; margin-right:4px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                Cette r&eacute;union sera enregistr&eacute;e &agrave; des fins de transcription.
+                Un consentement RGPD vous sera demand&eacute; s&eacute;par&eacute;ment.
+              </div>
+
+              <div class="btn-row">
+                <a href="#" class="btn btn-primary" style="background:#7c3aed;">Confirmer ma pr&eacute;sence</a>
+                <a href="#" class="btn btn-refuse">D&eacute;cliner</a>
+              </div>
+            </div>
+
+            <div class="email-footer">
+              <p>
+                Ce message a &eacute;t&eacute; envoy&eacute; par ScribIA. Si vous n'&ecirc;tes pas concern&eacute;(e),
+                vous pouvez ignorer cet email.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- DESIGN NOTES -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <div class="notes">
+    <h3>Notes de design</h3>
+    <div class="notes-grid">
+      <div class="note-item">
+        <div class="label">Ic&ocirc;nes</div>
+        <div class="value">
+          <span class="before">Emojis HTML (&#128274; &#9989; &#9889;)</span><br/>
+          <span class="after">SVG inline dans un carr&eacute; color&eacute; &mdash; rendu identique sur tous les clients email</span>
+        </div>
+      </div>
+      <div class="note-item">
+        <div class="label">Boutons</div>
+        <div class="value">
+          <span class="after">Border-radius: 8px (au lieu de 6px), font-weight: 600, padding plus g&eacute;n&eacute;reux</span>
+        </div>
+      </div>
+      <div class="note-item">
+        <div class="label">Couleurs par type</div>
+        <div class="value">
+          <span style="color:#60a5fa;">&#9679;</span> Consentement : bleu (#2563eb)<br/>
+          <span style="color:#4ade80;">&#9679;</span> Retrait : vert (#16a34a)<br/>
+          <span style="color:#fbbf24;">&#9679;</span> Notification : ambre (#d97706)<br/>
+          <span style="color:#a78bfa;">&#9679;</span> Invitation : violet (#7c3aed)
+        </div>
+      </div>
+      <div class="note-item">
+        <div class="label">Compatibilit&eacute;</div>
+        <div class="value">
+          SVG inline fonctionne sur Gmail, Apple Mail, Outlook web. Pour Outlook desktop, fallback VML existant reste en place. Les emojis sont simplement remplac&eacute;s.
+        </div>
+      </div>
+      <div class="note-item">
+        <div class="label">Template de base</div>
+        <div class="value">
+          Structure identique conserv&eacute;e : accent bar gradient + logo S + divider + icon titre + body + footer. Seul le param&egrave;tre <code style="background:#1e293b;padding:2px 6px;border-radius:3px;font-size:12px;">icon</code> passe de string emoji &agrave; SVG string.
+        </div>
+      </div>
+      <div class="note-item">
+        <div class="label">Nouveau template</div>
+        <div class="value">
+          <span class="after">Ajout d'un template &laquo; Invitation r&eacute;union &raquo; avec d&eacute;tails structur&eacute;s (nom, date, lieu, organisateur) dans un bloc info</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

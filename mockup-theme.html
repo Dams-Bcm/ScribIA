@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scrib' IA — Blur Admin Theme Mockup</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #e4e9f2;
+      background: linear-gradient(135deg, #1a2138 0%, #151a30 50%, #0d1117 100%);
+      background-attachment: fixed;
+      min-height: 100vh;
+    }
+
+    /* ── Variables ─────────────────────────────────────────────────── */
+    :root {
+      --bg-glass: rgba(36, 48, 77, 0.55);
+      --bg-sidebar: rgba(22, 30, 52, 0.85);
+      --bg-input: rgba(22, 30, 52, 0.6);
+      --border: rgba(101, 117, 148, 0.25);
+      --border-light: rgba(101, 117, 148, 0.15);
+      --text-primary: #e4e9f2;
+      --text-muted: #8f9bb3;
+      --accent: #7659ff;
+      --accent-hover: #6043e0;
+      --accent-glow: rgba(118, 89, 255, 0.3);
+      --accent-subtle: rgba(115, 92, 255, 0.15);
+      --danger: #ff3d71;
+      --success: #00d68f;
+      --warning: #ffaa00;
+      --info: #0095ff;
+      --radius: 0.75rem;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────── */
+    .app { display: flex; min-height: 100vh; }
+
+    /* ── Sidebar ───────────────────────────────────────────────────── */
+    .sidebar {
+      width: 240px;
+      background: var(--bg-sidebar);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-right: 1px solid var(--border-light);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 40;
+    }
+
+    .sidebar-brand {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border-light);
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .sidebar-brand span { color: var(--accent); }
+
+    .sidebar-nav { flex: 1; padding: 1rem 0.75rem; overflow-y: auto; }
+
+    .nav-section {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      padding: 0.5rem 0.75rem 0.25rem;
+      margin-top: 0.75rem;
+    }
+    .nav-section:first-child { margin-top: 0; }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+    }
+    .nav-item:hover {
+      background: var(--accent-subtle);
+      color: #c5bfff;
+    }
+    .nav-item.active {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+      color: #fff;
+      box-shadow: 0 2px 12px var(--accent-glow);
+    }
+
+    .nav-icon { width: 18px; height: 18px; opacity: 0.8; }
+    .nav-item.active .nav-icon { opacity: 1; }
+
+    .sidebar-footer {
+      padding: 1rem;
+      border-top: 1px solid var(--border-light);
+    }
+    .sidebar-user { font-size: 0.875rem; font-weight: 500; padding: 0 0.5rem; }
+    .sidebar-role { font-size: 0.75rem; color: var(--text-muted); padding: 0 0.5rem; margin-bottom: 0.5rem; }
+
+    /* ── Main ───────────────────────────────────────────────────────── */
+    .main {
+      flex: 1;
+      margin-left: 240px;
+      padding: 2rem;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Cards ──────────────────────────────────────────────────────── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      transition: box-shadow 0.2s;
+    }
+    .card:hover {
+      box-shadow: 0 4px 20px rgba(118, 89, 255, 0.1);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+    .card-label { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
+    .card-icon {
+      width: 36px; height: 36px;
+      border-radius: 0.5rem;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+    }
+    .card-icon.purple { background: var(--accent-subtle); color: #c5bfff; }
+    .card-icon.blue { background: rgba(0, 149, 255, 0.15); color: #66bbff; }
+    .card-icon.green { background: rgba(0, 214, 143, 0.15); color: #00d68f; }
+    .card-icon.orange { background: rgba(255, 170, 0, 0.15); color: #ffaa00; }
+
+    .card-value { font-size: 1.75rem; font-weight: 700; }
+    .card-trend { font-size: 0.75rem; margin-top: 0.25rem; }
+    .card-trend.up { color: var(--success); }
+    .card-trend.down { color: var(--danger); }
+
+    /* ── Table ──────────────────────────────────────────────────────── */
+    .table-card {
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+    .table-card-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left;
+      padding: 0.75rem 1.25rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      background: rgba(36, 48, 77, 0.6);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 0.75rem 1.25rem;
+      font-size: 0.875rem;
+      border-bottom: 1px solid var(--border-light);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(118, 89, 255, 0.04); }
+
+    /* ── Badges ─────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+    .badge.success { background: rgba(0, 214, 143, 0.15); color: #00d68f; }
+    .badge.warning { background: rgba(255, 170, 0, 0.15); color: #ffaa00; }
+    .badge.danger  { background: rgba(255, 61, 113, 0.15); color: #ff3d71; }
+    .badge.info    { background: rgba(0, 149, 255, 0.15); color: #66bbff; }
+    .badge.neutral { background: rgba(101, 117, 148, 0.2); color: var(--text-muted); }
+
+    /* ── Buttons ────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+      color: #fff;
+      box-shadow: 0 2px 8px var(--accent-glow);
+    }
+    .btn-primary:hover { box-shadow: 0 4px 16px var(--accent-glow); }
+    .btn-outline {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { background: var(--accent-subtle); color: #c5bfff; border-color: rgba(118, 89, 255, 0.3); }
+
+    /* ── Inputs ─────────────────────────────────────────────────────── */
+    .input, .select {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg-input);
+      border: 1px solid rgba(101, 117, 148, 0.3);
+      border-radius: 0.5rem;
+      color: var(--text-primary);
+      font-size: 0.875rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .input:focus, .select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(118, 89, 255, 0.15);
+    }
+    .input::placeholder { color: #596882; }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); margin-bottom: 0.35rem; }
+
+    /* ── Chart placeholder ──────────────────────────────────────────── */
+    .chart-area {
+      height: 180px;
+      background: linear-gradient(180deg, rgba(118, 89, 255, 0.08) 0%, transparent 100%);
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      padding: 1rem;
+    }
+    .chart-bar {
+      flex: 1;
+      background: linear-gradient(180deg, var(--accent), var(--accent-hover));
+      border-radius: 4px 4px 0 0;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
+    .chart-bar:hover { opacity: 1; }
+
+    /* ── Two-col layout ─────────────────────────────────────────────── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 2rem; }
+
+    /* ── Scrollbar ──────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(101, 117, 148, 0.3); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(101, 117, 148, 0.5); }
+
+    /* ── SVG icons ──────────────────────────────────────────────────── */
+    svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+      .cards-grid { grid-template-columns: 1fr; }
+      .two-col { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- ── Sidebar ──────────────────────────────────────────────── -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">Scrib' <span>IA</span></div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">General</div>
+        <a class="nav-item active" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Tableau de bord
+        </a>
+
+        <div class="nav-section">Modules</div>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+          Transcription
+        </a>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          T + Diarisation
+        </a>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Phases prep.
+        </a>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          RGPD
+        </a>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 3l1.5 4.5H18l-3.6 2.7 1.4 4.3L12 12l-3.8 2.5 1.4-4.3L6 7.5h4.5z"/></svg>
+          Documents IA
+        </a>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+          Procedures
+        </a>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Contacts
+        </a>
+
+        <div class="nav-section">Administration</div>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          Tenants
+        </a>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          Utilisateurs
+        </a>
+        <a class="nav-item" href="#">
+          <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Gestion IA
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user">David Caumont</div>
+        <div class="sidebar-role">super_admin</div>
+        <a class="nav-item" href="#" style="margin-top: 0.5rem;">
+          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Deconnexion
+        </a>
+      </div>
+    </aside>
+
+    <!-- ── Main Content ────────────────────────────────────────────── -->
+    <main class="main">
+      <h1 class="page-title">Tableau de bord</h1>
+
+      <!-- KPI Cards -->
+      <div class="cards-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-label">Transcriptions</span>
+            <div class="card-icon purple">&#x1F399;</div>
+          </div>
+          <div class="card-value">247</div>
+          <div class="card-trend up">+12% ce mois</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-label">Documents IA</span>
+            <div class="card-icon blue">&#x1F4C4;</div>
+          </div>
+          <div class="card-value">83</div>
+          <div class="card-trend up">+8% ce mois</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-label">Contacts</span>
+            <div class="card-icon green">&#x1F465;</div>
+          </div>
+          <div class="card-value">1 204</div>
+          <div class="card-trend up">+5%</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-label">Procedures actives</span>
+            <div class="card-icon orange">&#x1F4CB;</div>
+          </div>
+          <div class="card-value">19</div>
+          <div class="card-trend down">-2 cette semaine</div>
+        </div>
+      </div>
+
+      <!-- Two-col: Chart + Form -->
+      <div class="two-col">
+        <!-- Chart Card -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-label">Activite hebdomadaire</span>
+            <div>
+              <button class="btn btn-outline" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">7 jours</button>
+            </div>
+          </div>
+          <div class="chart-area">
+            <div class="chart-bar" style="height: 40%"></div>
+            <div class="chart-bar" style="height: 65%"></div>
+            <div class="chart-bar" style="height: 50%"></div>
+            <div class="chart-bar" style="height: 80%"></div>
+            <div class="chart-bar" style="height: 45%"></div>
+            <div class="chart-bar" style="height: 90%"></div>
+            <div class="chart-bar" style="height: 70%"></div>
+            <div class="chart-bar" style="height: 55%"></div>
+            <div class="chart-bar" style="height: 85%"></div>
+            <div class="chart-bar" style="height: 60%"></div>
+            <div class="chart-bar" style="height: 75%"></div>
+            <div class="chart-bar" style="height: 95%"></div>
+          </div>
+        </div>
+
+        <!-- Form Card -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-label">Nouvelle transcription</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fichier audio</label>
+            <input type="text" class="input" placeholder="Choisir un fichier..." />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Langue</label>
+            <select class="select">
+              <option>Francais</option>
+              <option>Anglais</option>
+              <option>Espagnol</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Modele Whisper</label>
+            <select class="select">
+              <option>large-v3</option>
+              <option>medium</option>
+              <option>small</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 0.75rem; margin-top: 1.25rem;">
+            <button class="btn btn-primary">Transcrire</button>
+            <button class="btn btn-outline">Annuler</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-card">
+        <div class="table-card-header">Transcriptions recentes</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th>Date</th>
+              <th>Duree</th>
+              <th>Statut</th>
+              <th>Locuteurs</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Reunion equipe projet</td>
+              <td>06/03/2026</td>
+              <td>42 min</td>
+              <td><span class="badge success">Termine</span></td>
+              <td>4</td>
+            </tr>
+            <tr>
+              <td>Entretien M. Dupont</td>
+              <td>05/03/2026</td>
+              <td>28 min</td>
+              <td><span class="badge success">Termine</span></td>
+              <td>2</td>
+            </tr>
+            <tr>
+              <td>Commission budgetaire</td>
+              <td>05/03/2026</td>
+              <td>1h 15min</td>
+              <td><span class="badge warning">En cours</span></td>
+              <td>8</td>
+            </tr>
+            <tr>
+              <td>Conseil municipal</td>
+              <td>04/03/2026</td>
+              <td>2h 30min</td>
+              <td><span class="badge info">En attente</span></td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td>Appel telephonique</td>
+              <td>04/03/2026</td>
+              <td>12 min</td>
+              <td><span class="badge danger">Erreur</span></td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td>Reunion de service</td>
+              <td>03/03/2026</td>
+              <td>55 min</td>
+              <td><span class="badge success">Termine</span></td>
+              <td>6</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

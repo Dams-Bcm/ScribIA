@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -8,24 +8,42 @@ import { useCurrentUser, useLogout } from "./api/hooks/useAuth";
 import { RequireAuth } from "./components/RequireAuth";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/LoginPage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { PrivacyPage } from "./pages/PrivacyPage";
+
+// Lazy-loaded pages (code splitting)
+const DashboardPage = lazy(() => import("./pages/DashboardPage").then(m => ({ default: m.DashboardPage })));
+const PrivacyPage = lazy(() => import("./pages/PrivacyPage").then(m => ({ default: m.PrivacyPage })));
 
 // Module pages
-import { TranscriptionPage } from "./pages/modules/TranscriptionPage";
-import { TranscriptionDiarisationPage } from "./pages/modules/TranscriptionDiarisationPage";
-import { LegalCompliancePage } from "./pages/modules/LegalCompliancePage";
-import { AIDocumentsPage } from "./pages/modules/AIDocumentsPage";
-import { ConvocationsPage } from "./pages/modules/ConvocationsPage";
+const DicteePage = lazy(() => import("./pages/modules/DicteePage").then(m => ({ default: m.DicteePage })));
+const RGPDPage = lazy(() => import("./pages/modules/RGPDPage").then(m => ({ default: m.RGPDPage })));
+const AIDocumentsPage = lazy(() => import("./pages/modules/AIDocumentsPage").then(m => ({ default: m.AIDocumentsPage })));
+const ProceduresPage = lazy(() => import("./pages/modules/ProceduresPage").then(m => ({ default: m.ProceduresPage })));
+const ContactsPage = lazy(() => import("./pages/modules/ContactsPage").then(m => ({ default: m.ContactsPage })));
+const SearchPage = lazy(() => import("./pages/modules/SearchPage").then(m => ({ default: m.SearchPage })));
+const DictionaryPage = lazy(() => import("./pages/modules/DictionaryPage").then(m => ({ default: m.DictionaryPage })));
+const ReunionsPage = lazy(() => import("./pages/modules/ReunionsPage").then(m => ({ default: m.ReunionsPage })));
+const FormPage = lazy(() => import("./pages/public/FormPage").then(m => ({ default: m.FormPage })));
+const ConsentResponsePage = lazy(() => import("./pages/public/ConsentResponsePage").then(m => ({ default: m.ConsentResponsePage })));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage").then(m => ({ default: m.ForgotPasswordPage })));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage").then(m => ({ default: m.ResetPasswordPage })));
 
 // Admin pages
-import { OrganizationsPage } from "./pages/admin/OrganizationsPage";
-import { UsersPage } from "./pages/admin/UsersPage";
-import { AuditLogsPage } from "./pages/admin/AuditLogsPage";
+const TenantsPage = lazy(() => import("./pages/admin/TenantsPage").then(m => ({ default: m.TenantsPage })));
+const UsersPage = lazy(() => import("./pages/admin/UsersPage").then(m => ({ default: m.UsersPage })));
+const AuditLogsPage = lazy(() => import("./pages/admin/AuditLogsPage").then(m => ({ default: m.AuditLogsPage })));
+const AISettingsPage = lazy(() => import("./pages/admin/AISettingsPage").then(m => ({ default: m.AISettingsPage })));
+const SectorsPage = lazy(() => import("./pages/admin/SectorsPage").then(m => ({ default: m.SectorsPage })));
+const AnnouncementsPage = lazy(() => import("./pages/admin/AnnouncementsPage").then(m => ({ default: m.AnnouncementsPage })));
+const EmailSettingsPage = lazy(() => import("./pages/admin/EmailSettingsPage").then(m => ({ default: m.EmailSettingsPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { refetchOnWindowFocus: false, retry: 1 },
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 2 * 60 * 1000,   // 2 min par défaut
+      gcTime: 10 * 60 * 1000,     // 10 min garbage collection
+    },
   },
 });
 
@@ -53,33 +71,60 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+function PageFallback() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+    </div>
+  );
+}
+
 function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route element={<RequireAuth />}>
-        <Route element={<Layout />}>
-          {/* Dashboard */}
-          <Route index element={<DashboardPage />} />
+    <Suspense fallback={<PageFallback />}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/form/:token" element={<FormPage />} />
+        <Route path="/consent-response" element={<ConsentResponsePage />} />
+        <Route element={<RequireAuth />}>
+          <Route element={<Layout />}>
+            {/* Dashboard */}
+            <Route index element={<DashboardPage />} />
 
-          {/* Modules */}
-          <Route path="transcription" element={<TranscriptionPage />} />
-          <Route path="transcription-diarisation" element={<TranscriptionDiarisationPage />} />
-          <Route path="conformite" element={<LegalCompliancePage />} />
-          <Route path="documents-ia" element={<AIDocumentsPage />} />
-          <Route path="convocations" element={<ConvocationsPage />} />
+            {/* Modules */}
+            <Route path="dictee" element={<DicteePage />} />
+            <Route path="reunions" element={<ReunionsPage />} />
+            {/* Legacy routes → redirect to unified page */}
+            <Route path="reunion" element={<Navigate to="/reunions" replace />} />
+            <Route path="reunions-planifiees" element={<Navigate to="/reunions" replace />} />
+            <Route path="phases-preparatoires" element={<Navigate to="/reunions" replace />} />
+            <Route path="rgpd" element={<RGPDPage />} />
+            {/* Legacy route → redirect to admin */}
+            <Route path="documents-ia" element={<Navigate to="/admin/templates-ia" replace />} />
+            <Route path="procedures" element={<ProceduresPage />} />
+            <Route path="contacts" element={<ContactsPage />} />
+            <Route path="recherche" element={<SearchPage />} />
+            <Route path="dictionnaire" element={<DictionaryPage />} />
 
-          {/* Compte */}
-          <Route path="privacy" element={<PrivacyPage />} />
+            {/* Compte */}
+            <Route path="privacy" element={<PrivacyPage />} />
 
-          {/* Administration */}
-          <Route path="admin/organizations" element={<OrganizationsPage />} />
-          <Route path="admin/users" element={<UsersPage />} />
-          <Route path="admin/audit-logs" element={<AuditLogsPage />} />
+            {/* Administration */}
+            <Route path="admin/tenants" element={<TenantsPage />} />
+            <Route path="admin/users" element={<UsersPage />} />
+            <Route path="admin/sectors" element={<SectorsPage />} />
+            <Route path="admin/ai-settings" element={<AISettingsPage />} />
+            <Route path="admin/templates-ia" element={<AIDocumentsPage />} />
+            <Route path="admin/email-settings" element={<EmailSettingsPage />} />
+            <Route path="admin/announcements" element={<AnnouncementsPage />} />
+            <Route path="admin/audit-logs" element={<AuditLogsPage />} />
+          </Route>
         </Route>
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 

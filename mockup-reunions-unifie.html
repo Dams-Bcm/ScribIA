@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Réunions (module unifié)</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --card-alt: #21242f;
+    --border: #2a2d3a;
+    --text: #e5e7eb;
+    --muted: #6b7280;
+    --primary: #8b5cf6;
+    --primary-light: rgba(139,92,246,.12);
+    --green: #22c55e;
+    --green-bg: rgba(34,197,94,.1);
+    --green-border: rgba(34,197,94,.2);
+    --amber: #f59e0b;
+    --amber-bg: rgba(245,158,11,.1);
+    --amber-border: rgba(245,158,11,.25);
+    --blue: #3b82f6;
+    --blue-bg: rgba(59,130,246,.1);
+    --blue-border: rgba(59,130,246,.25);
+    --red: #ef4444;
+    --red-bg: rgba(239,68,68,.1);
+    --emerald: #10b981;
+    --emerald-bg: rgba(16,185,129,.1);
+    --cyan: #06b6d4;
+    --cyan-bg: rgba(6,182,212,.1);
+    --cyan-border: rgba(6,182,212,.25);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+    line-height: 1.5;
+  }
+
+  .mockup-label {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin: 48px 0 16px;
+    font-weight: 600;
+  }
+  .mockup-label:first-child { margin-top: 0; }
+
+  .page { max-width: 1100px; margin: 0 auto; }
+
+  /* ── Header ──────────────────────────────────────────────── */
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .page-header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .page-header h1 .icon { color: var(--primary); }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    transition: all .15s;
+    text-decoration: none;
+  }
+  .btn:hover { background: var(--card-alt); }
+  .btn-primary {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  .btn-primary:hover { opacity: .9; }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+  }
+  .btn-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+  .btn-ghost {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 6px 8px;
+  }
+  .btn-ghost:hover { color: var(--text); }
+
+  /* ── Dropdown menu ───────────────────────────────────────── */
+  .dropdown {
+    position: relative;
+    display: inline-block;
+  }
+  .dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    min-width: 200px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.4);
+    z-index: 10;
+  }
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+  .dropdown-item:hover { background: var(--card-alt); }
+  .dropdown-item .di-icon { color: var(--muted); flex-shrink: 0; }
+  .dropdown-sep {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 8px;
+  }
+
+  /* ── Filter bar ──────────────────────────────────────────── */
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .filter-tabs {
+    display: flex;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .filter-tab {
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    transition: all .15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .filter-tab + .filter-tab { border-left: 1px solid var(--border); }
+  .filter-tab.active {
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+  .filter-tab .count {
+    font-size: 10px;
+    background: var(--card-alt);
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+  .filter-tab.active .count {
+    background: rgba(139,92,246,.2);
+  }
+
+  .search-box {
+    margin-left: auto;
+    position: relative;
+  }
+  .search-box input {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px 7px 32px;
+    font-size: 13px;
+    color: var(--text);
+    width: 220px;
+  }
+  .search-box input::placeholder { color: var(--muted); }
+  .search-box svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    width: 14px;
+    height: 14px;
+  }
+
+  /* ── Card / Table ────────────────────────────────────────── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .table-wrapper { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead th {
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--card-alt);
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .1s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--card-alt); }
+  td {
+    padding: 12px 16px;
+    vertical-align: middle;
+  }
+
+  .reunion-title {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+  .reunion-meta {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── Status badges ───────────────────────────────────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-planned {
+    background: var(--blue-bg);
+    color: var(--blue);
+    border: 1px solid var(--blue-border);
+  }
+  .badge-recording {
+    background: var(--red-bg);
+    color: var(--red);
+    border: 1px solid rgba(239,68,68,.25);
+  }
+  .badge-processing {
+    background: var(--amber-bg);
+    color: var(--amber);
+    border: 1px solid var(--amber-border);
+  }
+  .badge-transcribed {
+    background: var(--cyan-bg);
+    color: var(--cyan);
+    border: 1px solid var(--cyan-border);
+  }
+  .badge-done {
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid var(--green-border);
+  }
+  .badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .badge-recording .badge-dot {
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .3; }
+  }
+
+  /* ── Participants avatars ────────────────────────────────── */
+  .avatars {
+    display: flex;
+    gap: -4px;
+  }
+  .avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    margin-left: -4px;
+    border: 2px solid var(--card);
+  }
+  .avatar:first-child { margin-left: 0; }
+  .avatar-purple { background: #7c3aed; }
+  .avatar-blue { background: #2563eb; }
+  .avatar-green { background: #16a34a; }
+  .avatar-amber { background: #d97706; }
+  .avatar-pink { background: #db2777; }
+  .avatar-more {
+    background: var(--card-alt);
+    color: var(--muted);
+    font-size: 9px;
+  }
+
+  /* ── Actions column ──────────────────────────────────────── */
+  .row-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+
+  /* ── Document indicator ──────────────────────────────────── */
+  .doc-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--emerald);
+    background: var(--emerald-bg);
+    padding: 2px 8px;
+    border-radius: 12px;
+  }
+
+  /* ── Detail page ─────────────────────────────────────────── */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    margin-bottom: 16px;
+    text-decoration: none;
+  }
+  .back-link:hover { color: var(--text); }
+
+  .detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .detail-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .detail-header .detail-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .detail-header .detail-meta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* ── Tabs ─────────────────────────────────────────────────── */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .tab {
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    position: relative;
+    transition: color .15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--primary);
+  }
+  .tab.active::after {
+    content: "";
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--primary);
+    border-radius: 2px 2px 0 0;
+  }
+
+  /* ── Transcription view ──────────────────────────────────── */
+  .transcript-segment {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+  }
+  .transcript-segment:last-child { border-bottom: none; }
+  .segment-speaker {
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    min-width: 110px;
+    color: var(--primary);
+  }
+  .segment-time {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .segment-text {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  /* ── Generate doc section ────────────────────────────────── */
+  .generate-panel {
+    background: var(--card-alt);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+  }
+  .generate-panel h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .generate-panel p {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .template-select {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 12px;
+    min-width: 280px;
+  }
+
+  /* ── Document card in detail ─────────────────────────────── */
+  .doc-card {
+    background: var(--card-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .doc-card-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .doc-card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--emerald-bg);
+    color: var(--emerald);
+  }
+  .doc-card-title {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .doc-card-meta {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .doc-card-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  /* ── Sidebar mini ────────────────────────────────────────── */
+  .sidebar-demo {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    width: 220px;
+    margin: 0 auto;
+  }
+  .sidebar-section {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    padding: 8px 10px 4px;
+  }
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .sidebar-item:hover { background: var(--card-alt); color: var(--text); }
+  .sidebar-item.active {
+    background: var(--primary-light);
+    color: var(--primary);
+    font-weight: 600;
+  }
+  .sidebar-item .si-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+  .sidebar-item-old {
+    text-decoration: line-through;
+    opacity: .4;
+  }
+
+  .vs { display: flex; align-items: center; gap: 24px; justify-content: center; margin: 0 auto; max-width: 600px; }
+  .vs-arrow { color: var(--primary); font-size: 24px; }
+
+  .info-box {
+    background: var(--blue-bg);
+    border: 1px solid var(--blue-border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--blue);
+    margin: 16px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .info-box svg { flex-shrink: 0; margin-top: 1px; }
+
+  hr.sep {
+    border: none;
+    border-top: 1px dashed var(--border);
+    margin: 48px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════
+     1. SIDEBAR : AVANT / APRÈS
+     ════════════════════════════════════════════════════════════════ -->
+<div class="mockup-label">Sidebar — Avant vs Après</div>
+
+<div class="vs">
+  <!-- AVANT -->
+  <div>
+    <div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600;">AVANT</div>
+    <div class="sidebar-demo">
+      <div class="sidebar-section">Modules</div>
+      <div class="sidebar-item"><span class="si-icon">🎙️</span> Dictée vocale</div>
+      <div class="sidebar-item sidebar-item-old"><span class="si-icon">📄</span> Réunion</div>
+      <div class="sidebar-item sidebar-item-old"><span class="si-icon">📅</span> Réunions planifiées</div>
+      <div class="sidebar-item"><span class="si-icon">📁</span> Phases prép.</div>
+      <div class="sidebar-item sidebar-item-old"><span class="si-icon">✨</span> Documents IA</div>
+      <div class="sidebar-item"><span class="si-icon">📋</span> Procédures</div>
+      <div class="sidebar-item"><span class="si-icon">👥</span> Contacts</div>
+    </div>
+  </div>
+
+  <div class="vs-arrow">→</div>
+
+  <!-- APRÈS -->
+  <div>
+    <div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600;">APRÈS</div>
+    <div class="sidebar-demo">
+      <div class="sidebar-section">Modules</div>
+      <div class="sidebar-item"><span class="si-icon">🎙️</span> Dictée vocale</div>
+      <div class="sidebar-item active"><span class="si-icon">📋</span> Réunions</div>
+      <div class="sidebar-item"><span class="si-icon">📁</span> Phases prép.</div>
+      <div class="sidebar-item"><span class="si-icon">📋</span> Procédures</div>
+      <div class="sidebar-item"><span class="si-icon">👥</span> Contacts</div>
+    </div>
+  </div>
+</div>
+
+<div class="info-box" style="max-width:600px;margin:16px auto;">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  <span>3 items fusionnés en 1 : <strong>Réunion</strong> + <strong>Réunions planifiées</strong> + <strong>Documents IA</strong> → <strong>Réunions</strong></span>
+</div>
+
+<hr class="sep">
+
+<!-- ════════════════════════════════════════════════════════════════
+     2. PAGE LISTE — TOUTES LES RÉUNIONS
+     ════════════════════════════════════════════════════════════════ -->
+<div class="mockup-label">Vue 1 — Liste des réunions (toutes)</div>
+
+<div class="page">
+  <div class="page-header">
+    <h1>
+      <span class="icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
+      </span>
+      Réunions
+    </h1>
+    <div class="header-actions">
+      <div class="dropdown">
+        <button class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nouvelle réunion
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="dropdown-menu">
+          <button class="dropdown-item">
+            <span class="di-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </span>
+            Importer un audio
+          </button>
+          <button class="dropdown-item">
+            <span class="di-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+            </span>
+            Enregistrer en direct
+          </button>
+          <div class="dropdown-sep"></div>
+          <button class="dropdown-item">
+            <span class="di-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </span>
+            Planifier une réunion
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <div class="filter-tabs">
+      <button class="filter-tab active">Toutes <span class="count">12</span></button>
+      <button class="filter-tab">Planifiées <span class="count">3</span></button>
+      <button class="filter-tab">Transcrites <span class="count">6</span></button>
+      <button class="filter-tab">Avec document <span class="count">3</span></button>
+    </div>
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Rechercher...">
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Réunion</th>
+            <th>Statut</th>
+            <th>Participants</th>
+            <th>Documents</th>
+            <th style="width:80px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Planifiée (future) -->
+          <tr>
+            <td>
+              <div class="reunion-title">Conseil municipal</div>
+              <div class="reunion-meta">
+                <span>📅 15/03/2026</span>
+                <span>📍 Salle du conseil</span>
+              </div>
+            </td>
+            <td><span class="badge badge-planned"><span class="badge-dot"></span> Planifiée</span></td>
+            <td>
+              <div class="avatars">
+                <div class="avatar avatar-purple">MD</div>
+                <div class="avatar avatar-blue">JL</div>
+                <div class="avatar avatar-green">PD</div>
+                <div class="avatar avatar-amber">SB</div>
+                <div class="avatar avatar-more">+3</div>
+              </div>
+            </td>
+            <td><span style="color:var(--muted);font-size:12px">—</span></td>
+            <td>
+              <div class="row-actions">
+                <button class="btn btn-sm btn-primary" title="Démarrer">▶</button>
+                <button class="btn btn-ghost btn-sm" title="Options">⋯</button>
+              </div>
+            </td>
+          </tr>
+
+          <!-- En cours de traitement -->
+          <tr>
+            <td>
+              <div class="reunion-title">Réunion équipe technique</div>
+              <div class="reunion-meta">
+                <span>📅 09/03/2026</span>
+                <span>⏱ En traitement...</span>
+              </div>
+            </td>
+            <td><span class="badge badge-processing"><span class="badge-dot"></span> Traitement</span></td>
+            <td>
+              <div class="avatars">
+                <div class="avatar avatar-blue">AL</div>
+                <div class="avatar avatar-pink">MC</div>
+              </div>
+            </td>
+            <td><span style="color:var(--muted);font-size:12px">—</span></td>
+            <td>
+              <div class="row-actions">
+                <button class="btn btn-ghost btn-sm" title="Options">⋯</button>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Transcrite (sans document) -->
+          <tr>
+            <td>
+              <div class="reunion-title">Réunion de service — Urbanisme</div>
+              <div class="reunion-meta">
+                <span>📅 07/03/2026</span>
+                <span>⏱ 1h24min</span>
+                <span>👥 4 intervenants</span>
+              </div>
+            </td>
+            <td><span class="badge badge-transcribed"><span class="badge-dot"></span> Transcrite</span></td>
+            <td>
+              <div class="avatars">
+                <div class="avatar avatar-green">PD</div>
+                <div class="avatar avatar-amber">NR</div>
+                <div class="avatar avatar-purple">CB</div>
+                <div class="avatar avatar-blue">FK</div>
+              </div>
+            </td>
+            <td><span style="color:var(--muted);font-size:12px">—</span></td>
+            <td>
+              <div class="row-actions">
+                <button class="btn btn-sm btn-outline" title="Générer un document" style="color:var(--primary);">✨ Générer</button>
+                <button class="btn btn-ghost btn-sm" title="Options">⋯</button>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Transcrite + document généré -->
+          <tr>
+            <td>
+              <div class="reunion-title">Comité de direction — Budget 2026</div>
+              <div class="reunion-meta">
+                <span>📅 03/03/2026</span>
+                <span>⏱ 2h05min</span>
+                <span>👥 6 intervenants</span>
+              </div>
+            </td>
+            <td><span class="badge badge-done"><span class="badge-dot"></span> Terminée</span></td>
+            <td>
+              <div class="avatars">
+                <div class="avatar avatar-purple">MD</div>
+                <div class="avatar avatar-blue">JL</div>
+                <div class="avatar avatar-green">PD</div>
+                <div class="avatar avatar-more">+3</div>
+              </div>
+            </td>
+            <td><span class="doc-indicator">✨ Compte rendu</span></td>
+            <td>
+              <div class="row-actions">
+                <button class="btn btn-ghost btn-sm" title="Options">⋯</button>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Transcrite + document généré -->
+          <tr>
+            <td>
+              <div class="reunion-title">Point hebdo RH</div>
+              <div class="reunion-meta">
+                <span>📅 28/02/2026</span>
+                <span>⏱ 45min</span>
+                <span>👥 3 intervenants</span>
+              </div>
+            </td>
+            <td><span class="badge badge-done"><span class="badge-dot"></span> Terminée</span></td>
+            <td>
+              <div class="avatars">
+                <div class="avatar avatar-amber">SB</div>
+                <div class="avatar avatar-pink">LV</div>
+                <div class="avatar avatar-blue">RM</div>
+              </div>
+            </td>
+            <td><span class="doc-indicator">✨ Compte rendu</span></td>
+            <td>
+              <div class="row-actions">
+                <button class="btn btn-ghost btn-sm" title="Options">⋯</button>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Transcrite (sans document) -->
+          <tr>
+            <td>
+              <div class="reunion-title">Atelier participatif — Mobilité douce</div>
+              <div class="reunion-meta">
+                <span>📅 25/02/2026</span>
+                <span>⏱ 1h52min</span>
+                <span>👥 8 intervenants</span>
+              </div>
+            </td>
+            <td><span class="badge badge-transcribed"><span class="badge-dot"></span> Transcrite</span></td>
+            <td>
+              <div class="avatars">
+                <div class="avatar avatar-green">PD</div>
+                <div class="avatar avatar-purple">CB</div>
+                <div class="avatar avatar-more">+6</div>
+              </div>
+            </td>
+            <td><span style="color:var(--muted);font-size:12px">—</span></td>
+            <td>
+              <div class="row-actions">
+                <button class="btn btn-sm btn-outline" title="Générer un document" style="color:var(--primary);">✨ Générer</button>
+                <button class="btn btn-ghost btn-sm" title="Options">⋯</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ════════════════════════════════════════════════════════════════
+     3. PAGE DÉTAIL — RÉUNION TRANSCRITE (avec génération de document)
+     ════════════════════════════════════════════════════════════════ -->
+<div class="mockup-label">Vue 2 — Détail d'une réunion transcrite</div>
+
+<div class="page">
+  <a class="back-link">← Réunions</a>
+
+  <div class="detail-header">
+    <div>
+      <h2>Réunion de service — Urbanisme</h2>
+      <div class="detail-meta">
+        <span>📅 07/03/2026</span>
+        <span>📍 Salle B — Hôtel de ville</span>
+        <span>⏱ 1h24min</span>
+        <span>👥 4 intervenants</span>
+      </div>
+    </div>
+    <span class="badge badge-transcribed"><span class="badge-dot"></span> Transcrite</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active">Transcription</button>
+    <button class="tab">Intervenants</button>
+    <button class="tab">Documents</button>
+    <button class="tab">Infos</button>
+  </div>
+
+  <!-- Transcription content -->
+  <div class="card" style="margin-bottom:20px;">
+    <div class="transcript-segment">
+      <div>
+        <div class="segment-speaker" style="color:#7c3aed;">Marie Dupont</div>
+        <div class="segment-time">00:00:12</div>
+      </div>
+      <div class="segment-text">Bonjour à tous, merci d'être présents. On va commencer par le point sur le PLU modifié, ensuite on abordera les permis en attente.</div>
+    </div>
+    <div class="transcript-segment">
+      <div>
+        <div class="segment-speaker" style="color:#2563eb;">Nicolas Roux</div>
+        <div class="segment-time">00:00:34</div>
+      </div>
+      <div class="segment-text">Pour le PLU, on a reçu les observations de la commission départementale la semaine dernière. Il y a trois points de vigilance sur la zone AU2.</div>
+    </div>
+    <div class="transcript-segment">
+      <div>
+        <div class="segment-speaker" style="color:#16a34a;">Pierre Delmas</div>
+        <div class="segment-time">00:01:15</div>
+      </div>
+      <div class="segment-text">Sur la zone AU2, le problème principal c'est la desserte en eau. Le SDAGE impose des contraintes qu'on n'avait pas intégrées dans la première mouture.</div>
+    </div>
+    <div class="transcript-segment" style="border-bottom:none;">
+      <div>
+        <div class="segment-speaker" style="color:#7c3aed;">Marie Dupont</div>
+        <div class="segment-time">00:02:01</div>
+      </div>
+      <div class="segment-text">Très bien. Pierre, vous me faites une note de synthèse sur les contraintes SDAGE pour vendredi ?</div>
+    </div>
+    <div style="padding:12px 16px;text-align:center;border-top:1px solid var(--border);">
+      <span style="font-size:12px;color:var(--muted);">... 247 segments au total ...</span>
+    </div>
+  </div>
+
+  <!-- Generate document panel -->
+  <div class="generate-panel">
+    <h3>✨ Générer un document IA</h3>
+    <p>Créez un compte rendu, une synthèse ou tout autre document à partir de cette transcription</p>
+    <div style="display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <select class="template-select">
+        <option>Compte rendu de réunion (générique)</option>
+        <option>Réunion de services — Mairie (DGS)</option>
+        <option>Synthèse courte</option>
+        <option>PV de séance</option>
+      </select>
+      <button class="btn btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z"/></svg>
+        Générer
+      </button>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ════════════════════════════════════════════════════════════════
+     4. PAGE DÉTAIL — ONGLET DOCUMENTS (après génération)
+     ════════════════════════════════════════════════════════════════ -->
+<div class="mockup-label">Vue 3 — Onglet Documents (après génération)</div>
+
+<div class="page">
+  <a class="back-link">← Réunions</a>
+
+  <div class="detail-header">
+    <div>
+      <h2>Comité de direction — Budget 2026</h2>
+      <div class="detail-meta">
+        <span>📅 03/03/2026</span>
+        <span>📍 Salle du conseil</span>
+        <span>⏱ 2h05min</span>
+        <span>👥 6 intervenants</span>
+      </div>
+    </div>
+    <span class="badge badge-done"><span class="badge-dot"></span> Terminée</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab">Transcription</button>
+    <button class="tab">Intervenants</button>
+    <button class="tab active">Documents</button>
+    <button class="tab">Infos</button>
+  </div>
+
+  <!-- Document cards -->
+  <div class="doc-card">
+    <div class="doc-card-info">
+      <div class="doc-card-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      <div>
+        <div class="doc-card-title">Compte rendu — Comité de direction Budget 2026</div>
+        <div class="doc-card-meta">Généré le 03/03/2026 à 16:42 · Template : Réunion de services — Mairie</div>
+      </div>
+    </div>
+    <div class="doc-card-actions">
+      <button class="btn btn-sm btn-outline">👁 Voir</button>
+      <button class="btn btn-sm btn-outline">⬇ Exporter</button>
+      <button class="btn btn-sm btn-ghost">🔄</button>
+    </div>
+  </div>
+
+  <!-- Generate another -->
+  <div class="generate-panel" style="margin-top:16px;">
+    <h3>✨ Générer un autre document</h3>
+    <p>Vous pouvez générer plusieurs documents à partir de la même transcription</p>
+    <div style="display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <select class="template-select">
+        <option>Synthèse courte</option>
+        <option>Compte rendu de réunion (générique)</option>
+        <option>PV de séance</option>
+      </select>
+      <button class="btn btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z"/></svg>
+        Générer
+      </button>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ════════════════════════════════════════════════════════════════
+     5. PAGE DÉTAIL — RÉUNION PLANIFIÉE
+     ════════════════════════════════════════════════════════════════ -->
+<div class="mockup-label">Vue 4 — Détail d'une réunion planifiée</div>
+
+<div class="page">
+  <a class="back-link">← Réunions</a>
+
+  <div class="detail-header">
+    <div>
+      <h2>Conseil municipal</h2>
+      <div class="detail-meta">
+        <span>📅 15/03/2026 à 14h00</span>
+        <span>📍 Salle du conseil</span>
+        <span>👥 7 participants</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span class="badge badge-planned"><span class="badge-dot"></span> Planifiée</span>
+      <button class="btn btn-primary">▶ Démarrer la réunion</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active">Infos</button>
+    <button class="tab">Participants</button>
+  </div>
+
+  <div class="card" style="padding:20px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <div style="font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px;">Date et heure</div>
+        <div style="font-size:14px;">15 mars 2026 à 14h00</div>
+      </div>
+      <div>
+        <div style="font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px;">Lieu</div>
+        <div style="font-size:14px;">Salle du conseil — Hôtel de ville</div>
+      </div>
+      <div style="grid-column:1/-1;">
+        <div style="font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px;">Description / ordre du jour</div>
+        <div style="font-size:13px;line-height:1.6;color:var(--text);">
+          1. Approbation du PV de la séance précédente<br>
+          2. Débat d'orientation budgétaire 2026<br>
+          3. Délibération sur les tarifs des services publics<br>
+          4. Questions diverses
+        </div>
+      </div>
+      <div style="grid-column:1/-1;">
+        <div style="font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px;">Participants (7)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+          <span style="background:var(--card-alt);padding:4px 10px;border-radius:20px;font-size:12px;">Marie Dupont (DGS)</span>
+          <span style="background:var(--card-alt);padding:4px 10px;border-radius:20px;font-size:12px;">Jean Lefèvre (DGA)</span>
+          <span style="background:var(--card-alt);padding:4px 10px;border-radius:20px;font-size:12px;">Pierre Delmas</span>
+          <span style="background:var(--card-alt);padding:4px 10px;border-radius:20px;font-size:12px;">Sophie Blanc</span>
+          <span style="background:var(--card-alt);padding:4px 10px;border-radius:20px;font-size:12px;">Nicolas Roux</span>
+          <span style="background:var(--card-alt);padding:4px 10px;border-radius:20px;font-size:12px;">Claire Bonnet</span>
+          <span style="background:var(--card-alt);padding:4px 10px;border-radius:20px;font-size:12px;">Fatou Keita</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box" style="margin-top:16px;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    <span>Le lieu, la description et les participants seront automatiquement utilisés pour enrichir la transcription et la génération de documents IA.</span>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ════════════════════════════════════════════════════════════════
+     6. RÉSUMÉ DES FLUX
+     ════════════════════════════════════════════════════════════════ -->
+<div class="mockup-label">Flux utilisateur</div>
+
+<div class="page">
+  <div class="card" style="padding:24px;">
+    <div style="font-size:14px;font-weight:700;margin-bottom:16px;">Parcours utilisateur unifié</div>
+    <div style="font-size:13px;line-height:2.2;">
+      <div><strong style="color:var(--blue);">Flux 1 — Réunion directe :</strong></div>
+      <div style="padding-left:16px;color:var(--muted);">
+        Réunions → <span style="color:var(--text);">+ Nouvelle réunion</span> → Importer audio / Enregistrer → Traitement → Transcription → <span style="color:var(--primary);">✨ Générer document</span>
+      </div>
+
+      <div style="margin-top:12px;"><strong style="color:var(--blue);">Flux 2 — Réunion planifiée :</strong></div>
+      <div style="padding-left:16px;color:var(--muted);">
+        Réunions → <span style="color:var(--text);">+ Planifier</span> → (date, lieu, participants, ordre du jour) → <span style="color:var(--text);">▶ Démarrer</span> → Traitement → Transcription → <span style="color:var(--primary);">✨ Générer document</span>
+      </div>
+
+      <div style="margin-top:12px;"><strong style="color:var(--blue);">Flux 3 — Générer un nouveau document :</strong></div>
+      <div style="padding-left:16px;color:var(--muted);">
+        Réunions → Clic sur réunion transcrite → Onglet Documents → <span style="color:var(--primary);">✨ Générer</span> (choix template)
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="height:60px;"></div>
+
+</body>
+</html>

@@ -4,6 +4,8 @@ import { api, ApiError } from "../../api/client";
 import { useTenants } from "../../api/hooks/useTenants";
 import type { User } from "../../api/types";
 import { Users, Plus, Trash2, X } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 export function UsersPage() {
   const { data: users = [], isLoading } = useQuery<User[]>({
@@ -23,6 +25,7 @@ export function UsersPage() {
     tenant_id: "",
   });
   const [error, setError] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const createUser = useMutation({
     mutationFn: (data: typeof form) => api.post("/admin/users", data),
@@ -43,9 +46,11 @@ export function UsersPage() {
   });
 
   function handleDelete(id: string) {
-    if (confirm("Supprimer cet utilisateur ?")) {
-      deleteUser.mutate(id);
-    }
+    confirm({
+      title: "Supprimer cet utilisateur ?",
+      confirmLabel: "Supprimer",
+      onConfirm: () => deleteUser.mutate(id),
+    });
   }
 
   const getTenantName = (tid: string) => tenants.find((t) => t.id === tid)?.name ?? tid;
@@ -76,7 +81,7 @@ export function UsersPage() {
             <tr className="border-b border-border bg-muted/50">
               <th className="text-left px-4 py-3 font-medium">Utilisateur</th>
               <th className="text-left px-4 py-3 font-medium">Email</th>
-              <th className="text-left px-4 py-3 font-medium">Organisation</th>
+              <th className="text-left px-4 py-3 font-medium">Tenant</th>
               <th className="text-left px-4 py-3 font-medium">Rôle</th>
               <th className="w-12" />
             </tr>
@@ -120,6 +125,7 @@ export function UsersPage() {
       </div>
 
       {/* Create modal */}
+      {confirmDialog}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-background rounded-xl border border-border p-6 w-full max-w-md shadow-lg">
@@ -150,21 +156,29 @@ export function UsersPage() {
                   className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5">Organisation</label>
-                <select value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                  <option value="">— Sélectionner —</option>
-                  {tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
+                <label className="block text-sm font-medium mb-1.5">Tenant</label>
+                <Select value={form.tenant_id} onValueChange={(v) => setForm({ ...form, tenant_id: v === "__none__" ? "" : v })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="— Sélectionner —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Sélectionner —</SelectItem>
+                    {tenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">Rôle</label>
-                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                  <option value="user">Utilisateur</option>
-                  <option value="admin">Admin</option>
-                  <option value="super_admin">Super Admin</option>
-                </select>
+                <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">Utilisateur</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {error && <p className="text-sm text-destructive">{error}</p>}

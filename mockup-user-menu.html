@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scrib' IA — Menu Utilisateur (Mockup)</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #e4e9f2;
+      background: linear-gradient(135deg, #1a2138 0%, #151a30 50%, #0d1117 100%);
+      background-attachment: fixed;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    :root {
+      --bg-sidebar: rgba(22, 30, 52, 0.85);
+      --bg-input: rgba(22, 30, 52, 0.6);
+      --border: rgba(101, 117, 148, 0.25);
+      --border-light: rgba(101, 117, 148, 0.15);
+      --text-primary: #e4e9f2;
+      --text-muted: #8f9bb3;
+      --accent: #7659ff;
+      --accent-hover: rgba(118, 89, 255, 0.15);
+      --radius: 0.5rem;
+    }
+
+    /* ── Sidebar container (partial, just bottom zone) ────────── */
+    .sidebar-demo {
+      width: 240px;
+      background: var(--bg-sidebar);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    /* ── Nav items (just a few to provide context) ────────────── */
+    .nav-section {
+      padding: 0.75rem 1rem 0;
+    }
+    .nav-section-label {
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      padding: 0 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+    .nav-items {
+      padding: 0 0.5rem 0.5rem;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .nav-item:hover {
+      background: var(--accent-hover);
+      color: var(--text-primary);
+    }
+    .nav-item.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .nav-item svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    /* ── Separator ─────────────────────────────────────────────── */
+    .sidebar-sep {
+      height: 1px;
+      background: var(--border);
+      margin: 0;
+    }
+
+    /* ── User info zone (the mockup focus) ────────────────────── */
+    .user-zone {
+      padding: 0.75rem 0.75rem 0.75rem;
+    }
+
+    .user-identity {
+      padding: 0 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+    .user-name {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.3;
+    }
+    .user-role {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .user-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      width: 100%;
+      border: none;
+      background: none;
+      text-align: left;
+      font-family: inherit;
+    }
+    .user-menu-item:hover {
+      background: var(--accent-hover);
+      color: var(--text-primary);
+    }
+    .user-menu-item svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      opacity: 0.7;
+    }
+    .user-menu-item:hover svg {
+      opacity: 1;
+    }
+
+    /* Notification toggle active state */
+    .user-menu-item.notif-active svg {
+      opacity: 1;
+      color: var(--accent);
+    }
+
+    /* ── Password modal (shown on click) ──────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open {
+      display: flex;
+    }
+    .modal-card {
+      background: #1c2540;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+    }
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+    }
+    .form-group {
+      margin-bottom: 0.75rem;
+    }
+    .form-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    .form-input {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+    .form-input:focus {
+      border-color: var(--accent);
+    }
+    .modal-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    .btn {
+      flex: 1;
+      padding: 0.55rem 1rem;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .btn-outline {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .btn-outline:hover {
+      background: var(--accent-hover);
+      color: var(--text-primary);
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #6043e0;
+    }
+
+    /* ── Annotation labels ────────────────────────────────────── */
+    .demo-wrapper {
+      display: flex;
+      gap: 48px;
+      align-items: flex-start;
+    }
+    .annotations {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-top: 8px;
+    }
+    .annotation {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .annotation .line {
+      width: 40px;
+      height: 1px;
+      background: rgba(118, 89, 255, 0.4);
+    }
+    .annotation .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+    .title-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 12px;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+
+<div class="demo-wrapper">
+  <!-- Sidebar partial -->
+  <div>
+    <div class="sidebar-demo">
+      <!-- A few nav items for context -->
+      <div class="nav-section">
+        <div class="nav-section-label">Compte</div>
+      </div>
+      <div class="nav-items">
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Confidentialité
+        </div>
+      </div>
+
+      <!-- Separator -->
+      <div class="sidebar-sep"></div>
+
+      <!-- USER ZONE — le focus du mockup -->
+      <div class="user-zone">
+        <!-- Identité -->
+        <div class="user-identity">
+          <div class="user-name">Linxe</div>
+          <div class="user-role">admin</div>
+        </div>
+
+        <!-- Notifications -->
+        <button class="user-menu-item notif-active" id="btn-notif">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          Notifications actives
+        </button>
+
+        <!-- Changer mot de passe -->
+        <button class="user-menu-item" id="btn-pwd">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+          Changer le mot de passe
+        </button>
+
+        <!-- Thème -->
+        <button class="user-menu-item" id="btn-theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          Sombre
+        </button>
+
+        <!-- Déconnexion -->
+        <button class="user-menu-item" id="btn-logout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+          Déconnexion
+        </button>
+      </div>
+    </div>
+    <div class="title-label">Zone utilisateur — bas de sidebar</div>
+  </div>
+
+  <!-- Modal mot de passe (à côté) -->
+  <div>
+    <div class="modal-card">
+      <div class="modal-title">Changer le mot de passe</div>
+      <div class="form-group">
+        <label class="form-label">Mot de passe actuel</label>
+        <input type="password" class="form-input" value="••••••••" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nouveau mot de passe</label>
+        <input type="password" class="form-input" placeholder="Min. 8 caractères" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirmer le nouveau mot de passe</label>
+        <input type="password" class="form-input" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline">Annuler</button>
+        <button class="btn btn-primary">Modifier</button>
+      </div>
+    </div>
+    <div class="title-label">Modal « Changer le mot de passe »</div>
+  </div>
+</div>
+
+<!-- Interactive modal (when clicking the password button in sidebar) -->
+<div class="modal-overlay" id="pwd-modal">
+  <div class="modal-card">
+    <div class="modal-title">Changer le mot de passe</div>
+    <div class="form-group">
+      <label class="form-label">Mot de passe actuel</label>
+      <input type="password" class="form-input" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nouveau mot de passe</label>
+      <input type="password" class="form-input" placeholder="Min. 8 caractères" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Confirmer le nouveau mot de passe</label>
+      <input type="password" class="form-input" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="document.getElementById('pwd-modal').classList.remove('open')">Annuler</button>
+      <button class="btn btn-primary">Modifier</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Toggle notification state
+  document.getElementById('btn-notif').addEventListener('click', function() {
+    this.classList.toggle('notif-active');
+    if (this.classList.contains('notif-active')) {
+      this.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg> Notifications actives';
+    } else {
+      this.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><line x1="1" x2="23" y1="1" y2="23"/></svg> Activer les notifications';
+    }
+  });
+
+  // Open password modal
+  document.getElementById('btn-pwd').addEventListener('click', function() {
+    document.getElementById('pwd-modal').classList.add('open');
+  });
+
+  // Close modal on overlay click
+  document.getElementById('pwd-modal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+
+  // Theme toggle
+  document.getElementById('btn-theme').addEventListener('click', function() {
+    const isSombre = this.textContent.trim() === 'Sombre';
+    if (isSombre) {
+      this.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg> Clair';
+    } else {
+      this.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg> Sombre';
+    }
+  });
+</script>
+
+</body>
+</html>

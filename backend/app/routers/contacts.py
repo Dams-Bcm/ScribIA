@@ -1,0 +1,512 @@
+"""Router — Module Contacts (carnets de contacts groupés).
+
+Préfixe : /contacts
+Module requis : contacts
+"""
+
+import io
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from sqlalchemy.orm import Session, joinedload, subqueryload
+
+from app.database import get_db
+from app.deps import get_current_user, require_module
+from app.models.contacts import Contact, ContactGroup, contact_group_members
+from app.models.speaker import SpeakerProfile
+from app.models.user import User
+from app.schemas.contacts import (
+    ContactCreate,
+    ContactGroupCreate,
+    ContactGroupDetailResponse,
+    ContactGroupResponse,
+    ContactGroupUpdate,
+    ContactResponse,
+    ContactUpdate,
+)
+
+router = APIRouter(
+    prefix="/contacts",
+    tags=["contacts"],
+    dependencies=[Depends(require_module("contacts"))],
+)
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _parse_json(raw: str | None) -> dict | None:
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+def _to_group_response(g: ContactGroup) -> ContactGroupResponse:
+    return ContactGroupResponse(
+        id=g.id,
+        name=g.name,
+        description=g.description,
+        metadata=_parse_json(g.metadata_),
+        contact_count=len(g.contacts) if g.contacts else 0,
+        is_default=g.is_default,
+        created_at=g.created_at,
+        updated_at=g.updated_at,
+    )
+
+
+def _to_contact_response(c: Contact, speaker_profile=None) -> ContactResponse:
+    # Oral consent is local to a meeting — don't show it in the Contacts page
+    is_oral = speaker_profile and speaker_profile.consent_type == "oral_recording"
+    return ContactResponse(
+        id=c.id,
+        group_ids=[g.id for g in c.groups] if c.groups else [],
+        name=c.name,
+        first_name=c.first_name,
+        email=c.email,
+        phone=c.phone,
+        role=c.role,
+        custom_fields=_parse_json(c.custom_fields),
+        created_at=c.created_at,
+        speaker_profile_id=speaker_profile.id if speaker_profile else None,
+        consent_status=None if is_oral else (speaker_profile.consent_status if speaker_profile else None),
+        consent_type=None if is_oral else (speaker_profile.consent_type if speaker_profile else None),
+        enrollment_status=speaker_profile.enrollment_status if speaker_profile else None,
+    )
+
+
+def _get_group(db: Session, group_id: str, tenant_id: str) -> ContactGroup:
+    g = (
+        db.query(ContactGroup)
+        .options(joinedload(ContactGroup.contacts))
+        .filter(ContactGroup.id == group_id, ContactGroup.tenant_id == tenant_id)
+        .first()
+    )
+    if not g:
+        raise HTTPException(status_code=404, detail="Groupe introuvable")
+    return g
+
+
+def _build_profile_map(db: Session, contact_ids: list[str], tenant_id: str) -> dict[str, SpeakerProfile]:
+    if not contact_ids:
+        return {}
+    profiles = db.query(SpeakerProfile).filter(
+        SpeakerProfile.contact_id.in_(contact_ids),
+        SpeakerProfile.tenant_id == tenant_id,
+    ).all()
+    return {p.contact_id: p for p in profiles}
+
+
+# ── All contacts (virtual "Tous" group) ───────────────────────────────────────
+
+@router.get("/all", response_model=ContactGroupDetailResponse)
+def list_all_contacts(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return all contacts across all groups for this tenant."""
+    all_contacts = (
+        db.query(Contact)
+        .options(subqueryload(Contact.groups))
+        .filter(Contact.tenant_id == user.tenant_id)
+        .order_by(Contact.name)
+        .all()
+    )
+
+    contact_ids = [c.id for c in all_contacts]
+    profile_map = _build_profile_map(db, contact_ids, user.tenant_id)
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    return ContactGroupDetailResponse(
+        id="__all__",
+        name="Tous",
+        description=None,
+        metadata=None,
+        contact_count=len(all_contacts),
+        created_at=now,
+        updated_at=now,
+        contacts=[_to_contact_response(c, profile_map.get(c.id)) for c in all_contacts],
+    )
+
+
+# ── Groups ────────────────────────────────────────────────────────────────────
+
+@router.get("/groups", response_model=list[ContactGroupResponse])
+def list_groups(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    groups = (
+        db.query(ContactGroup)
+        .options(joinedload(ContactGroup.contacts))
+        .filter(ContactGroup.tenant_id == user.tenant_id)
+        .order_by(ContactGroup.is_default.desc(), ContactGroup.name)
+        .all()
+    )
+    return [_to_group_response(g) for g in groups]
+
+
+@router.post("/groups", response_model=ContactGroupDetailResponse, status_code=201)
+def create_group(
+    body: ContactGroupCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    g = ContactGroup(
+        tenant_id=user.tenant_id,
+        name=body.name,
+        description=body.description,
+        metadata_=json.dumps(body.metadata) if body.metadata else None,
+    )
+    db.add(g)
+    db.commit()
+    db.refresh(g)
+    return ContactGroupDetailResponse(
+        **_to_group_response(g).model_dump(),
+        contacts=[],
+    )
+
+
+@router.get("/groups/{group_id}", response_model=ContactGroupDetailResponse)
+def get_group(
+    group_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    g = _get_group(db, group_id, user.tenant_id)
+
+    contact_ids = [c.id for c in g.contacts]
+    profile_map = _build_profile_map(db, contact_ids, user.tenant_id)
+
+    # Eager-load groups for each contact so group_ids is populated
+    for c in g.contacts:
+        if not hasattr(c, '_sa_instance_state') or 'groups' not in c.__dict__:
+            db.refresh(c, ['groups'])
+
+    return ContactGroupDetailResponse(
+        **_to_group_response(g).model_dump(),
+        contacts=[_to_contact_response(c, profile_map.get(c.id)) for c in g.contacts],
+    )
+
+
+@router.patch("/groups/{group_id}", response_model=ContactGroupResponse)
+def update_group(
+    group_id: str,
+    body: ContactGroupUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    g = _get_group(db, group_id, user.tenant_id)
+    updates = body.model_dump(exclude_unset=True)
+    if "metadata" in updates:
+        g.metadata_ = json.dumps(updates.pop("metadata")) if updates["metadata"] else None
+    for field, value in updates.items():
+        setattr(g, field, value)
+    db.commit()
+    db.refresh(g)
+    return _to_group_response(g)
+
+
+@router.delete("/groups/{group_id}", status_code=204)
+def delete_group(
+    group_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    g = _get_group(db, group_id, user.tenant_id)
+    if g.is_default:
+        raise HTTPException(status_code=400, detail="Impossible de supprimer le groupe par défaut")
+    # Clean junction table before deleting group (MSSQL NO ACTION)
+    db.execute(contact_group_members.delete().where(contact_group_members.c.group_id == group_id))
+    db.delete(g)
+    db.commit()
+
+
+# ── Contacts ─────────────────────────────────────────────────────────────────
+
+@router.post("/groups/{group_id}/contacts", response_model=ContactResponse, status_code=201)
+def add_contact(
+    group_id: str,
+    body: ContactCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    g = _get_group(db, group_id, user.tenant_id)
+    c = Contact(
+        tenant_id=user.tenant_id,
+        name=body.name,
+        first_name=body.first_name,
+        email=body.email,
+        phone=body.phone,
+        role=body.role,
+        custom_fields=json.dumps(body.custom_fields) if body.custom_fields else None,
+    )
+    c.groups.append(g)
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    # Reload with groups eagerly loaded
+    c = (
+        db.query(Contact)
+        .options(joinedload(Contact.groups))
+        .filter(Contact.id == c.id)
+        .first()
+    )
+    return _to_contact_response(c)
+
+
+@router.patch("/groups/{group_id}/contacts/{contact_id}", response_model=ContactResponse)
+def update_contact(
+    group_id: str,
+    contact_id: str,
+    body: ContactUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _get_group(db, group_id, user.tenant_id)
+    c = (
+        db.query(Contact)
+        .options(joinedload(Contact.groups))
+        .filter(Contact.id == contact_id, Contact.tenant_id == user.tenant_id)
+        .first()
+    )
+    if not c or not any(g.id == group_id for g in c.groups):
+        raise HTTPException(status_code=404, detail="Contact introuvable")
+    updates = body.model_dump(exclude_unset=True)
+    if "custom_fields" in updates:
+        c.custom_fields = json.dumps(updates.pop("custom_fields")) if updates["custom_fields"] else None
+    for field, value in updates.items():
+        setattr(c, field, value)
+    db.commit()
+    db.refresh(c)
+    return _to_contact_response(c)
+
+
+@router.delete("/groups/{group_id}/contacts/{contact_id}", status_code=204)
+def delete_contact(
+    group_id: str,
+    contact_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _get_group(db, group_id, user.tenant_id)
+    c = (
+        db.query(Contact)
+        .options(joinedload(Contact.groups))
+        .filter(Contact.id == contact_id, Contact.tenant_id == user.tenant_id)
+        .first()
+    )
+    if not c or not any(g.id == group_id for g in c.groups):
+        raise HTTPException(status_code=404, detail="Contact introuvable")
+
+    # Clean junction table + FK references before deleting
+    db.execute(contact_group_members.delete().where(contact_group_members.c.contact_id == contact_id))
+    try:
+        from app.models.consent import ConsentRequest, ConsentDetection
+        db.query(ConsentRequest).filter(ConsentRequest.contact_id == contact_id).delete(
+            synchronize_session=False)
+        db.query(ConsentDetection).filter(ConsentDetection.contact_id == contact_id).delete(
+            synchronize_session=False)
+    except Exception:
+        pass  # Tables may not exist yet
+
+    db.delete(c)
+    db.commit()
+
+
+# ── Group membership management ──────────────────────────────────────────────
+
+@router.post("/contacts/{contact_id}/groups/{group_id}", status_code=204)
+def add_contact_to_group(
+    contact_id: str,
+    group_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Add an existing contact to a group."""
+    g = _get_group(db, group_id, user.tenant_id)
+    c = (
+        db.query(Contact)
+        .options(joinedload(Contact.groups))
+        .filter(Contact.id == contact_id, Contact.tenant_id == user.tenant_id)
+        .first()
+    )
+    if not c:
+        raise HTTPException(status_code=404, detail="Contact introuvable")
+    if g not in c.groups:
+        c.groups.append(g)
+        db.commit()
+
+
+@router.delete("/contacts/{contact_id}/groups/{group_id}", status_code=204)
+def remove_contact_from_group(
+    contact_id: str,
+    group_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Remove a contact from a group (does not delete the contact)."""
+    g = _get_group(db, group_id, user.tenant_id)
+    c = (
+        db.query(Contact)
+        .options(joinedload(Contact.groups))
+        .filter(Contact.id == contact_id, Contact.tenant_id == user.tenant_id)
+        .first()
+    )
+    if not c:
+        raise HTTPException(status_code=404, detail="Contact introuvable")
+    if g in c.groups:
+        c.groups.remove(g)
+        db.commit()
+
+
+# ── Excel import / export ────────────────────────────────────────────────────
+
+_XLSX_COLUMNS = ["Nom", "Prénom", "Email", "Téléphone", "Rôle"]
+
+
+def _build_xlsx_workbook(contacts: list[Contact], sheet_title: str = "Contacts") -> Workbook:
+    """Create a styled workbook from a list of contacts."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet_title
+
+    # Header style
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        bottom=Side(style="thin", color="B4C6E7"),
+    )
+
+    for col_idx, col_name in enumerate(_XLSX_COLUMNS, 1):
+        cell = ws.cell(row=1, column=col_idx, value=col_name)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+
+    for row_idx, c in enumerate(contacts, 2):
+        ws.cell(row=row_idx, column=1, value=c.name)
+        ws.cell(row=row_idx, column=2, value=c.first_name or "")
+        ws.cell(row=row_idx, column=3, value=c.email or "")
+        ws.cell(row=row_idx, column=4, value=c.phone or "")
+        ws.cell(row=row_idx, column=5, value=c.role or "")
+        for col_idx in range(1, 6):
+            ws.cell(row=row_idx, column=col_idx).border = thin_border
+
+    # Auto-width
+    ws.column_dimensions["A"].width = 25
+    ws.column_dimensions["B"].width = 20
+    ws.column_dimensions["C"].width = 30
+    ws.column_dimensions["D"].width = 18
+    ws.column_dimensions["E"].width = 20
+
+    return wb
+
+
+def _wb_to_response(wb: Workbook, filename: str) -> StreamingResponse:
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/export")
+def export_contacts(
+    group_id: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Export contacts to XLSX. If group_id is provided, export only that group."""
+    if group_id and group_id != "__all__":
+        g = _get_group(db, group_id, user.tenant_id)
+        contacts = g.contacts
+        filename = f"contacts_{g.name}.xlsx"
+        sheet_title = g.name
+    else:
+        contacts = (
+            db.query(Contact)
+            .filter(Contact.tenant_id == user.tenant_id)
+            .order_by(Contact.name)
+            .all()
+        )
+        filename = "contacts.xlsx"
+        sheet_title = "Tous les contacts"
+
+    wb = _build_xlsx_workbook(contacts, sheet_title)
+    return _wb_to_response(wb, filename)
+
+
+@router.get("/template")
+def download_template(user: User = Depends(get_current_user)):
+    """Download an empty XLSX template for import."""
+    wb = _build_xlsx_workbook([], "Modèle")
+    return _wb_to_response(wb, "modele_contacts.xlsx")
+
+
+@router.post("/import")
+def import_contacts(
+    group_id: str,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Import contacts from an XLSX file into a group."""
+    if group_id == "__all__":
+        raise HTTPException(status_code=400, detail="Sélectionnez un groupe spécifique pour l'import")
+
+    g = _get_group(db, group_id, user.tenant_id)
+
+    if not file.filename or not file.filename.endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Le fichier doit être au format .xlsx")
+
+    try:
+        wb = load_workbook(io.BytesIO(file.file.read()), read_only=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Fichier Excel invalide")
+
+    ws = wb.active
+    rows = list(ws.iter_rows(min_row=2, values_only=True))
+    wb.close()
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="Le fichier ne contient aucun contact")
+
+    created = 0
+    errors = []
+    for i, row in enumerate(rows, 2):
+        # Pad row to 5 columns
+        padded = list(row) + [None] * (5 - len(row)) if len(row) < 5 else list(row)
+        name = str(padded[0]).strip() if padded[0] else ""
+        if not name:
+            errors.append(f"Ligne {i}: nom manquant")
+            continue
+
+        first_name = str(padded[1]).strip() if padded[1] else None
+        email = str(padded[2]).strip() if padded[2] else None
+        phone = str(padded[3]).strip() if padded[3] else None
+        role = str(padded[4]).strip() if padded[4] else None
+
+        c = Contact(
+            tenant_id=user.tenant_id,
+            name=name,
+            first_name=first_name,
+            email=email,
+            phone=phone,
+            role=role,
+        )
+        c.groups.append(g)
+        db.add(c)
+        created += 1
+
+    db.commit()
+    return {"created": created, "errors": errors}

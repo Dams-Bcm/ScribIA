@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Theme Switcher</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    gap: 48px;
+    min-height: 100vh;
+  }
+
+  h1 { font-size: 14px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
+  h2 { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 16px; }
+
+  .section { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+  /* ─── Option A : Pill toggle (comme iOS) ─── */
+  .pill-toggle {
+    display: flex;
+    background: #e2e8f0;
+    border-radius: 10px;
+    padding: 3px;
+    gap: 2px;
+    width: 220px;
+  }
+  .pill-toggle button {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #64748b;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .pill-toggle button.active {
+    background: white;
+    color: #0f172a;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .pill-toggle button svg { width: 14px; height: 14px; }
+
+  /* ─── Option B : Icônes seules avec fond actif ─── */
+  .icon-toggle {
+    display: flex;
+    gap: 4px;
+    background: #e2e8f0;
+    border-radius: 10px;
+    padding: 3px;
+  }
+  .icon-toggle button {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .icon-toggle button.active {
+    background: white;
+    color: #0f172a;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .icon-toggle button svg { width: 16px; height: 16px; }
+
+  /* ─── Option C : Toggle switch soleil/lune ─── */
+  .sun-moon-toggle {
+    position: relative;
+    width: 52px;
+    height: 28px;
+    background: #cbd5e1;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: background 0.3s;
+    border: none;
+    padding: 0;
+  }
+  .sun-moon-toggle.dark { background: #475569; }
+  .sun-moon-toggle .thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .sun-moon-toggle.dark .thumb { transform: translateX(24px); }
+  .sun-moon-toggle .thumb svg { width: 12px; height: 12px; }
+
+  /* ─── Option D : Cartes visuelles ─── */
+  .card-toggle {
+    display: flex;
+    gap: 10px;
+  }
+  .card-toggle button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 20px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 90px;
+  }
+  .card-toggle button.active {
+    border-color: #6366f1;
+    background: #eef2ff;
+  }
+  .card-toggle button .preview {
+    width: 48px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+  }
+  .card-toggle button .preview.light-preview {
+    background: linear-gradient(135deg, #fff 50%, #f1f5f9 50%);
+  }
+  .card-toggle button .preview.dark-preview {
+    background: linear-gradient(135deg, #1e293b 50%, #0f172a 50%);
+    border-color: #334155;
+  }
+  .card-toggle button .preview.auto-preview {
+    background: linear-gradient(135deg, #fff 50%, #1e293b 50%);
+    border-color: #94a3b8;
+  }
+  .card-toggle button span {
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+  }
+  .card-toggle button.active span { color: #4f46e5; font-weight: 600; }
+  .card-toggle button .check {
+    display: none;
+    position: absolute;
+    top: 6px; right: 6px;
+    width: 16px; height: 16px;
+    background: #6366f1;
+    border-radius: 50%;
+    color: white;
+  }
+
+  /* ─── Option E : Inline avec label ─── */
+  .inline-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    width: 280px;
+  }
+  .inline-row .label-part {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    font-size: 14px;
+    color: #334155;
+    font-weight: 500;
+  }
+  .inline-row .label-part svg { width: 16px; height: 16px; color: #64748b; }
+
+  /* ─── Context: dans le dropdown menu ─── */
+  .dropdown-preview {
+    width: 260px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+  }
+  .dropdown-preview .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #334155;
+    cursor: pointer;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+  .dropdown-preview .menu-item:hover { background: #f8fafc; }
+  .dropdown-preview .menu-item svg { width: 16px; height: 16px; color: #64748b; }
+  .dropdown-preview .menu-item .right { margin-left: auto; }
+  .dropdown-preview .sep { height: 1px; background: #f1f5f9; margin: 4px 8px; }
+  .dropdown-preview .user-info {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px 4px;
+  }
+  .dropdown-preview .user-info .name { font-size: 14px; font-weight: 600; color: #0f172a; }
+  .dropdown-preview .user-info .role { font-size: 12px; color: #94a3b8; }
+
+  /* Dark variants for context */
+  .dark-ctx {
+    background: #1e293b;
+    color: #e2e8f0;
+  }
+  .dark-ctx .menu-item { color: #e2e8f0; }
+  .dark-ctx .menu-item:hover { background: #334155; }
+  .dark-ctx .menu-item svg { color: #94a3b8; }
+  .dark-ctx .sep { background: #334155; }
+  .dark-ctx .user-info .name { color: #f1f5f9; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+
+  .context-label {
+    font-size: 11px;
+    color: #94a3b8;
+    text-align: center;
+    margin-top: -4px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Mockup — Sélecteur de thème</h1>
+
+<!-- ═══ Composants isolés ═══ -->
+
+<div class="section">
+  <h2>A — Pill toggle (3 options)</h2>
+  <div class="pill-toggle">
+    <button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      Clair
+    </button>
+    <button class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      Sombre
+    </button>
+    <button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      Auto
+    </button>
+  </div>
+</div>
+
+<div class="section">
+  <h2>B — Icônes compactes</h2>
+  <div class="icon-toggle">
+    <button title="Clair">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+    </button>
+    <button class="active" title="Sombre">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <button title="Système">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="section">
+  <h2>C — Switch simple (clair/sombre)</h2>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+    <button class="sun-moon-toggle dark" onclick="this.classList.toggle('dark')">
+      <div class="thumb">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </div>
+    </button>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  </div>
+</div>
+
+<div class="section">
+  <h2>D — Cartes visuelles</h2>
+  <div class="card-toggle">
+    <button>
+      <div class="preview light-preview"></div>
+      <span>Clair</span>
+    </button>
+    <button class="active">
+      <div class="preview dark-preview"></div>
+      <span>Sombre</span>
+    </button>
+    <button>
+      <div class="preview auto-preview"></div>
+      <span>Auto</span>
+    </button>
+  </div>
+</div>
+
+<div class="section">
+  <h2>E — Ligne inline (dans les options)</h2>
+  <div class="inline-row">
+    <div class="label-part">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      Thème
+    </div>
+    <div class="pill-toggle" style="width:150px;">
+      <button style="padding:5px 8px;font-size:12px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
+      <button class="active" style="padding:5px 8px;font-size:12px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <button style="padding:5px 8px;font-size:12px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ En contexte : dans le dropdown utilisateur ═══ -->
+
+<h1 style="margin-top:16px;">En contexte (dropdown utilisateur)</h1>
+
+<div class="grid">
+
+  <!-- Contexte avec option A -->
+  <div class="section">
+    <div class="dropdown-preview">
+      <div class="user-info">
+        <span class="name">Linxe</span>
+        <span class="role">admin</span>
+      </div>
+      <div class="sep"></div>
+      <button class="menu-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        Options
+      </button>
+      <div class="sep"></div>
+      <div style="padding:4px 12px 2px;">
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Thème</div>
+        <div class="pill-toggle" style="width:100%;margin-bottom:6px;">
+          <button style="padding:5px 8px;font-size:12px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            Clair
+          </button>
+          <button class="active" style="padding:5px 8px;font-size:12px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            Sombre
+          </button>
+        </div>
+      </div>
+      <div class="sep"></div>
+      <button class="menu-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        Déconnexion
+      </button>
+    </div>
+    <span class="context-label">Pill toggle intégré</span>
+  </div>
+
+  <!-- Contexte avec option B (icônes) -->
+  <div class="section">
+    <div class="dropdown-preview">
+      <div class="user-info">
+        <span class="name">Linxe</span>
+        <span class="role">admin</span>
+      </div>
+      <div class="sep"></div>
+      <button class="menu-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        Options
+      </button>
+      <div class="sep"></div>
+      <div class="menu-item" style="cursor:default;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        Thème
+        <div class="right">
+          <div class="icon-toggle" style="background:#f1f5f9;">
+            <button style="width:28px;height:28px;" title="Clair">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            </button>
+            <button class="active" style="width:28px;height:28px;" title="Sombre">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="sep"></div>
+      <button class="menu-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        Déconnexion
+      </button>
+    </div>
+    <span class="context-label">Icônes inline sur la ligne</span>
+  </div>
+
+</div>
+
+<script>
+  // Interactivité pour les toggles
+  document.querySelectorAll('.pill-toggle, .icon-toggle, .card-toggle').forEach(group => {
+    group.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        group.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+  });
+</script>
+
+</body>
+</html>

@@ -22,6 +22,8 @@ dist/
 # ── OS ──
 .DS_Store
 Thumbs.db
+nul
+frontend/nul
 
 # ── Docker ──
 docker-compose.override.yml
@@ -30,5 +32,14 @@ docker-compose.override.yml
 backend/alembic/versions/*.py
 !backend/alembic/versions/.gitkeep
 
+# ── Data (audio files, database, models) ──
+data/
+*.db
+*.sqlite
+*.sqlite3
+
 # ── Logs ──
 *.log
+
+# ── Revue ──
+revue.txt

@@ -64,7 +64,7 @@ def require_module(module_key: str):
         if not enabled:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Module '{module_key}' non activé pour cette organisation",
+                detail=f"Module '{module_key}' non activé pour ce tenant",
             )
         return True
     return _check

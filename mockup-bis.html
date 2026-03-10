@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup Bis — Réunion + Réunions planifiées (sidebar séparés)</title>
+<style>
+  :root {
+    --bg: #1a2138;
+    --fg: #e4e9f2;
+    --card: rgba(36, 48, 77, 0.7);
+    --primary: #7659ff;
+    --primary-fg: #fff;
+    --muted: rgba(36, 48, 77, 0.4);
+    --muted-fg: #8f9bb3;
+    --border: rgba(101, 117, 148, 0.25);
+    --input: rgba(101, 117, 148, 0.3);
+    --accent: rgba(115, 92, 255, 0.15);
+    --accent-fg: #c5bfff;
+    --destructive: #ff3d71;
+    --green: #4ade80;
+    --amber: #fbbf24;
+    --blue: #60a5fa;
+    --sidebar-bg: rgba(22, 30, 52, 0.85);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #1a2138 0%, #151a30 50%, #0d1117 100%);
+    background-attachment: fixed;
+    color: var(--fg);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 240px; background: var(--sidebar-bg); backdrop-filter: blur(16px);
+    border-right: 1px solid rgba(101, 117, 148, 0.15);
+    display: flex; flex-direction: column; min-height: 100vh;
+    position: fixed; left: 0; top: 0; bottom: 0; z-index: 50;
+  }
+  .sidebar-brand { padding: 20px; border-bottom: 1px solid var(--border); font-weight: 700; font-size: 1.2rem; }
+  .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+  .sidebar-section { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted-fg); padding: 0 12px; margin: 16px 0 4px; }
+  .sidebar-section:first-child { margin-top: 0; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px;
+    font-size: 0.875rem; font-weight: 500; color: var(--muted-fg); cursor: pointer;
+    transition: all 0.15s; text-decoration: none; position: relative;
+  }
+  .nav-item:hover { background: var(--accent); color: var(--accent-fg); }
+  .nav-item.active {
+    background: linear-gradient(135deg, #7659ff 0%, #6043e0 100%);
+    color: var(--primary-fg);
+    box-shadow: 0 2px 12px rgba(118, 89, 255, 0.3);
+  }
+  .nav-icon { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
+  .nav-item.active .nav-icon { opacity: 1; }
+  .nav-badge {
+    margin-left: auto; font-size: 10px; font-weight: 600; padding: 1px 7px;
+    border-radius: 100px; background: rgba(255, 61, 113, 0.2); color: #ff6b8a;
+  }
+  .nav-item.active .nav-badge { background: rgba(255,255,255,0.2); color: #fff; }
+  .sidebar-footer { padding: 12px; border-top: 1px solid var(--border); }
+  .user-info { padding: 0 12px 4px; }
+  .user-name { font-size: 0.875rem; font-weight: 500; }
+  .user-role { font-size: 0.75rem; color: var(--muted-fg); }
+  .sidebar-btn {
+    display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 12px; border-radius: 8px;
+    font-size: 0.875rem; color: var(--muted-fg); cursor: pointer; transition: all 0.15s;
+    background: none; border: none; text-align: left;
+  }
+  .sidebar-btn:hover { background: var(--accent); color: var(--accent-fg); }
+
+  /* ── Main ── */
+  .main { flex: 1; padding: 32px; margin-left: 240px; }
+
+  /* ── Page views ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card); backdrop-filter: blur(12px);
+    border: 1px solid var(--border); border-radius: 0.75rem; padding: 24px;
+  }
+
+  /* ── Header ── */
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .page-title { font-size: 1.5rem; font-weight: 700; }
+  .page-subtitle { font-size: 0.875rem; color: var(--muted-fg); margin-top: 2px; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;
+    border-radius: 8px; font-size: 0.875rem; font-weight: 500; border: none;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-primary { background: linear-gradient(135deg, #7659ff 0%, #6043e0 100%); color: var(--primary-fg); box-shadow: 0 2px 12px rgba(118, 89, 255, 0.3); }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--fg); }
+  .btn-outline:hover { background: var(--accent); }
+  .btn-sm { padding: 6px 12px; font-size: 0.8125rem; }
+  .btn-destructive { background: var(--destructive); color: #fff; }
+  .btn-green { background: rgba(34, 197, 94, 0.15); color: var(--green); border: 1px solid rgba(34, 197, 94, 0.3); }
+  .btn-green:hover { background: rgba(34, 197, 94, 0.25); }
+
+  /* ── Table ── */
+  .table-wrap { border-radius: 0.75rem; border: 1px solid var(--border); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  th { text-align: left; padding: 12px 16px; font-weight: 500; background: rgba(36, 48, 77, 0.6); color: var(--muted-fg); }
+  td { padding: 12px 16px; border-top: 1px solid var(--border); }
+  tr:hover td { background: rgba(115, 92, 255, 0.05); }
+
+  /* ── Badge ── */
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 500; padding: 2px 10px; border-radius: 100px; }
+  .badge-green { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+  .badge-amber { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+  .badge-blue { background: rgba(59, 130, 246, 0.15); color: var(--blue); }
+  .badge-muted { background: var(--muted); color: var(--muted-fg); }
+  .badge-red { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+  .dot-green { background: var(--green); }
+  .dot-blue { background: var(--blue); }
+
+  /* ── Avatars ── */
+  .avatar-stack { display: flex; }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 11px; font-weight: 600; border: 2px solid var(--bg); margin-left: -6px;
+  }
+  .avatar:first-child { margin-left: 0; }
+  .avatar-purple { background: #7659ff; color: #fff; }
+  .avatar-blue { background: #3b82f6; color: #fff; }
+  .avatar-green { background: #22c55e; color: #fff; }
+  .avatar-amber { background: #f59e0b; color: #fff; }
+  .avatar-pink { background: #ec4899; color: #fff; }
+  .avatar-more { background: var(--muted); color: var(--muted-fg); font-size: 10px; }
+
+  /* ── Stats ── */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--card); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 0.75rem; padding: 16px; }
+  .stat-value { font-size: 1.5rem; font-weight: 700; }
+  .stat-label { font-size: 0.75rem; color: var(--muted-fg); margin-top: 2px; }
+
+  /* ── Detail ── */
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .detail-label { font-size: 0.75rem; color: var(--muted-fg); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 4px; }
+  .detail-value { font-size: 0.875rem; }
+
+  /* ── Participants ── */
+  .participant-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 0.875rem; transition: background 0.1s; }
+  .participant-row:hover { background: var(--accent); }
+  .participant-name { flex: 1; }
+  .participant-role { color: var(--muted-fg); font-size: 0.8125rem; }
+
+  /* ── Form ── */
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-size: 0.8125rem; font-weight: 500; margin-bottom: 6px; }
+  .form-hint { font-size: 0.75rem; color: var(--muted-fg); font-weight: 400; }
+  .form-input { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--input); background: rgba(22, 30, 52, 0.6); color: var(--fg); font-size: 0.875rem; outline: none; transition: border-color 0.15s; font-family: inherit; }
+  .form-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(118, 89, 255, 0.2); }
+  .form-input::placeholder { color: #596882; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* ── Checkbox ── */
+  .checkbox-row { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 0.875rem; }
+  .checkbox-row:hover { background: rgba(115, 92, 255, 0.08); }
+  .cbox { width: 16px; height: 16px; border-radius: 4px; border: 2px solid var(--input); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .cbox.checked { background: var(--primary); border-color: var(--primary); }
+  .cbox.checked::after { content: "✓"; color: #fff; font-size: 11px; }
+  .voice-enrolled { color: var(--green); }
+  .voice-not { color: var(--muted-fg); opacity: 0.4; }
+
+  .section-title { font-size: 0.875rem; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  /* ── Modal ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: #1a2138; border: 1px solid var(--border); border-radius: 0.75rem; padding: 24px; width: 100%; max-width: 540px; max-height: 80vh; overflow-y: auto; }
+  .modal-title { font-size: 1.125rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+  .select-trigger { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--input); background: rgba(22, 30, 52, 0.6); color: var(--fg); font-size: 0.875rem; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+  .select-trigger::after { content: "▾"; color: var(--muted-fg); font-size: 12px; }
+
+  /* ── Waveform ── */
+  .waveform { display: flex; align-items: center; gap: 2px; height: 32px; }
+  .waveform-bar { width: 3px; background: var(--primary); border-radius: 2px; animation: wave 1.2s ease-in-out infinite; }
+  @keyframes wave { 0%, 100% { height: 8px; opacity: 0.4; } 50% { height: 24px; opacity: 1; } }
+  .rec-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff3d71; animation: blink 1s infinite; margin-right: 6px; }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .text-sm { font-size: 0.875rem; }
+  .text-xs { font-size: 0.75rem; }
+  .text-muted { color: var(--muted-fg); }
+  .font-medium { font-weight: 500; }
+  .mt-2 { margin-top: 8px; }
+  .mb-4 { margin-bottom: 16px; }
+
+  /* ── Empty state ── */
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 24px; text-align: center; }
+  .empty-icon { width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-brand">Scrib' IA</div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Général</div>
+    <a class="nav-item" href="#" onclick="navigate('dashboard')">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+      Tableau de bord
+    </a>
+
+    <div class="sidebar-section">Modules</div>
+    <a class="nav-item" href="#" onclick="navigate('dictee')">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+      Dictée vocale
+    </a>
+    <a class="nav-item" href="#" id="nav-reunion" onclick="navigate('reunion')">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+      Réunion
+    </a>
+    <a class="nav-item" href="#" id="nav-planned" onclick="navigate('planned')">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+      Réunions planifiées
+      <span class="nav-badge">3</span>
+    </a>
+    <a class="nav-item" href="#" onclick="navigate('docs')">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+      Documents IA
+    </a>
+    <a class="nav-item" href="#" onclick="navigate('contacts')">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Contacts
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-info">
+      <div class="user-name">David Caumont</div>
+      <div class="user-role">super_admin</div>
+    </div>
+    <button class="sidebar-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      Options
+    </button>
+    <button class="sidebar-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+      Déconnexion
+    </button>
+  </div>
+</aside>
+
+<!-- ═══════════════ MAIN ═══════════════ -->
+<div class="main">
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- PAGE: RÉUNION (enregistrement libre + import)   -->
+  <!-- ════════════════════════════════════════════════ -->
+  <div id="page-reunion" class="page active">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Réunion</div>
+        <div class="page-subtitle">Enregistrer ou importer un fichier audio</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 720px;">
+      <!-- Card: Enregistrer -->
+      <div class="card" style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(118, 89, 255, 0.15); display: flex; align-items: center; justify-content: center;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7659ff" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        </div>
+        <div>
+          <div class="font-medium" style="margin-bottom: 4px;">Enregistrer en direct</div>
+          <p class="text-sm text-muted">Lancez un enregistrement live. Les locuteurs seront identifiés après la transcription.</p>
+        </div>
+        <button class="btn btn-primary" style="margin-top: auto;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+          Démarrer
+        </button>
+      </div>
+
+      <!-- Card: Importer -->
+      <div class="card" style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(59, 130, 246, 0.15); display: flex; align-items: center; justify-content: center;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        </div>
+        <div>
+          <div class="font-medium" style="margin-bottom: 4px;">Importer un fichier</div>
+          <p class="text-sm text-muted">Importez un enregistrement audio existant pour le transcrire et l'analyser.</p>
+        </div>
+        <button class="btn btn-outline" style="margin-top: auto;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+          Choisir un fichier
+        </button>
+      </div>
+    </div>
+
+    <p class="text-xs text-muted" style="margin-top: 12px; max-width: 720px;">
+      Pour identifier automatiquement les participants grâce à leur profil vocal, utilisez les
+      <a href="#" onclick="navigate('planned'); return false;" style="color: var(--accent-fg); text-decoration: underline;">Réunions planifiées</a>.
+    </p>
+  </div>
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- PAGE: RÉUNIONS PLANIFIÉES                       -->
+  <!-- ════════════════════════════════════════════════ -->
+  <div id="page-planned" class="page">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Réunions planifiées</div>
+        <div class="page-subtitle">Planifiez vos réunions pour identifier automatiquement les participants</div>
+      </div>
+      <button class="btn btn-primary" onclick="toggleModal('create-modal')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+        Planifier une réunion
+      </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat-card"><div class="stat-value">12</div><div class="stat-label">Planifiées</div></div>
+      <div class="stat-card"><div class="stat-value" style="color: #ff6b8a;">3</div><div class="stat-label">En cours</div></div>
+      <div class="stat-card"><div class="stat-value">47</div><div class="stat-label">Terminées</div></div>
+      <div class="stat-card"><div class="stat-value" style="color: var(--green);">8</div><div class="stat-label">Profils vocaux</div></div>
+    </div>
+
+    <!-- Search -->
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="position: relative; flex: 1; max-width: 320px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position: absolute; left: 10px; top: 9px; color: var(--muted-fg);"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input class="form-input" placeholder="Rechercher une réunion..." style="padding-left: 32px;">
+      </div>
+    </div>
+
+    <!-- LIST view -->
+    <div id="planned-list">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Réunion</th>
+              <th>Date & heure</th>
+              <th>Lieu</th>
+              <th>Participants</th>
+              <th>Profils vocaux</th>
+              <th>Statut</th>
+              <th style="width:120px;text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="cursor:pointer;" onclick="showDetail()">
+              <td><div class="font-medium">Conseil municipal</div><div class="text-xs text-muted">Budget prévisionnel 2026</div></td>
+              <td><div>12 mars 2026</div><div class="text-xs text-muted">14:00 — 16:00</div></td>
+              <td>Salle du conseil</td>
+              <td>
+                <div class="avatar-stack">
+                  <div class="avatar avatar-purple">JD</div><div class="avatar avatar-blue">ML</div><div class="avatar avatar-green">PB</div><div class="avatar avatar-amber">SC</div><div class="avatar avatar-more">+4</div>
+                </div>
+              </td>
+              <td><span class="badge badge-green"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/></svg> 6/8</span></td>
+              <td><span class="badge badge-blue"><span class="dot dot-blue"></span> Planifiée</span></td>
+              <td style="text-align:right;"><button class="btn btn-green btn-sm" onclick="event.stopPropagation(); showRecording()">Lancer</button></td>
+            </tr>
+            <tr style="cursor:pointer;" onclick="showRecording()">
+              <td><div class="font-medium">Commission urbanisme</div><div class="text-xs text-muted">PLU révision</div></td>
+              <td><div>8 mars 2026</div><div class="text-xs text-muted">10:00 — 12:00</div></td>
+              <td>Salle des fêtes</td>
+              <td>
+                <div class="avatar-stack"><div class="avatar avatar-blue">ML</div><div class="avatar avatar-pink">AF</div><div class="avatar avatar-green">PB</div></div>
+              </td>
+              <td><span class="badge badge-green"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/></svg> 3/3</span></td>
+              <td><span class="badge badge-red"><span class="rec-dot"></span> En cours</span></td>
+              <td style="text-align:right;"><button class="btn btn-destructive btn-sm" onclick="event.stopPropagation()">Arrêter</button></td>
+            </tr>
+            <tr>
+              <td><div class="font-medium">Réunion DGS</div><div class="text-xs text-muted">Point hebdomadaire</div></td>
+              <td><div>5 mars 2026</div><div class="text-xs text-muted">09:00 — 10:30</div></td>
+              <td>Bureau DGS</td>
+              <td><div class="avatar-stack"><div class="avatar avatar-purple">JD</div><div class="avatar avatar-amber">SC</div></div></td>
+              <td><span class="badge badge-green"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/></svg> 2/2</span></td>
+              <td><span class="badge badge-green"><span class="dot dot-green"></span> Terminée</span></td>
+              <td style="text-align:right;"><button class="btn btn-outline btn-sm">Voir</button></td>
+            </tr>
+            <tr>
+              <td><div class="font-medium">Commission finances</div><div class="text-xs text-muted">Comptes administratifs</div></td>
+              <td><div>3 mars 2026</div><div class="text-xs text-muted">14:00 — 15:30</div></td>
+              <td>Salle polyvalente</td>
+              <td><div class="avatar-stack"><div class="avatar avatar-blue">ML</div><div class="avatar avatar-green">PB</div><div class="avatar avatar-amber">SC</div><div class="avatar avatar-more">+2</div></div></td>
+              <td><span class="badge badge-amber"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/></svg> 3/5</span></td>
+              <td><span class="badge badge-green"><span class="dot dot-green"></span> Terminée</span></td>
+              <td style="text-align:right;"><button class="btn btn-outline btn-sm">Voir</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="text-xs text-muted mt-2">4 réunion(s) — 1 en cours</div>
+    </div>
+
+    <!-- DETAIL view (hidden by default) -->
+    <div id="planned-detail" style="display: none;">
+      <button class="btn btn-outline btn-sm mb-4" onclick="hideDetail()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+        Retour à la liste
+      </button>
+      <div class="card">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <h2 style="font-size: 1.25rem; font-weight: 700;">Conseil municipal</h2>
+              <span class="badge badge-blue"><span class="dot dot-blue"></span> Planifiée</span>
+            </div>
+            <div class="text-sm text-muted mt-2">Budget prévisionnel 2026</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-outline btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+              Modifier
+            </button>
+            <button class="btn btn-green" style="font-size: 0.875rem; padding: 8px 20px;" onclick="showRecording()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+              Lancer l'enregistrement
+            </button>
+          </div>
+        </div>
+        <div class="detail-grid mb-4">
+          <div><div class="detail-label">Date & heure</div><div class="detail-value">12 mars 2026 — 14:00 à 16:00</div></div>
+          <div><div class="detail-label">Lieu</div><div class="detail-value">Salle du conseil — Mairie de Linxe</div></div>
+          <div><div class="detail-label">Créée par</div><div class="detail-value">David Caumont</div></div>
+          <div><div class="detail-label">Groupe de contacts</div><div class="detail-value">Elus</div></div>
+        </div>
+        <hr class="divider">
+        <div class="section-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          Participants (8)
+          <span class="badge badge-green" style="margin-left: auto;">6 profils vocaux</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div class="participant-row"><div class="avatar avatar-purple" style="width:32px;height:32px;margin:0;font-size:12px;">JD</div><div class="participant-name">Jean Dupont</div><div class="participant-role">Maire</div><span class="badge badge-green">Enrollé</span></div>
+          <div class="participant-row"><div class="avatar avatar-blue" style="width:32px;height:32px;margin:0;font-size:12px;">ML</div><div class="participant-name">Marie Laurent</div><div class="participant-role">1ère adjointe</div><span class="badge badge-green">Enrollé</span></div>
+          <div class="participant-row"><div class="avatar avatar-green" style="width:32px;height:32px;margin:0;font-size:12px;">PB</div><div class="participant-name">Pierre Bernard</div><div class="participant-role">Adjoint finances</div><span class="badge badge-green">Enrollé</span></div>
+          <div class="participant-row"><div class="avatar avatar-amber" style="width:32px;height:32px;margin:0;font-size:12px;">SC</div><div class="participant-name">Sophie Clement</div><div class="participant-role">Adjointe culture</div><span class="badge badge-green">Enrollé</span></div>
+          <div class="participant-row"><div class="avatar avatar-pink" style="width:32px;height:32px;margin:0;font-size:12px;">AF</div><div class="participant-name">Antoine Fabre</div><div class="participant-role">Adjoint urbanisme</div><span class="badge badge-green">Enrollé</span></div>
+          <div class="participant-row"><div class="avatar" style="width:32px;height:32px;margin:0;font-size:12px;background:#6366f1;color:#fff;">LR</div><div class="participant-name">Lucie Renard</div><div class="participant-role">Adjointe jeunesse</div><span class="badge badge-green">Enrollé</span></div>
+          <div class="participant-row" style="opacity:0.6;"><div class="avatar" style="width:32px;height:32px;margin:0;font-size:12px;background:var(--muted);color:var(--muted-fg);">RG</div><div class="participant-name">Robert Garcia</div><div class="participant-role">Conseiller</div><span class="badge badge-muted">Non enrollé</span></div>
+          <div class="participant-row" style="opacity:0.6;"><div class="avatar" style="width:32px;height:32px;margin:0;font-size:12px;background:var(--muted);color:var(--muted-fg);">CM</div><div class="participant-name">Claire Martin</div><div class="participant-role">Conseillère</div><span class="badge badge-muted">Non enrollé</span></div>
+        </div>
+        <div style="margin-top: 12px; padding: 12px 16px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; font-size: 0.8125rem; color: var(--amber); display: flex; align-items: flex-start; gap: 8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <div><strong>2 participants sans profil vocal</strong> — ils apparaîtront comme "Speaker inconnu". <a href="#" style="color:var(--accent-fg);text-decoration:underline;">Enroller</a></div>
+        </div>
+        <hr class="divider">
+        <div class="section-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>
+          Notes
+        </div>
+        <p class="text-sm text-muted">Ordre du jour : présentation du budget prévisionnel, vote des taux d'imposition, investissements voirie.</p>
+      </div>
+    </div>
+
+    <!-- RECORDING view (hidden by default) -->
+    <div id="planned-recording" style="display: none;">
+      <button class="btn btn-outline btn-sm mb-4" onclick="hideRecording()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+        Retour à la liste
+      </button>
+      <div class="card">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span class="rec-dot" style="width:12px;height:12px;"></span>
+            <div>
+              <h2 style="font-size: 1.25rem; font-weight: 700;">Commission urbanisme</h2>
+              <div class="text-sm text-muted">PLU révision — Salle des fêtes</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--primary);">01:23:45</div>
+            <button class="btn btn-destructive">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+              Arrêter
+            </button>
+          </div>
+        </div>
+        <div style="background: rgba(22, 30, 52, 0.4); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <div class="waveform" style="justify-content: center;">
+            <div class="waveform-bar" style="animation-delay:0s;"></div><div class="waveform-bar" style="animation-delay:0.1s;"></div><div class="waveform-bar" style="animation-delay:0.2s;"></div><div class="waveform-bar" style="animation-delay:0.3s;"></div><div class="waveform-bar" style="animation-delay:0.15s;"></div><div class="waveform-bar" style="animation-delay:0.25s;"></div><div class="waveform-bar" style="animation-delay:0.35s;"></div><div class="waveform-bar" style="animation-delay:0.05s;"></div><div class="waveform-bar" style="animation-delay:0.4s;"></div><div class="waveform-bar" style="animation-delay:0.2s;"></div><div class="waveform-bar" style="animation-delay:0.1s;"></div><div class="waveform-bar" style="animation-delay:0.3s;"></div><div class="waveform-bar" style="animation-delay:0.45s;"></div><div class="waveform-bar" style="animation-delay:0.15s;"></div><div class="waveform-bar" style="animation-delay:0.35s;"></div><div class="waveform-bar" style="animation-delay:0.05s;"></div><div class="waveform-bar" style="animation-delay:0.25s;"></div><div class="waveform-bar" style="animation-delay:0.4s;"></div><div class="waveform-bar" style="animation-delay:0.1s;"></div><div class="waveform-bar" style="animation-delay:0.2s;"></div>
+          </div>
+        </div>
+        <div class="section-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          Identification en temps réel
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px;">
+          <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 8px; padding: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <div class="avatar avatar-blue" style="width:24px;height:24px;margin:0;font-size:10px;">ML</div>
+              <span class="font-medium text-sm">Marie Laurent</span>
+              <span class="badge badge-green" style="margin-left:auto;font-size:10px;">95%</span>
+            </div>
+            <div class="text-xs text-muted">Parle actuellement</div>
+            <div style="width:100%;height:3px;background:rgba(34,197,94,0.2);border-radius:2px;margin-top:6px;"><div style="width:95%;height:100%;background:var(--green);border-radius:2px;"></div></div>
+          </div>
+          <div style="background: rgba(36, 48, 77, 0.3); border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <div class="avatar avatar-pink" style="width:24px;height:24px;margin:0;font-size:10px;">AF</div>
+              <span class="font-medium text-sm">Antoine Fabre</span>
+              <span class="badge badge-green" style="margin-left:auto;font-size:10px;">91%</span>
+            </div>
+            <div class="text-xs text-muted">Il y a 2 min</div>
+            <div style="width:100%;height:3px;background:rgba(34,197,94,0.2);border-radius:2px;margin-top:6px;"><div style="width:91%;height:100%;background:var(--green);border-radius:2px;"></div></div>
+          </div>
+          <div style="background: rgba(36, 48, 77, 0.3); border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <div class="avatar avatar-green" style="width:24px;height:24px;margin:0;font-size:10px;">PB</div>
+              <span class="font-medium text-sm">Pierre Bernard</span>
+              <span class="badge badge-green" style="margin-left:auto;font-size:10px;">88%</span>
+            </div>
+            <div class="text-xs text-muted">Il y a 8 min</div>
+            <div style="width:100%;height:3px;background:rgba(34,197,94,0.2);border-radius:2px;margin-top:6px;"><div style="width:88%;height:100%;background:var(--green);border-radius:2px;"></div></div>
+          </div>
+        </div>
+        <hr class="divider">
+        <div class="section-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>
+          Transcription en direct
+        </div>
+        <div style="background: rgba(22, 30, 52, 0.4); border-radius: 8px; padding: 16px; max-height: 300px; overflow-y: auto;">
+          <div style="margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+              <span class="font-medium text-sm" style="color: #60a5fa;">Marie Laurent</span>
+              <span class="text-xs text-muted">01:22:30</span>
+            </div>
+            <p class="text-sm">Concernant le point numéro trois, la révision du PLU, nous avons reçu les observations du commissaire enquêteur...</p>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+              <span class="font-medium text-sm" style="color: #ec4899;">Antoine Fabre</span>
+              <span class="text-xs text-muted">01:23:15</span>
+            </div>
+            <p class="text-sm">La première remarque porte sur la zone AU2 qui devrait être reclassifiée. J'ai préparé un document de synthèse.</p>
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+              <span class="font-medium text-sm" style="color: #60a5fa;">Marie Laurent</span>
+              <span class="text-xs text-muted">01:23:40</span>
+              <span style="display:inline-flex;align-items:center;gap:3px;color:var(--green);font-size:11px;"><span class="rec-dot" style="width:6px;height:6px;background:var(--green);"></span> en cours</span>
+            </div>
+            <p class="text-sm" style="opacity: 0.7;">Très bien, est-ce que tout le monde a eu le temps de consulter le document ?...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════ MODAL: PLANIFIER ═══════════════ -->
+<div class="modal-overlay" id="create-modal">
+  <div class="modal">
+    <div class="modal-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+      Planifier une réunion
+    </div>
+    <div class="form-group"><label class="form-label">Titre *</label><input class="form-input" value="Conseil municipal"></div>
+    <div class="form-group"><label class="form-label">Description</label><input class="form-input" value="Budget prévisionnel 2026"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Date *</label><input class="form-input" type="date" value="2026-03-12"></div>
+      <div class="form-group"><label class="form-label">Heure</label><div class="form-row" style="gap:8px;"><input class="form-input" type="time" value="14:00"><input class="form-input" type="time" value="16:00"></div></div>
+    </div>
+    <div class="form-group"><label class="form-label">Lieu</label><input class="form-input" value="Salle du conseil"></div>
+    <hr class="divider">
+    <div class="form-group">
+      <label class="form-label">Participants <span class="form-hint">— sélectionnez un groupe</span></label>
+      <div class="select-trigger">Elus (8 contacts)</div>
+      <div style="margin-top: 12px; max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-bottom: 1px solid var(--border);">
+          <span class="text-xs text-muted">8 contacts — <span style="color: var(--green);">6 profils vocaux</span></span>
+          <div style="display: flex; gap: 8px;">
+            <button class="text-xs" style="color:var(--primary);background:none;border:none;cursor:pointer;">Tout</button>
+            <span class="text-xs text-muted">|</span>
+            <button class="text-xs" style="color:var(--primary);background:none;border:none;cursor:pointer;">Aucun</button>
+          </div>
+        </div>
+        <div class="checkbox-row"><div class="cbox checked"></div><span>Jean Dupont</span><span class="text-xs text-muted">Maire</span><span class="voice-enrolled" style="margin-left:auto;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></span></div>
+        <div class="checkbox-row"><div class="cbox checked"></div><span>Marie Laurent</span><span class="text-xs text-muted">1ère adjointe</span><span class="voice-enrolled" style="margin-left:auto;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></span></div>
+        <div class="checkbox-row"><div class="cbox checked"></div><span>Pierre Bernard</span><span class="text-xs text-muted">Adjoint finances</span><span class="voice-enrolled" style="margin-left:auto;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></span></div>
+        <div class="checkbox-row"><div class="cbox checked"></div><span>Sophie Clement</span><span class="text-xs text-muted">Adjointe culture</span><span class="voice-enrolled" style="margin-left:auto;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></span></div>
+        <div class="checkbox-row"><div class="cbox checked"></div><span>Robert Garcia</span><span class="text-xs text-muted">Conseiller</span><span class="voice-not" style="margin-left:auto;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></span></div>
+        <div class="checkbox-row"><div class="cbox checked"></div><span>Claire Martin</span><span class="text-xs text-muted">Conseillère</span><span class="voice-not" style="margin-left:auto;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></span></div>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Notes <span class="form-hint">(optionnel)</span></label><textarea class="form-input" rows="2" style="resize:vertical;">Présentation du budget prévisionnel, vote des taux.</textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="toggleModal('create-modal')">Annuler</button>
+      <button class="btn btn-primary" onclick="toggleModal('create-modal')">Planifier</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function navigate(page) {
+  // Update sidebar
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (page === 'reunion') document.getElementById('nav-reunion').classList.add('active');
+  else if (page === 'planned') document.getElementById('nav-planned').classList.add('active');
+
+  // Show page
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  if (page === 'reunion') document.getElementById('page-reunion').classList.add('active');
+  else if (page === 'planned') {
+    document.getElementById('page-planned').classList.add('active');
+    hideDetail(); hideRecording();
+  }
+  return false;
+}
+
+function showDetail() {
+  document.getElementById('planned-list').style.display = 'none';
+  document.getElementById('planned-detail').style.display = 'block';
+  document.getElementById('planned-recording').style.display = 'none';
+}
+function hideDetail() {
+  document.getElementById('planned-list').style.display = 'block';
+  document.getElementById('planned-detail').style.display = 'none';
+}
+function showRecording() {
+  document.getElementById('planned-list').style.display = 'none';
+  document.getElementById('planned-detail').style.display = 'none';
+  document.getElementById('planned-recording').style.display = 'block';
+}
+function hideRecording() {
+  document.getElementById('planned-list').style.display = 'block';
+  document.getElementById('planned-recording').style.display = 'none';
+}
+function toggleModal(id) {
+  document.getElementById(id).classList.toggle('active');
+}
+document.getElementById('create-modal').addEventListener('click', function(e) {
+  if (e.target === this) toggleModal('create-modal');
+});
+</script>
+</body>
+</html>

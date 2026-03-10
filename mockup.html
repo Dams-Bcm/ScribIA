@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup – Réunion (après transcription)</title>
+<style>
+  /* ── Reset & base ──────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #151a30;
+    --surface: rgba(36, 48, 77, 0.55);
+    --surface-solid: #1e2a47;
+    --border: rgba(101, 117, 148, 0.25);
+    --border-light: rgba(101, 117, 148, 0.15);
+    --text: #e4e9f2;
+    --text-muted: #8f9bb3;
+    --primary: #7659ff;
+    --primary-light: rgba(115, 92, 255, 0.15);
+    --green: #34d399;
+    --green-bg: rgba(16, 185, 129, 0.12);
+    --green-border: rgba(16, 185, 129, 0.25);
+    --amber: #fbbf24;
+    --amber-bg: rgba(245, 158, 11, 0.12);
+    --amber-border: rgba(245, 158, 11, 0.25);
+    --red: #f87171;
+    --sidebar-w: 240px;
+    --radius: 0.75rem;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #1a2138 0%, #151a30 50%, #0d1117 100%);
+    background-attachment: fixed;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ── Sidebar (simplifié) ───────────────────────────────────────── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: rgba(22, 30, 52, 0.85);
+    backdrop-filter: blur(16px);
+    border-right: 1px solid var(--border-light);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 50;
+  }
+  .sidebar-brand { padding: 20px; font-weight: 700; font-size: 1.25rem; border-bottom: 1px solid var(--border-light); }
+  .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+  .sidebar-section { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); padding: 0 12px; margin: 16px 0 4px; }
+  .sidebar-section:first-child { margin-top: 0; }
+  .sidebar-link {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 12px; border-radius: 8px; font-size: 0.875rem; font-weight: 500;
+    color: var(--text-muted); text-decoration: none; transition: all .15s;
+  }
+  .sidebar-link:hover { background: var(--primary-light); color: var(--text); }
+  .sidebar-link.active { background: linear-gradient(135deg, #7659ff 0%, #6043e0 100%); color: #fff; box-shadow: 0 2px 12px rgba(118, 89, 255, 0.3); }
+  .sidebar-link svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  /* ── Main content ──────────────────────────────────────────────── */
+  .main { flex: 1; margin-left: var(--sidebar-w); padding: 32px; min-height: 100vh; }
+
+  /* ── Page header ───────────────────────────────────────────────── */
+  .page-header h1 { font-size: 1.5rem; font-weight: 700; }
+  .page-header p { font-size: 0.875rem; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── Back button ───────────────────────────────────────────────── */
+  .back-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.875rem; color: var(--text-muted); text-decoration: none;
+    margin: 16px 0 12px; transition: color .15s;
+  }
+  .back-btn:hover { color: var(--text); }
+  .back-btn svg { width: 16px; height: 16px; }
+
+  /* ── Card ───────────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  /* ── Job header card ───────────────────────────────────────────── */
+  .job-header { padding: 16px 20px; }
+  .job-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .job-title { font-size: 1rem; font-weight: 600; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+  }
+  .badge-muted { background: rgba(101,117,148,0.2); color: var(--text-muted); }
+  .badge-green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+  .badge-primary { background: var(--primary-light); color: #c5bfff; }
+  .job-filename { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── Consent compact bar ─── LA CLÉ DU REDESIGN ────────────────── */
+  .consent-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    border-top: 1px solid var(--border);
+    background: rgba(22, 30, 52, 0.3);
+    flex-wrap: wrap;
+  }
+  .consent-bar-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .consent-bar-icon.ok { background: var(--green-bg); color: var(--green); }
+  .consent-bar-icon.pending { background: var(--amber-bg); color: var(--amber); }
+  .consent-bar-icon.blocked { background: rgba(239,68,68,0.12); color: var(--red); }
+  .consent-bar-info { flex: 1; min-width: 200px; }
+  .consent-bar-title { font-size: 0.8125rem; font-weight: 600; }
+  .consent-bar-detail { font-size: 0.75rem; color: var(--text-muted); margin-top: 1px; }
+  .consent-bar-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .consent-bar-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  /* ── Consent expanded panel (accordion) ────────────────────────── */
+  .consent-panel {
+    border-top: 1px solid var(--border);
+    padding: 16px 20px;
+    background: rgba(22, 30, 52, 0.2);
+    display: none;
+  }
+  .consent-panel.open { display: block; }
+  .consent-panel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .consent-section-title {
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .consent-section-title svg { width: 14px; height: 14px; }
+  .attendee-list {
+    max-height: 160px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .attendee-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 8px; border-radius: 6px; font-size: 0.8125rem;
+    background: rgba(36, 48, 77, 0.4);
+  }
+  .attendee-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .attendee-status.oral { background: var(--primary); }
+  .attendee-status.email { background: var(--green); }
+  .attendee-status.pending { background: var(--amber); }
+  .attendee-name { flex: 1; }
+  .attendee-method { font-size: 0.6875rem; color: var(--text-muted); }
+
+  .consent-selector {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .consent-selector p { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
+  .consent-selector select {
+    width: 100%; padding: 6px 10px; border-radius: 6px; font-size: 0.8125rem;
+    background: rgba(22, 30, 52, 0.6); border: 1px solid var(--border);
+    color: var(--text); outline: none;
+  }
+  .consent-selector select:focus { border-color: var(--primary); }
+
+  /* ── Toolbar ────────────────────────────────────────────────────── */
+  .toolbar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 12px 0; flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 8px; font-size: 0.8125rem; font-weight: 500;
+    border: 1px solid var(--border); background: transparent; color: var(--text);
+    cursor: pointer; transition: all .15s; white-space: nowrap;
+  }
+  .btn:hover { background: var(--primary-light); border-color: rgba(118,89,255,0.3); }
+  .btn svg { width: 14px; height: 14px; }
+  .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn-primary:hover { background: #6043e0; }
+  .btn-ghost { border-color: transparent; }
+  .btn-ghost:hover { background: var(--primary-light); }
+  .btn-sm { padding: 4px 10px; font-size: 0.75rem; }
+
+  /* ── Two-column layout ─────────────────────────────────────────── */
+  .content-grid {
+    display: flex; gap: 16px; margin-top: 4px;
+  }
+
+  /* ── Speakers panel ────────────────────────────────────────────── */
+  .speakers-panel {
+    width: 240px; flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .speakers-title { font-size: 0.875rem; font-weight: 600; margin-bottom: 4px; }
+  .speaker-card {
+    border-radius: 8px; border: 1px solid var(--border);
+    padding: 10px 12px; transition: all .15s;
+    cursor: pointer;
+  }
+  .speaker-card:hover { border-color: rgba(118,89,255,0.3); }
+  .speaker-top { display: flex; align-items: center; gap: 8px; }
+  .speaker-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .speaker-name { font-size: 0.8125rem; font-weight: 600; flex: 1; }
+  .speaker-actions { display: flex; gap: 4px; }
+  .speaker-actions button {
+    background: transparent; border: none; color: var(--text-muted);
+    cursor: pointer; padding: 2px; border-radius: 4px;
+  }
+  .speaker-actions button:hover { color: var(--text); }
+  .speaker-actions svg { width: 14px; height: 14px; }
+  .speaker-stats { font-size: 0.6875rem; color: var(--text-muted); margin-top: 4px; margin-left: 20px; }
+
+  /* Speaker colors */
+  .sp-blue { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.3); }
+  .sp-blue .speaker-dot { background: #3b82f6; }
+  .sp-blue .speaker-name { color: #93c5fd; }
+  .sp-amber { background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.3); }
+  .sp-amber .speaker-dot { background: #f59e0b; }
+  .sp-amber .speaker-name { color: #fcd34d; }
+  .sp-green { background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.3); }
+  .sp-green .speaker-dot { background: #10b981; }
+  .sp-green .speaker-name { color: #6ee7b7; }
+  .sp-rose { background: rgba(244,63,94,0.15); border-color: rgba(244,63,94,0.3); }
+  .sp-rose .speaker-dot { background: #f43f5e; }
+  .sp-rose .speaker-name { color: #fda4af; }
+  .sp-purple { background: rgba(147,51,234,0.15); border-color: rgba(147,51,234,0.3); }
+  .sp-purple .speaker-dot { background: #9333ea; }
+  .sp-purple .speaker-name { color: #c4b5fd; }
+
+  /* ── Transcript ────────────────────────────────────────────────── */
+  .transcript-panel { flex: 1; min-width: 0; }
+  .transcript-instructions { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
+  .transcript-scroll {
+    max-height: 65vh; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .segment {
+    display: flex; gap: 8px; padding: 6px 8px; border-radius: 8px;
+    align-items: flex-start; transition: background .1s;
+  }
+  .segment:hover { background: rgba(36, 48, 77, 0.4); }
+  .seg-play {
+    background: transparent; border: none; color: var(--text-muted);
+    cursor: pointer; padding: 2px; margin-top: 1px; flex-shrink: 0;
+  }
+  .seg-play:hover { color: var(--text); }
+  .seg-play svg { width: 14px; height: 14px; }
+  .seg-speaker {
+    font-size: 0.6875rem; font-weight: 600; padding: 1px 6px;
+    border-radius: 4px; flex-shrink: 0; margin-top: 1px;
+  }
+  .seg-speaker.sp-blue-tag { background: rgba(59,130,246,0.2); color: #93c5fd; }
+  .seg-speaker.sp-amber-tag { background: rgba(245,158,11,0.2); color: #fcd34d; }
+  .seg-speaker.sp-green-tag { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+  .seg-speaker.sp-rose-tag { background: rgba(244,63,94,0.2); color: #fda4af; }
+  .seg-speaker.sp-purple-tag { background: rgba(147,51,234,0.2); color: #c4b5fd; }
+  .seg-time { font-size: 0.6875rem; color: var(--text-muted); flex-shrink: 0; margin-top: 2px; min-width: 36px; }
+  .seg-text { font-size: 0.875rem; line-height: 1.5; flex: 1; border-left: 3px solid transparent; padding-left: 8px; }
+  .seg-text.bl-blue { border-color: #3b82f6; }
+  .seg-text.bl-amber { border-color: #f59e0b; }
+  .seg-text.bl-green { border-color: #10b981; }
+  .seg-text.bl-rose { border-color: #f43f5e; }
+  .seg-text.bl-purple { border-color: #9333ea; }
+
+  /* ── Scrollbar ─────────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(101, 117, 148, 0.3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(101, 117, 148, 0.5); }
+
+  /* ── Design notes ──────────────────────────────────────────────── */
+  .design-notes {
+    margin: 40px 0 24px;
+    padding: 20px;
+    background: rgba(255, 107, 53, 0.08);
+    border: 2px dashed rgba(255, 107, 53, 0.4);
+    border-radius: 12px;
+    color: #ffb088;
+  }
+  .design-notes h2 { font-size: 1rem; font-weight: 700; color: #ff6b35; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .design-notes h2 svg { width: 18px; height: 18px; }
+  .design-notes ul { padding-left: 20px; font-size: 0.8125rem; line-height: 1.7; }
+  .design-notes li { margin-bottom: 4px; }
+  .design-notes strong { color: #ff9a6c; }
+
+  .comparison {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    margin-top: 20px;
+  }
+  .comparison-card {
+    border-radius: 10px; padding: 16px;
+    border: 1px solid var(--border);
+  }
+  .comparison-card.before { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.2); }
+  .comparison-card.after { background: rgba(16,185,129,0.06); border-color: rgba(16,185,129,0.2); }
+  .comparison-card h3 { font-size: 0.8125rem; font-weight: 700; margin-bottom: 8px; }
+  .comparison-card.before h3 { color: var(--red); }
+  .comparison-card.after h3 { color: var(--green); }
+  .comparison-card p { font-size: 0.75rem; color: var(--text-muted); line-height: 1.6; }
+
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; }
+    .content-grid { flex-direction: column; }
+    .speakers-panel { width: 100%; }
+    .consent-panel-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SIDEBAR (simplifié pour le mockup)                                -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-brand">Scrib' IA</div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Général</div>
+    <a class="sidebar-link" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Tableau de bord
+    </a>
+    <div class="sidebar-section">Modules</div>
+    <a class="sidebar-link" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+      Dictée vocale
+    </a>
+    <a class="sidebar-link active" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Réunion
+    </a>
+    <a class="sidebar-link" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Phases prép.
+    </a>
+  </nav>
+</aside>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- MAIN CONTENT                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="main">
+
+  <!-- Design notes -->
+  <div class="design-notes">
+    <h2>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      Proposition de redesign — Consentement RGPD compact
+    </h2>
+    <ul>
+      <li><strong>Problème :</strong> Le panneau de consentement occupe ~40% de l'espace visible, repoussant la transcription très bas.</li>
+      <li><strong>Solution :</strong> Transformer le consentement en une <strong>barre résumé compacte</strong> intégrée au header de la carte, avec un <strong>panneau dépliable</strong> pour gérer les participants.</li>
+      <li><strong>Le bandeau de détection automatique</strong> est fusionné dans la barre résumé (icône + texte + badges).</li>
+      <li><strong>La barre d'export</strong> (Copier, TXT, SRT…) est sortie de la carte pour être juste au-dessus de la transcription.</li>
+      <li><strong>Gain :</strong> ~250px d'espace vertical récupéré → la transcription est visible sans scroller.</li>
+    </ul>
+
+    <div class="comparison">
+      <div class="comparison-card before">
+        <h3>Avant</h3>
+        <p>
+          Header carte<br>
+          Bandeau détection auto (50px)<br>
+          Toolbar export (40px)<br>
+          <strong>Consentement RGPD (300px+)</strong><br>
+          ─── fin du viewport ───<br>
+          Intervenants + Transcription (masqués)
+        </p>
+      </div>
+      <div class="comparison-card after">
+        <h3>Après (ce mockup)</h3>
+        <p>
+          Header carte + <strong>barre résumé consentement (45px)</strong><br>
+          Toolbar export (40px)<br>
+          <strong>Intervenants + Transcription (visibles !)</strong><br>
+          ─── fin du viewport ───<br>
+          <em>(Panel participants dépliable si besoin)</em>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page header -->
+  <div class="page-header">
+    <h1>Réunion</h1>
+    <p>Transcription avec identification des intervenants</p>
+  </div>
+
+  <!-- Back -->
+  <a class="back-btn" href="#">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+    Retour
+  </a>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- JOB CARD — HEADER + CONSENT BAR COMPACTE                      -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="card" style="margin-bottom: 12px;">
+    <!-- Job header -->
+    <div class="job-header">
+      <div class="job-title-row">
+        <span class="job-title">2026.03.06_15.44_01</span>
+        <span class="badge badge-muted">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          13 intervenants
+        </span>
+      </div>
+      <div class="job-filename">2026.03.06_15.44_01.wav</div>
+    </div>
+
+    <!-- ── CONSENT BAR (compact — remplace l'ancien gros panneau) ── -->
+    <div class="consent-bar">
+      <div class="consent-bar-icon ok">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+      </div>
+      <div class="consent-bar-info">
+        <div class="consent-bar-title">Consentement oral détecté automatiquement</div>
+        <div class="consent-bar-detail">« Cette réunion va être enregistrée, si ça ne dérange personne » — 0:00</div>
+      </div>
+      <div class="consent-bar-badges">
+        <span class="badge badge-green">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          8 oral validés
+        </span>
+        <span class="badge badge-primary">medium</span>
+      </div>
+      <div class="consent-bar-actions">
+        <button class="btn btn-sm btn-ghost" onclick="toggleConsent()" id="consentToggle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Participants
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="chevron" style="transition: transform .2s;"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── CONSENT PANEL (dépliable) ─────────────────────────────── -->
+    <div class="consent-panel" id="consentPanel">
+      <div class="consent-panel-grid">
+        <!-- Left: current attendees -->
+        <div>
+          <div class="consent-section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Participants actuels (8)
+          </div>
+          <div class="attendee-list">
+            <div class="attendee-row"><span class="attendee-status oral"></span><span class="attendee-name">CE</span><span class="attendee-method">Oral</span></div>
+            <div class="attendee-row"><span class="attendee-status oral"></span><span class="attendee-name">EL</span><span class="attendee-method">Oral</span></div>
+            <div class="attendee-row"><span class="attendee-status oral"></span><span class="attendee-name">GA</span><span class="attendee-method">Oral</span></div>
+            <div class="attendee-row"><span class="attendee-status oral"></span><span class="attendee-name">ME</span><span class="attendee-method">Oral</span></div>
+            <div class="attendee-row"><span class="attendee-status oral"></span><span class="attendee-name">RA</span><span class="attendee-method">Oral</span></div>
+            <div class="attendee-row"><span class="attendee-status email"></span><span class="attendee-name">Dupont Jean</span><span class="attendee-method">Email</span></div>
+            <div class="attendee-row"><span class="attendee-status oral"></span><span class="attendee-name">Martin Sophie</span><span class="attendee-method">Oral</span></div>
+            <div class="attendee-row"><span class="attendee-status oral"></span><span class="attendee-name">Leroy Marc</span><span class="attendee-method">Oral</span></div>
+          </div>
+        </div>
+        <!-- Right: selector -->
+        <div>
+          <div class="consent-section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Modifier les participants
+          </div>
+          <div class="consent-selector">
+            <p>Sélectionnez le groupe puis les contacts présents à cet enregistrement.</p>
+            <select>
+              <option>-- Choisir un groupe de contacts --</option>
+              <option>Conseil municipal (15 contacts)</option>
+              <option>Commission finances (8 contacts)</option>
+            </select>
+            <div style="margin-top: 8px; text-align: right;">
+              <button class="btn btn-sm btn-primary">Définir participants</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- TOOLBAR                                                        -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="toolbar">
+    <button class="btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copier
+    </button>
+    <button class="btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      TXT
+    </button>
+    <button class="btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      SRT
+    </button>
+    <button class="btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      VTT
+    </button>
+    <button class="btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Dictionnaire
+    </button>
+    <div style="flex: 1;"></div>
+    <button class="btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+      Enrollment
+    </button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- TWO-COLUMN: SPEAKERS + TRANSCRIPT                              -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="content-grid">
+    <!-- Speakers panel -->
+    <div class="speakers-panel">
+      <div class="speakers-title">Intervenants (13)</div>
+
+      <div class="speaker-card sp-blue">
+        <div class="speaker-top">
+          <span class="speaker-dot"></span>
+          <span class="speaker-name">SPEAKER_09</span>
+          <span class="speaker-actions">
+            <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </span>
+        </div>
+        <div class="speaker-stats">204 seg. &middot; 17m30s</div>
+      </div>
+
+      <div class="speaker-card sp-amber">
+        <div class="speaker-top">
+          <span class="speaker-dot"></span>
+          <span class="speaker-name">SPEAKER_07</span>
+          <span class="speaker-actions">
+            <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </span>
+        </div>
+        <div class="speaker-stats">64 seg. &middot; 3m12s</div>
+      </div>
+
+      <div class="speaker-card sp-green">
+        <div class="speaker-top">
+          <span class="speaker-dot"></span>
+          <span class="speaker-name">SPEAKER_11</span>
+          <span class="speaker-actions">
+            <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </span>
+        </div>
+        <div class="speaker-stats">6 seg. &middot; 0m24s</div>
+      </div>
+
+      <div class="speaker-card sp-rose">
+        <div class="speaker-top">
+          <span class="speaker-dot"></span>
+          <span class="speaker-name">SPEAKER_02</span>
+          <span class="speaker-actions">
+            <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </span>
+        </div>
+        <div class="speaker-stats">47 seg. &middot; 2m05s</div>
+      </div>
+
+      <div class="speaker-card sp-purple">
+        <div class="speaker-top">
+          <span class="speaker-dot"></span>
+          <span class="speaker-name">SPEAKER_04</span>
+          <span class="speaker-actions">
+            <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </span>
+        </div>
+        <div class="speaker-stats">22 seg. &middot; 1m40s</div>
+      </div>
+
+      <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; padding: 4px;">
+        + 8 autres…
+      </div>
+    </div>
+
+    <!-- Transcript -->
+    <div class="transcript-panel">
+      <div class="transcript-instructions">Cliquez sur les segments pour les sélectionner (Shift-clic pour une plage).</div>
+      <div class="transcript-scroll">
+
+        <div class="segment">
+          <button class="seg-play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <span class="seg-speaker sp-blue-tag">SPEAKER_09</span>
+          <span class="seg-time">0:00</span>
+          <span class="seg-text bl-blue">Cette réunion va être enregistrée, si ça ne dérange personne.</span>
+        </div>
+
+        <div class="segment">
+          <button class="seg-play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <span class="seg-speaker sp-blue-tag">SPEAKER_09</span>
+          <span class="seg-time">0:06</span>
+          <span class="seg-text bl-blue">En même temps, il va falloir s'y habituer. Ma messagerie est en rouge. Ma messagerie, elle n'en peut plus, je vous regarde. Je vais voir la suite de mes signes.</span>
+        </div>
+
+        <div class="segment">
+          <button class="seg-play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <span class="seg-speaker sp-blue-tag">SPEAKER_09</span>
+          <span class="seg-time">0:16</span>
+          <span class="seg-text bl-blue">Ok, donc je vous explique pourquoi on enregistre la réunion, parce qu'on est en train de voir pour mettre en place un logiciel qui va retranscrire les réunions. qui permet, c'est essentiellement pour les conseils municipaux, mais si ça peut servir à toutes les réunions, ça peut être bien.</span>
+        </div>
+
+        <div class="segment">
+          <button class="seg-play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <span class="seg-speaker sp-amber-tag">SPEAKER_07</span>
+          <span class="seg-time">0:42</span>
+          <span class="seg-text bl-amber">D'accord, c'est intéressant. Et du coup, ça retranscrit mot pour mot ce qu'on dit ?</span>
+        </div>
+
+        <div class="segment">
+          <button class="seg-play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <span class="seg-speaker sp-blue-tag">SPEAKER_09</span>
+          <span class="seg-time">0:48</span>
+          <span class="seg-text bl-blue">Oui, ça peut vraiment retracer chaque point qui aura été abordé et pouvoir faire un petit compte-rendu aussi aux personnes qui sont absentes de la manière la plus fidèle possible à la réunion.</span>
+        </div>
+
+        <div class="segment">
+          <button class="seg-play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <span class="seg-speaker sp-green-tag">SPEAKER_11</span>
+          <span class="seg-time">1:05</span>
+          <span class="seg-text bl-green">On commence par le tour de table ?</span>
+        </div>
+
+        <div class="segment">
+          <button class="seg-play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <span class="seg-speaker sp-blue-tag">SPEAKER_09</span>
+          <span class="seg-time">1:08</span>
+          <span class="seg-text bl-blue">Oui, on va commencer par le tour de table. Donc je vais demander à chacun de se présenter brièvement, prénom, nom, et fonction.</span>
+        </div>
+
+        <div class="segment">
+          <button class="seg-play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <span class="seg-speaker sp-rose-tag">SPEAKER_02</span>
+          <span class="seg-time">1:20</span>
+          <span class="seg-text bl-rose">Bonjour, je suis Jean Dupont, adjoint aux finances.</span>
+        </div>
+
+        <div class="segment">
+          <button class="seg-play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <span class="seg-speaker sp-purple-tag">SPEAKER_04</span>
+          <span class="seg-time">1:25</span>
+          <span class="seg-text bl-purple">Sophie Martin, déléguée à l'urbanisme.</span>
+        </div>
+
+        <div class="segment">
+          <button class="seg-play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <span class="seg-speaker sp-amber-tag">SPEAKER_07</span>
+          <span class="seg-time">1:30</span>
+          <span class="seg-text bl-amber">Marc Leroy, responsable des services techniques.</span>
+        </div>
+
+        <div class="segment">
+          <button class="seg-play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <span class="seg-speaker sp-blue-tag">SPEAKER_09</span>
+          <span class="seg-time">1:35</span>
+          <span class="seg-text bl-blue">Très bien, merci. Donc on va passer au premier point de l'ordre du jour, qui concerne le budget prévisionnel pour l'année prochaine.</span>
+        </div>
+
+        <div class="segment">
+          <button class="seg-play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <span class="seg-speaker sp-rose-tag">SPEAKER_02</span>
+          <span class="seg-time">1:50</span>
+          <span class="seg-text bl-rose">Alors, concernant le budget, j'ai préparé une synthèse que je vais vous distribuer. Les grandes lignes sont les suivantes : nous prévoyons une augmentation des investissements de 12% par rapport à l'année dernière.</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function toggleConsent() {
+  const panel = document.getElementById('consentPanel');
+  const chevron = document.getElementById('chevron');
+  panel.classList.toggle('open');
+  chevron.style.transform = panel.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+</script>
+
+</body>
+</html>

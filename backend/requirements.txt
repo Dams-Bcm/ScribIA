@@ -10,9 +10,39 @@ alembic==1.14.1
 # Auth
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 
 # Settings
 pydantic-settings==2.7.1
+
+# Transcription
+faster-whisper==1.1.0
+requests
+
+# Diarisation
+pyannote.audio==4.0.4
+soundfile
+scipy
+scikit-learn
+
+# LLM (via LiteLLM proxy, API OpenAI-compatible)
+openai>=1.30.0
+
+# AI Documents
+python-docx==1.1.2
+pdfminer.six==20231228
+fpdf2==2.8.3
+
+# RAG / Vector Search
+chromadb==0.6.3
+
+# Excel
+openpyxl==3.1.5
+
+# Push Notifications
+pywebpush==2.0.1
+py-vapid==1.9.2
+cryptography>=41.0.0
 
 # Utilities
 python-multipart==0.0.20

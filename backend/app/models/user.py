@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Boolean, ForeignKey, UniqueConstraint, DateTime
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base, UUIDMixin, TimestampMixin
@@ -17,6 +17,8 @@ class User(UUIDMixin, TimestampMixin, Base):
     role            = Column(String(50), nullable=False, default="user")  # 'super_admin', 'admin', 'user'
     tenant_id       = Column(String(36), ForeignKey("tenants.id"), nullable=False)
     is_active       = Column(Boolean, nullable=False, default=True)
+    reset_token         = Column(String(255), nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
 
     tenant = relationship("Tenant", back_populates="users")
 
@@ -32,3 +34,7 @@ class User(UUIDMixin, TimestampMixin, Base):
     def enabled_modules(self) -> list[str]:
         """List of enabled module keys for this user's tenant."""
         return [m.module_key for m in self.tenant.modules if m.enabled]
+
+    @property
+    def tenant_sector(self) -> str | None:
+        return self.tenant.sector if self.tenant else None
