@@ -600,6 +600,166 @@ def process_transcription_job(job_id: str):
         db.close()
 
 
+def _process_external_partial_analysis(job_id: str):
+    """Partial analysis via external RAG: crop 60s locally → POST /v1/transcribe → consent check.
+
+    Préserve le flux CONSENT_CHECK : si le consentement n'est pas détecté automatiquement,
+    le statut passe à CONSENT_CHECK et la bannière s'affiche côté frontend.
+    """
+    from app.services import external_rag
+    from app.models.transcription import DiarisationSpeaker
+
+    db = SessionLocal()
+    try:
+        job = db.query(TranscriptionJob).filter(TranscriptionJob.id == job_id).first()
+        if not job:
+            logger.error(f"[EXT-PARTIAL] Job {job_id} not found")
+            return
+
+        audio_dir = Path(settings.audio_path) / job.tenant_id
+        original_path = audio_dir / job.audio_filename
+
+        if not original_path.exists():
+            _update_job(db, job,
+                        status=TranscriptionJobStatus.ERROR,
+                        error_message=f"Fichier audio introuvable: {job.audio_filename}",
+                        progress=0)
+            return
+
+        # ── Step 1: Crop to ~60s WAV ──────────────────────────────────────
+        _update_job(db, job,
+                    status=TranscriptionJobStatus.CONVERTING,
+                    progress=10,
+                    progress_message="Extraction des 60 premières secondes...")
+
+        partial_wav = audio_dir / f"{Path(job.audio_filename).stem}_partial60.wav"
+        try:
+            crop_audio(original_path, partial_wav, duration_seconds=60.0)
+        except Exception as e:
+            _update_job(db, job,
+                        status=TranscriptionJobStatus.ERROR,
+                        error_message=f"Erreur extraction partielle: {e}",
+                        progress=0)
+            return
+
+        # ── Step 2: Transcription externe des 60s ─────────────────────────
+        _update_job(db, job,
+                    status=TranscriptionJobStatus.TRANSCRIBING,
+                    progress=40,
+                    progress_message="Analyse partielle en cours (~60s, serveur distant)...")
+
+        whisper_prompt = _build_whisper_prompt(db, job)
+        try:
+            result = external_rag.transcribe(
+                job.tenant_id,
+                str(partial_wav),
+                initial_prompt=whisper_prompt,
+                language=job.language,
+            )
+        except Exception as e:
+            _update_job(db, job,
+                        status=TranscriptionJobStatus.ERROR,
+                        error_message=f"Erreur transcription partielle externe: {e}",
+                        progress=0)
+            return
+        finally:
+            if partial_wav.exists():
+                partial_wav.unlink()
+
+        # ── Step 3: Save partial segments ─────────────────────────────────
+        _update_job(db, job,
+                    progress=80,
+                    progress_message="Enregistrement de l'analyse partielle...")
+
+        db.query(TranscriptionSegment).filter_by(job_id=job.id).delete()
+        for idx, seg in enumerate(result.get("segments", [])):
+            db.add(TranscriptionSegment(
+                job_id=job.id,
+                start_time=seg["start"],
+                end_time=seg["end"],
+                text=seg["text"],
+                order_index=idx,
+                speaker_id=seg.get("speaker"),
+                speaker_label=seg.get("speaker"),
+            ))
+        db.commit()
+
+        # ── Step 4: Detect oral consent ────────────────────────────────────
+        _update_job(db, job,
+                    progress=90,
+                    progress_message="Détection automatique du consentement oral...")
+
+        try:
+            from app.services.consent_detection import detect_oral_consent
+            import json as _json
+            result_consent = detect_oral_consent(db, job)
+            job.consent_detection_result = _json.dumps(result_consent)
+            if result_consent.get("detected") and result_consent.get("detection_type") == "collective_consent":
+                try:
+                    raw_attendees = _json.loads(job.attendees) if job.attendees else []
+                    updated = False
+                    for att in raw_attendees:
+                        if att.get("status") == "pending_oral":
+                            att["status"] = "accepted_oral"
+                            att["evidence_type"] = "oral_auto"
+                            updated = True
+                    if updated:
+                        job.attendees = _json.dumps(raw_attendees)
+                        statuses = {a.get("status") for a in raw_attendees}
+                        if "refused" in statuses or "withdrawn" in statuses:
+                            job.recording_validity = "invalidated"
+                        elif all(s in ("accepted_email", "accepted_oral") for s in statuses):
+                            job.recording_validity = "valid"
+                        else:
+                            job.recording_validity = "pending"
+                except (ValueError, TypeError):
+                    pass
+            db.commit()
+        except Exception as exc:
+            logger.warning(f"[EXT-PARTIAL] Consent detection failed for job {job_id}: {exc}")
+
+        # ── Step 5: All consented? → full external transcription ──────────
+        all_accepted = False
+        try:
+            import json as _json2
+            raw = _json2.loads(job.attendees) if job.attendees else []
+            statuses = {a.get("status") for a in raw}
+            all_accepted = bool(raw) and all(s in ("accepted_email", "accepted_oral") for s in statuses)
+        except (ValueError, TypeError):
+            pass
+
+        if all_accepted:
+            logger.info(f"[EXT-PARTIAL] Job {job_id} — all consents OK, proceeding to full external transcription")
+            db.query(TranscriptionSegment).filter_by(job_id=job.id).delete()
+            _update_job(db, job,
+                        status=TranscriptionJobStatus.QUEUED,
+                        progress=5,
+                        progress_message="Consentement oral détecté — transcription complète en file d'attente...")
+            from app.services.diarisation import run_diarisation_job_in_thread
+            run_diarisation_job_in_thread(job.id)
+        else:
+            _update_job(db, job,
+                        status=TranscriptionJobStatus.CONSENT_CHECK,
+                        progress=100,
+                        progress_message="Analyse partielle terminée — vérification du consentement oral requise")
+
+        logger.info(f"[EXT-PARTIAL] Job {job_id} partial analysis done, auto_proceed={all_accepted}")
+
+    except Exception as e:
+        logger.exception(f"[EXT-PARTIAL] Job {job_id} failed")
+        try:
+            job = db.query(TranscriptionJob).filter(TranscriptionJob.id == job_id).first()
+            if job:
+                _update_job(db, job,
+                            status=TranscriptionJobStatus.ERROR,
+                            error_message=f"Erreur analyse partielle: {e}",
+                            progress=0)
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
 def process_partial_analysis(job_id: str):
     """Partial pipeline: convert → crop to ~60s → transcribe → detect consent.
 
@@ -607,7 +767,7 @@ def process_partial_analysis(job_id: str):
     Only transcribes the first ~60 seconds to check for oral consent.
     """
     if settings.use_external_transcription:
-        return _process_external_transcription(job_id)
+        return _process_external_partial_analysis(job_id)
 
     if _is_cancelled(job_id):
         _clear_cancelled(job_id)
