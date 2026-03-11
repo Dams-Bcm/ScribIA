@@ -48,10 +48,10 @@ try:
             num_channels: int = 0
             bits_per_sample: int = 0
             encoding: str = ""
+
+        torchaudio.AudioMetaData = _AudioMetaData
 except ImportError:
     torchaudio = None  # type: ignore  # non disponible sans torch (use_external_transcription=True)
-
-    torchaudio.AudioMetaData = _AudioMetaData
 
 # ── Pyannote model (lazy-loaded) ─────────────────────────────────────────────
 _diarization_pipeline = None
