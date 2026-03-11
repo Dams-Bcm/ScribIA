@@ -267,10 +267,13 @@ def resolve_model(model_name: str) -> str:
 
 
 def llm_health_check() -> bool:
-    """Vérifie que le proxy LiteLLM est accessible."""
+    """Vérifie que le service LLM est accessible (RAG externe ou LiteLLM selon config)."""
     try:
-        import httpx
-        # /health répond 200 même sans model_list déclaré (models.list() échoue dans ce cas)
+        if settings.use_external_llm:
+            # En mode externe, le LLM passe par le RAG — vérifier cet endpoint
+            from app.services.external_rag import health_check as rag_health
+            return rag_health()
+        # Mode local : vérifier LiteLLM Proxy
         base = settings.litellm_url.rstrip("/").removesuffix("/v1")
         r = httpx.get(f"{base}/health", timeout=5.0)
         return r.status_code < 500
