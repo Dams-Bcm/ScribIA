@@ -4,6 +4,7 @@ ou via le RAG externe (POST /v1/generate) selon settings.use_external_llm.
 Les modèles cloud (préfixe "cloud/") sont routés directement vers le provider cloud.
 """
 
+import json
 import logging
 from typing import Generator
 
@@ -131,8 +132,15 @@ def _rag_generate_stream(
             for line in resp.iter_lines():
                 if line.startswith("data: "):
                     chunk = line[6:]
-                    if chunk and chunk != "[DONE]":
-                        yield chunk
+                    if not chunk or chunk == "[DONE]":
+                        continue
+                    try:
+                        data = json.loads(chunk)
+                        content = data["choices"][0]["delta"].get("content")
+                        if content:
+                            yield content
+                    except (json.JSONDecodeError, KeyError, IndexError):
+                        pass
     except Exception as exc:
         raise RuntimeError(f"Erreur RAG LLM stream : {exc}") from exc
 
