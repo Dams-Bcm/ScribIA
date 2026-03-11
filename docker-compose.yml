@@ -4,6 +4,8 @@
 #  Profils disponibles :
 #    docker-compose up                         → front + back + ollama (tout local)
 #    docker-compose --profile db up            → + base de données SQL Server locale
+#    docker-compose --profile rag up           → + Redis + Qdrant + MinIO (infra RAG-API)
+#    docker-compose --profile db --profile rag up → tout
 #    docker-compose up backend frontend        → front + back (db + ollama externes)
 #    docker-compose up frontend                → front seul (back + db + ollama ailleurs)
 # ============================================================================
@@ -69,6 +71,9 @@ services:
       SCRIBIA_OLLAMA_URL: "${SCRIBIA_OLLAMA_URL:-http://ollama:11434}"
       SCRIBIA_LITELLM_URL: "${SCRIBIA_LITELLM_URL:-http://litellm:4000/v1}"
       SCRIBIA_LITELLM_API_KEY: "${LITELLM_MASTER_KEY:-sk-scribia-litellm}"
+      SCRIBIA_RAG_API_URL: "${SCRIBIA_RAG_API_URL:-http://192.168.9.16:8000}"
+      SCRIBIA_RAG_API_KEY: "${SCRIBIA_RAG_API_KEY:-}"
+      SCRIBIA_USE_EXTERNAL_TRANSCRIPTION: "${SCRIBIA_USE_EXTERNAL_TRANSCRIPTION:-false}"
       # SCRIBIA_HF_TOKEN passé directement via env_file: .env
     ports:
       - "${BACKEND_PORT:-8001}:8000"
@@ -85,20 +90,56 @@ services:
               count: 1
               capabilities: [gpu]
 
-  chroma:
-    image: chromadb/chroma:0.6.3
-    ports:
-      - "${CHROMA_PORT:-8100}:8000"
-    volumes:
-      - chroma_data:/chroma/chroma
-    environment:
-      - ANONYMIZED_TELEMETRY=FALSE
-      - IS_PERSISTENT=TRUE
-
   frontend:
     build: ./frontend
     ports:
       - "${FRONTEND_PORT:-3001}:80"
+
+  # ── Services RAG-API ─────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    profiles: ["rag"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    profiles: ["rag"]
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    profiles: ["rag"]
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER:-minioadmin}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minioadmin}"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
 volumes:
   mssql_data:
@@ -106,4 +147,6 @@ volumes:
   prep_docs:
   ai_docs:
   ollama_data:
-  chroma_data:
+  redis_data:
+  qdrant_data:
+  minio_data:

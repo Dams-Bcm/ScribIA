@@ -581,6 +581,11 @@ def align_segments(
 
 def process_diarisation_job(job_id: str):
     """Full diarisation pipeline: convert → diarize → transcribe → align → save."""
+    # Déléguer au RAG externe si configuré (gère transcription + diarisation)
+    if settings.use_external_transcription:
+        from app.services.transcription import _process_external_transcription
+        return _process_external_transcription(job_id)
+
     db = SessionLocal()
     try:
         job = db.query(TranscriptionJob).filter(TranscriptionJob.id == job_id).first()

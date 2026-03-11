@@ -1272,7 +1272,7 @@ WHISPER_SETTINGS_KEYS = {
     "whisper_beam_size": ("Beam size", "5"),
     "whisper_no_speech_threshold": ("Seuil no-speech", "0.45"),
     "whisper_temperature": ("Température (cascade)", "0.0,0.2,0.4,0.6,0.8,1.0"),
-    "whisper_initial_prompt": ("Prompt initial (vocabulaire)", ""),
+    "whisper_initial_prompt": ("Prompt global (vocabulaire par défaut)", ""),
     "whisper_condition_on_previous_text": ("Conditionner sur texte précédent", "true"),
     "whisper_vad_min_silence_ms": ("VAD : silence min (ms)", "500"),
     "whisper_vad_speech_pad_ms": ("VAD : padding parole (ms)", "200"),
@@ -1403,10 +1403,8 @@ def update_pyannote_settings(
 # ── RAG / Search Settings ────────────────────────────────────────────────────
 
 RAG_SETTINGS_KEYS = {
-    "rag_chunk_size": ("Taille des chunks (caractères)", "1500"),
-    "rag_chunk_overlap": ("Chevauchement des chunks", "200"),
     "rag_top_k": ("Nombre de résultats (top-k)", "10"),
-    "embedding_model": ("Modèle d'embeddings", "nomic-embed-text"),
+    "rag_score_threshold": ("Seuil de score (0.0-1.0)", "0.5"),
 }
 
 
@@ -1425,7 +1423,7 @@ def get_rag_settings(
             }
             for key, (label, default) in RAG_SETTINGS_KEYS.items()
         ],
-        "chroma_url": settings.chroma_url,
+        "rag_api_url": settings.rag_api_url,
     }
 
 

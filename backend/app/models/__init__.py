@@ -19,6 +19,7 @@ from app.models.substitution import SubstitutionRule
 from app.models.announcement import Announcement, announcement_tenants
 from app.models.system_settings import SystemSetting
 from app.models.planned_meeting import PlannedMeeting, PlannedMeetingParticipant, PlannedMeetingStatus
+from app.models.rag_document import RagDocumentMapping
 
 __all__ = [
     "Base", "Tenant", "TenantModule", "User", "AVAILABLE_MODULES",
@@ -39,4 +40,5 @@ __all__ = [
     "Announcement", "announcement_tenants",
     "SystemSetting",
     "PlannedMeeting", "PlannedMeetingParticipant", "PlannedMeetingStatus",
+    "RagDocumentMapping",
 ]

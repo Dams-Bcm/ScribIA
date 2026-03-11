@@ -45,7 +45,7 @@ interface RAGSetting {
 
 interface RAGSettingsResponse {
   settings: RAGSetting[];
-  chroma_url: string;
+  rag_api_url: string;
 }
 
 interface WhisperSetting {
@@ -735,7 +735,7 @@ export function AISettingsPage() {
               </div>
 
               <p className="text-xs text-muted-foreground mb-4">
-                ChromaDB : <span className="font-mono font-medium text-foreground">{ragData.chroma_url}</span>
+                RAG API : <span className="font-mono font-medium text-foreground">{ragData.rag_api_url}</span>
               </p>
 
               <div className="space-y-4">
@@ -893,7 +893,7 @@ export function AISettingsPage() {
 
               <p className="text-xs text-muted-foreground mt-4">
                 Le modèle Whisper sera rechargé automatiquement lors de la prochaine transcription après modification.
-                Le <strong>prompt initial</strong> permet d'injecter du vocabulaire métier (noms propres, termes techniques).
+                Le <strong>prompt global</strong> permet d'injecter du vocabulaire métier par défaut (noms propres, termes techniques). Il est utilisé si le tenant n'a pas défini son propre vocabulaire.
               </p>
             </div>
           )}

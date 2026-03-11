@@ -232,8 +232,228 @@ def _update_job(db, job: TranscriptionJob, **kwargs):
     })
 
 
+def _process_external_transcription(job_id: str):
+    """Pipeline externe : convert → POST /v1/transcribe → save segments.
+
+    Utilisé quand settings.use_external_transcription est True.
+    Gère les deux modes (simple et diarisation) car l'API externe
+    retourne les speakers si pyannote est activé côté RAG.
+    """
+    from app.services import external_rag
+    from app.models.transcription import DiarisationSpeaker
+
+    db = SessionLocal()
+    try:
+        job = db.query(TranscriptionJob).filter(TranscriptionJob.id == job_id).first()
+        if not job:
+            logger.error(f"[EXT] Job {job_id} not found")
+            return
+
+        audio_dir = Path(settings.audio_path) / job.tenant_id
+        original_path = audio_dir / job.audio_filename
+
+        if not original_path.exists():
+            _update_job(db, job,
+                        status=TranscriptionJobStatus.ERROR,
+                        error_message=f"Fichier audio introuvable: {job.audio_filename}",
+                        progress=0)
+            return
+
+        # ── Step 1: Convert to WAV ───────────────────────────────────────
+        _update_job(db, job,
+                    status=TranscriptionJobStatus.CONVERTING,
+                    progress=10,
+                    progress_message="Conversion audio en cours...")
+
+        wav_filename = f"{Path(job.audio_filename).stem}_16k.wav"
+        wav_path = audio_dir / wav_filename
+
+        try:
+            convert_to_wav(original_path, wav_path)
+        except Exception as e:
+            _update_job(db, job,
+                        status=TranscriptionJobStatus.ERROR,
+                        error_message=f"Erreur conversion: {e}",
+                        progress=0)
+            return
+
+        duration = get_audio_duration(wav_path)
+        if duration > 0:
+            job.duration_seconds = duration
+
+        if _is_cancelled(job_id):
+            _clear_cancelled(job_id)
+            if wav_path != original_path and wav_path.exists():
+                wav_path.unlink()
+            return
+
+        # ── Step 2: Transcription externe ─────────────────────────────────
+        _update_job(db, job,
+                    status=TranscriptionJobStatus.TRANSCRIBING,
+                    progress=20,
+                    progress_message="Transcription en cours (serveur distant)...")
+
+        whisper_prompt = _build_whisper_prompt(db, job)
+        try:
+            result = external_rag.transcribe(
+                job.tenant_id,
+                str(wav_path),
+                initial_prompt=whisper_prompt,
+                language=job.language,
+            )
+        except Exception as e:
+            _update_job(db, job,
+                        status=TranscriptionJobStatus.ERROR,
+                        error_message=f"Erreur transcription externe: {e}",
+                        progress=0)
+            return
+
+        ext_segments = result.get("segments", [])
+        if result.get("duration"):
+            job.duration_seconds = result["duration"]
+
+        # ── Step 3: Save segments + speakers ──────────────────────────────
+        _update_job(db, job,
+                    progress=85,
+                    progress_message="Enregistrement des résultats...")
+
+        unique_speakers: dict = {}
+        for idx, seg in enumerate(ext_segments):
+            speaker = seg.get("speaker")  # None if pyannote disabled
+            db_seg = TranscriptionSegment(
+                job_id=job.id,
+                start_time=seg["start"],
+                end_time=seg["end"],
+                text=seg["text"],
+                order_index=idx,
+                speaker_id=speaker,
+                speaker_label=speaker,
+            )
+            db.add(db_seg)
+
+            if speaker and speaker not in unique_speakers:
+                unique_speakers[speaker] = {
+                    "count": 0, "duration": 0.0,
+                    "color_index": len(unique_speakers),
+                }
+            if speaker:
+                unique_speakers[speaker]["count"] += 1
+                unique_speakers[speaker]["duration"] += seg["end"] - seg["start"]
+
+        for spk_id, info in unique_speakers.items():
+            db.add(DiarisationSpeaker(
+                job_id=job.id,
+                speaker_id=spk_id,
+                display_name=spk_id,
+                color_index=info["color_index"],
+                segment_count=info["count"],
+                total_duration=info["duration"],
+            ))
+
+        if unique_speakers:
+            job.detected_speakers = len(unique_speakers)
+        db.commit()
+
+        # ── Step 3b: Auto-match speakers to profiles via embeddings ────
+        ext_speaker_embeddings = result.get("speaker_embeddings")
+        if ext_speaker_embeddings and unique_speakers:
+            try:
+                import numpy as np
+                from app.services.speaker_enrollment import match_speakers_to_profiles
+
+                # Convert list[float] → np.ndarray for each speaker
+                np_embeddings: dict[str, np.ndarray] = {}
+                for spk_id, emb_list in ext_speaker_embeddings.items():
+                    np_embeddings[spk_id] = np.array(emb_list, dtype=np.float32)
+
+                # Restrict to attendee contacts if available
+                restrict_contact_ids = None
+                if job.attendees:
+                    try:
+                        import json as _json
+                        attendees = _json.loads(job.attendees)
+                        restrict_contact_ids = [a["contact_id"] for a in attendees if a.get("contact_id")]
+                    except (ValueError, TypeError, KeyError):
+                        pass
+
+                match_speakers_to_profiles(
+                    job_id=job.id,
+                    tenant_id=job.tenant_id,
+                    speaker_embeddings=np_embeddings,
+                    db=db,
+                    threshold=settings.speaker_matching_threshold,
+                    restrict_contact_ids=restrict_contact_ids,
+                )
+            except Exception as e_match:
+                logger.warning(f"[EXT] Speaker auto-matching failed for job {job_id}: {e_match}")
+        elif unique_speakers:
+            logger.info("[EXT] No speaker_embeddings in response — auto-match skipped")
+
+        # Clean up WAV
+        if wav_path != original_path and wav_path.exists():
+            wav_path.unlink()
+
+        logger.info(f"[EXT] Job {job_id} completed: {len(ext_segments)} segments, "
+                    f"{len(unique_speakers)} speakers")
+
+        # ── Consent detection ─────────────────────────────────────────────
+        try:
+            from app.services.consent_detection import auto_detect_after_transcription
+            _update_job(db, job, progress=98,
+                        progress_message="Détection automatique du consentement oral...")
+            auto_detect_after_transcription(job_id, db)
+            db.refresh(job)
+        except Exception as exc:
+            logger.warning(f"[CONSENT] Auto-detection failed for job {job_id}: {exc}")
+
+        # ── Done ──────────────────────────────────────────────────────────
+        msg = "Transcription terminée"
+        if unique_speakers:
+            msg = "Transcription + diarisation terminées"
+        _update_job(db, job,
+                    status=TranscriptionJobStatus.COMPLETED,
+                    progress=100,
+                    progress_message=msg)
+
+        try:
+            from app.services.push import notify_job_completed
+            notify_job_completed(db, job)
+        except Exception as exc:
+            logger.warning(f"[PUSH] Notification failed for job {job_id}: {exc}")
+
+        try:
+            from app.services.indexer import index_transcription
+            seg_data = [{"speaker": s.speaker_label or "", "text": s.text} for s in
+                        db.query(TranscriptionSegment).filter_by(job_id=job_id).order_by(TranscriptionSegment.start_time).all()]
+            index_transcription(job.tenant_id, job.id, job.original_filename or "Transcription", seg_data)
+        except Exception as exc:
+            logger.warning(f"[RAG] Indexation échouée pour transcription {job_id}: {exc}")
+
+    except Exception as e:
+        logger.exception(f"[EXT] Job {job_id} failed unexpectedly")
+        try:
+            job = db.query(TranscriptionJob).filter(TranscriptionJob.id == job_id).first()
+            if job:
+                _update_job(db, job,
+                            status=TranscriptionJobStatus.ERROR,
+                            error_message=f"Erreur inattendue: {e}",
+                            progress=0)
+                try:
+                    from app.services.push import notify_job_error
+                    notify_job_error(db, job)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
 def process_transcription_job(job_id: str):
     """Full pipeline: convert → transcribe → save segments. Runs in a thread."""
+    if settings.use_external_transcription:
+        return _process_external_transcription(job_id)
+
     if _is_cancelled(job_id):
         _clear_cancelled(job_id)
         logger.info(f"Job {job_id} was cancelled before starting")

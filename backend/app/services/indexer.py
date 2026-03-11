@@ -1,101 +1,126 @@
-"""Pipeline d'indexation RAG — découpe les documents en chunks et les indexe.
+"""Pipeline d'indexation RAG — envoie les documents au rag-api externe.
 
 Sources indexées :
   - ai_document   : documents IA générés (PV, convocations, etc.)
   - transcription : transcriptions de réunions
   - procedure     : procédures (titre + description + réponses participants)
+  - contact       : groupes de contacts
 """
 
 import json
 import logging
-import uuid
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.config import settings
-from app.services.embeddings import embed_texts
-from app.services import vectorstore
+from app.database import SessionLocal
+from app.services import external_rag
 
 logger = logging.getLogger(__name__)
 
 
-# ── Chunking ────────────────────────────────────────────────────────────────
+def _save_rag_mapping(tenant_id: str, source_type: str, source_id: str, rag_doc_id: str) -> None:
+    """Persiste le lien source ScribIA → document RAG externe."""
+    from app.models.rag_document import RagDocumentMapping
+
+    db = SessionLocal()
+    try:
+        # Upsert : supprime l'ancien mapping s'il existe
+        db.query(RagDocumentMapping).filter(
+            RagDocumentMapping.tenant_id == tenant_id,
+            RagDocumentMapping.source_type == source_type,
+            RagDocumentMapping.source_id == source_id,
+        ).delete()
+        db.add(RagDocumentMapping(
+            tenant_id=tenant_id,
+            source_type=source_type,
+            source_id=source_id,
+            rag_document_id=rag_doc_id,
+        ))
+        db.commit()
+    except Exception as exc:
+        logger.warning("[RAG] Failed to save mapping %s/%s → %s: %s",
+                       source_type, source_id, rag_doc_id, exc)
+        db.rollback()
+    finally:
+        db.close()
 
 
-def _chunk_text(text: str, chunk_size: int = 0, overlap: int = 0) -> list[str]:
-    """Découpe un texte en chunks avec overlap."""
-    chunk_size = chunk_size or settings.rag_chunk_size
-    overlap = overlap or settings.rag_chunk_overlap
-
-    if len(text) <= chunk_size:
-        return [text]
-
-    chunks: list[str] = []
-    start = 0
-    while start < len(text):
-        end = start + chunk_size
-        chunk = text[start:end]
-        if chunk.strip():
-            chunks.append(chunk.strip())
-        start = end - overlap
-    return chunks
+def _sanitize_filename(name: str) -> str:
+    """Nettoie un nom pour l'utiliser comme nom de fichier."""
+    return "".join(c if c.isalnum() or c in " -_." else "_" for c in name)[:100]
 
 
 # ── Indexation par type de source ────────────────────────────────────────────
 
 
 def index_ai_document(tenant_id: str, doc_id: str, title: str, content: str) -> int:
-    """Indexe un document IA (PV, convocation, etc.)."""
+    """Indexe un document IA (PV, convocation, etc.) via le RAG externe."""
     if not content or not content.strip():
         return 0
 
-    chunks = _chunk_text(f"[Document : {title}]\n{content}")
-    doc_ids = [f"aidoc_{doc_id}_{i}" for i in range(len(chunks))]
-    metadatas = [
-        {"source_type": "ai_document", "source_id": doc_id, "title": title, "chunk_index": i}
-        for i in range(len(chunks))
-    ]
+    text = f"# {title}\n\n{content}"
+    filename = f"{_sanitize_filename(title)}.md"
+    metadata = {
+        "source_type": "ai_document",
+        "source_id": doc_id,
+        "title": title,
+        "tenant_id": tenant_id,
+    }
 
-    embeddings = embed_texts(chunks)
-    vectorstore.add_documents(tenant_id, doc_ids, embeddings, chunks, metadatas)
-    return len(chunks)
+    try:
+        result = external_rag.ingest_file(tenant_id, text, filename, metadata=metadata)
+        rag_doc_id = result.get("document_id") or result.get("id")
+        logger.info("[RAG] Ingested ai_document %s → doc %s", doc_id, rag_doc_id)
+        if rag_doc_id:
+            _save_rag_mapping(tenant_id, "ai_document", doc_id, rag_doc_id)
+        return 1
+    except Exception as exc:
+        logger.exception("[RAG] Failed to ingest ai_document %s: %s", doc_id, exc)
+        return 0
 
 
 def index_transcription(tenant_id: str, job_id: str, title: str, segments: list[dict]) -> int:
-    """Indexe une transcription (segments regroupés en chunks)."""
+    """Indexe une transcription via le RAG externe."""
     if not segments:
         return 0
 
-    # Regroupe les segments en texte continu avec indicateur de locuteur
-    full_text_parts = []
+    parts = [f"# Transcription : {title}\n"]
     for seg in segments:
         speaker = seg.get("speaker", "")
         text = seg.get("text", "").strip()
         if text:
             prefix = f"[{speaker}] " if speaker else ""
-            full_text_parts.append(f"{prefix}{text}")
+            parts.append(f"{prefix}{text}")
 
-    full_text = f"[Transcription : {title}]\n" + "\n".join(full_text_parts)
+    full_text = "\n".join(parts)
     if len(full_text.strip()) < 20:
         return 0
 
-    chunks = _chunk_text(full_text)
-    doc_ids = [f"trans_{job_id}_{i}" for i in range(len(chunks))]
-    metadatas = [
-        {"source_type": "transcription", "source_id": job_id, "title": title, "chunk_index": i}
-        for i in range(len(chunks))
-    ]
+    filename = f"{_sanitize_filename(title)}.md"
+    metadata = {
+        "source_type": "transcription",
+        "source_id": job_id,
+        "title": title,
+        "tenant_id": tenant_id,
+    }
 
-    embeddings = embed_texts(chunks)
-    vectorstore.add_documents(tenant_id, doc_ids, embeddings, chunks, metadatas)
-    return len(chunks)
+    try:
+        result = external_rag.ingest_file(tenant_id, full_text, filename, metadata=metadata)
+        rag_doc_id = result.get("document_id") or result.get("id")
+        logger.info("[RAG] Ingested transcription %s → doc %s", job_id, rag_doc_id)
+        if rag_doc_id:
+            _save_rag_mapping(tenant_id, "transcription", job_id, rag_doc_id)
+        return 1
+    except Exception as exc:
+        logger.exception("[RAG] Failed to ingest transcription %s: %s", job_id, exc)
+        return 0
 
 
 def index_procedure(tenant_id: str, procedure_id: str, title: str,
                     description: Optional[str], participants_data: list[dict]) -> int:
-    """Indexe une procédure (titre + description + réponses des participants)."""
-    parts = [f"Procédure : {title}"]
+    """Indexe une procédure via le RAG externe."""
+    parts = [f"# Procédure : {title}"]
     if description:
         parts.append(description)
 
@@ -108,40 +133,48 @@ def index_procedure(tenant_id: str, procedure_id: str, title: str,
         if not responses:
             continue
 
-        part = f"\n--- {role} : {name} ---"
+        part = f"\n## {role} : {name}"
         for q in questions:
             qid = q.get("id", "")
             label = q.get("label", qid)
             answer = responses.get(qid, "")
             if answer:
-                part += f"\n{label} : {answer}"
+                part += f"\n- **{label}** : {answer}"
         parts.append(part)
 
     full_text = "\n".join(parts)
     if len(full_text.strip()) < 10:
         return 0
 
-    chunks = _chunk_text(full_text)
-    doc_ids = [f"proc_{procedure_id}_{i}" for i in range(len(chunks))]
-    metadatas = [
-        {"source_type": "procedure", "source_id": procedure_id, "title": title, "chunk_index": i}
-        for i in range(len(chunks))
-    ]
+    filename = f"{_sanitize_filename(title)}.md"
+    metadata = {
+        "source_type": "procedure",
+        "source_id": procedure_id,
+        "title": title,
+        "tenant_id": tenant_id,
+    }
 
-    embeddings = embed_texts(chunks)
-    vectorstore.add_documents(tenant_id, doc_ids, embeddings, chunks, metadatas)
-    return len(chunks)
+    try:
+        result = external_rag.ingest_file(tenant_id, full_text, filename, metadata=metadata)
+        rag_doc_id = result.get("document_id") or result.get("id")
+        logger.info("[RAG] Ingested procedure %s → doc %s", procedure_id, rag_doc_id)
+        if rag_doc_id:
+            _save_rag_mapping(tenant_id, "procedure", procedure_id, rag_doc_id)
+        return 1
+    except Exception as exc:
+        logger.exception("[RAG] Failed to ingest procedure %s: %s", procedure_id, exc)
+        return 0
 
 
 def index_contact_group(tenant_id: str, group_id: str, group_name: str,
                         description: Optional[str], contacts: list[dict]) -> int:
-    """Indexe un groupe de contacts avec tous ses membres."""
-    parts = [f"[Groupe de contacts : {group_name}]"]
+    """Indexe un groupe de contacts via le RAG externe."""
+    parts = [f"# Groupe de contacts : {group_name}"]
     if description:
         parts.append(description)
 
     for c in contacts:
-        line = c.get("name", "")
+        line = f"- {c.get('name', '')}"
         if c.get("role"):
             line += f" ({c['role']})"
         if c.get("email"):
@@ -159,61 +192,84 @@ def index_contact_group(tenant_id: str, group_id: str, group_name: str,
     if len(full_text.strip()) < 10:
         return 0
 
-    chunks = _chunk_text(full_text)
-    doc_ids = [f"contact_{group_id}_{i}" for i in range(len(chunks))]
-    metadatas = [
-        {"source_type": "contact", "source_id": group_id, "title": group_name, "chunk_index": i}
-        for i in range(len(chunks))
-    ]
+    filename = f"{_sanitize_filename(group_name)}.md"
+    metadata = {
+        "source_type": "contact",
+        "source_id": group_id,
+        "title": group_name,
+        "tenant_id": tenant_id,
+    }
 
-    embeddings = embed_texts(chunks)
-    vectorstore.add_documents(tenant_id, doc_ids, embeddings, chunks, metadatas)
-    return len(chunks)
+    try:
+        result = external_rag.ingest_file(tenant_id, full_text, filename, metadata=metadata)
+        rag_doc_id = result.get("document_id") or result.get("id")
+        logger.info("[RAG] Ingested contact group %s → doc %s", group_id, rag_doc_id)
+        if rag_doc_id:
+            _save_rag_mapping(tenant_id, "contact", group_id, rag_doc_id)
+        return 1
+    except Exception as exc:
+        logger.exception("[RAG] Failed to ingest contact group %s: %s", group_id, exc)
+        return 0
 
 
 def delete_source(tenant_id: str, source_type: str, source_id: str) -> None:
-    """Supprime un document source de l'index."""
-    vectorstore.delete_by_source(tenant_id, source_type, source_id)
+    """Supprime un document source du RAG externe via DELETE /v1/documents/{doc_id}."""
+    from app.models.rag_document import RagDocumentMapping
+
+    db = SessionLocal()
+    try:
+        mapping = db.query(RagDocumentMapping).filter(
+            RagDocumentMapping.tenant_id == tenant_id,
+            RagDocumentMapping.source_type == source_type,
+            RagDocumentMapping.source_id == source_id,
+        ).first()
+
+        if not mapping:
+            logger.warning("[RAG] No mapping found for %s/%s — cannot delete from RAG",
+                           source_type, source_id)
+            return
+
+        try:
+            external_rag.delete_document(tenant_id, mapping.rag_document_id)
+            logger.info("[RAG] Deleted %s/%s (rag_doc=%s)", source_type, source_id,
+                        mapping.rag_document_id)
+        except Exception as exc:
+            logger.exception("[RAG] Failed to delete %s/%s from RAG: %s",
+                             source_type, source_id, exc)
+
+        # Remove mapping regardless (even if RAG delete failed — doc may already be gone)
+        db.delete(mapping)
+        db.commit()
+    except Exception as exc:
+        logger.exception("[RAG] delete_source error for %s/%s: %s",
+                         source_type, source_id, exc)
+        db.rollback()
+    finally:
+        db.close()
 
 
 # ── Réindexation complète d'un tenant ────────────────────────────────────────
 
 
 def reindex_tenant(tenant_id: str, db: Session) -> dict:
-    """Réindexe toutes les données d'un tenant. Retourne un récapitulatif."""
+    """Réindexe toutes les données d'un tenant via le RAG externe."""
     from app.models import AIDocument, Procedure, ProcedureParticipant
 
     stats = {"ai_documents": 0, "transcriptions": 0, "procedures": 0, "contacts": 0, "chunks_total": 0}
 
-    # Purge existing data for this tenant before reindex
-    try:
-        client = vectorstore._get_client()
-        col_name = vectorstore._collection_name(tenant_id)
-        client.delete_collection(col_name)
-        logger.warning("[RAG] Purged collection %s", col_name)
-    except Exception:
-        pass  # collection may not exist yet
-
     # 1. Documents IA
-    all_docs = db.query(AIDocument).filter(AIDocument.tenant_id == tenant_id).all()
-    if not all_docs:
-        # Debug: show which tenant_ids actually have AI documents
-        from sqlalchemy import func
-        tenant_counts = db.query(AIDocument.tenant_id, func.count(AIDocument.id)).group_by(AIDocument.tenant_id).all()
-        logger.warning("[RAG] No AI docs for tenant %s. Existing tenants with docs: %s", tenant_id, tenant_counts)
-    else:
-        logger.warning("[RAG] Total AI documents for tenant %s: %d (statuses: %s)",
-                       tenant_id, len(all_docs),
-                       {d.status for d in all_docs})
-    docs = [d for d in all_docs if d.status == "completed"]
+    docs = db.query(AIDocument).filter(
+        AIDocument.tenant_id == tenant_id,
+        AIDocument.status == "completed",
+    ).all()
     logger.warning("[RAG] Found %d completed AI documents for tenant %s", len(docs), tenant_id)
     for doc in docs:
         if doc.result_text:
             n = index_ai_document(tenant_id, doc.id, doc.title, doc.result_text)
-            stats["ai_documents"] += 1
+            stats["ai_documents"] += n
             stats["chunks_total"] += n
 
-    # 2. Transcriptions (segments are stored in transcription_segments table)
+    # 2. Transcriptions
     from app.models.transcription import TranscriptionJob, TranscriptionSegment
     jobs = db.query(TranscriptionJob).filter(
         TranscriptionJob.tenant_id == tenant_id,
@@ -228,11 +284,10 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
             .all()
         )
         title = job.title or job.original_filename or "Transcription"
-        logger.warning("[RAG]   Transcription '%s' (id=%s, segs=%d, status=%s)", title, job.id, len(segs), job.status)
         if segs:
             segments = [{"speaker": s.speaker_label or "", "text": s.text} for s in segs]
             n = index_transcription(tenant_id, job.id, title, segments)
-            stats["transcriptions"] += 1
+            stats["transcriptions"] += n
             stats["chunks_total"] += n
 
     # 3. Procédures terminées
@@ -254,11 +309,11 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
                 "form_questions": json.loads(p.form_questions) if p.form_questions else [],
             })
         n = index_procedure(tenant_id, proc.id, proc.title, proc.description, p_data)
-        stats["procedures"] += 1
+        stats["procedures"] += n
         stats["chunks_total"] += n
 
     # 4. Contacts
-    from app.models.contacts import ContactGroup, Contact
+    from app.models.contacts import ContactGroup
     groups = db.query(ContactGroup).filter(
         ContactGroup.tenant_id == tenant_id,
     ).all()
@@ -281,7 +336,7 @@ def reindex_tenant(tenant_id: str, db: Session) -> dict:
                     "custom_fields": custom,
                 })
             n = index_contact_group(tenant_id, group.id, group.name, group.description, c_data)
-            stats["contacts"] += 1
+            stats["contacts"] += n
             stats["chunks_total"] += n
 
     logger.warning("[RAG] Reindexed tenant %s: %s", tenant_id, stats)
