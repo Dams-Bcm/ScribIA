@@ -231,5 +231,7 @@ def transcribe(
             headers=_headers(tenant_id),
             timeout=_TRANSCRIBE_TIMEOUT,
         )
+    if r.status_code == 422:
+        logger.error(f"[TRANSCRIBE] 422 detail: {r.text}")
     r.raise_for_status()
     return r.json()
