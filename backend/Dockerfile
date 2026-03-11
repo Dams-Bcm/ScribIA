@@ -1,22 +1,13 @@
-FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04
+FROM python:3.12-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Paris
 
-# Install Python 3.12 + system deps
+# Install system deps
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        python3.12 python3.12-venv python3.12-dev \
         curl gnupg2 unixodbc-dev ffmpeg && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Create venv with pip included
-RUN python3.12 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
 
 # Install ODBC Driver 17 for SQL Server
 RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg && \
