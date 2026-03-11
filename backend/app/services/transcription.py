@@ -606,6 +606,9 @@ def process_partial_analysis(job_id: str):
     Used for imported audio when some attendees are pending_oral.
     Only transcribes the first ~60 seconds to check for oral consent.
     """
+    if settings.use_external_transcription:
+        return _process_external_transcription(job_id)
+
     if _is_cancelled(job_id):
         _clear_cancelled(job_id)
         logger.info(f"[PARTIAL] Job {job_id} was cancelled before starting")
