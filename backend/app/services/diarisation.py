@@ -30,23 +30,26 @@ logger = logging.getLogger(__name__)
 
 # ── Patch torchaudio for compatibility with newer versions ────────────────────
 # pyannote still references APIs removed in recent torchaudio releases
-import torchaudio
-if not hasattr(torchaudio, "set_audio_backend"):
-    torchaudio.set_audio_backend = lambda backend: None
-if not hasattr(torchaudio, "get_audio_backend"):
-    torchaudio.get_audio_backend = lambda: "soundfile"
-if not hasattr(torchaudio, "list_audio_backends"):
-    torchaudio.list_audio_backends = lambda: ["soundfile"]
-if not hasattr(torchaudio, "AudioMetaData"):
-    from dataclasses import dataclass as _dc
+try:
+    import torchaudio
+    if not hasattr(torchaudio, "set_audio_backend"):
+        torchaudio.set_audio_backend = lambda backend: None
+    if not hasattr(torchaudio, "get_audio_backend"):
+        torchaudio.get_audio_backend = lambda: "soundfile"
+    if not hasattr(torchaudio, "list_audio_backends"):
+        torchaudio.list_audio_backends = lambda: ["soundfile"]
+    if not hasattr(torchaudio, "AudioMetaData"):
+        from dataclasses import dataclass as _dc
 
-    @_dc
-    class _AudioMetaData:
-        sample_rate: int = 0
-        num_frames: int = 0
-        num_channels: int = 0
-        bits_per_sample: int = 0
-        encoding: str = ""
+        @_dc
+        class _AudioMetaData:
+            sample_rate: int = 0
+            num_frames: int = 0
+            num_channels: int = 0
+            bits_per_sample: int = 0
+            encoding: str = ""
+except ImportError:
+    torchaudio = None  # type: ignore  # non disponible sans torch (use_external_transcription=True)
 
     torchaudio.AudioMetaData = _AudioMetaData
 

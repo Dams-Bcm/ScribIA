@@ -16,6 +16,10 @@ bcrypt==4.0.1
 pydantic-settings==2.7.1
 
 requests
+numpy
+scipy
+soundfile
+scikit-learn
 
 # LLM (via LiteLLM proxy, API OpenAI-compatible)
 openai>=1.30.0
