@@ -29,34 +29,6 @@ services:
       retries: 10
       start_period: 30s
 
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "${OLLAMA_PORT:-11435}:11434"     # 11435 pour ne pas conflicte avec un ollama local
-    environment:
-      OLLAMA_KEEP_ALIVE: "${OLLAMA_KEEP_ALIVE:-0}"  # Libère la VRAM immédiatement après chaque appel (0 = pas de cache)
-    volumes:
-      - ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-
-  litellm:
-    image: ghcr.io/berriai/litellm:main-latest
-    ports:
-      - "${LITELLM_PORT:-4000}:4000"
-    volumes:
-      - ./litellm_config.yaml:/app/config.yaml
-    command: ["--config", "/app/config.yaml", "--port", "4000"]
-    environment:
-      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:-sk-scribia-litellm}"
-    depends_on:
-      - ollama
-
   backend:
     build: ./backend
     env_file: .env
@@ -68,12 +40,10 @@ services:
       SCRIBIA_DB_PASSWORD: "${DB_PASSWORD:-ScribIA_Dev_2026!}"
       SCRIBIA_JWT_SECRET: "${JWT_SECRET:-CHANGE-ME-IN-PRODUCTION}"
       SCRIBIA_CORS_ORIGINS: "${SCRIBIA_CORS_ORIGINS:-http://localhost:3001,http://localhost:5173}"
-      SCRIBIA_OLLAMA_URL: "${SCRIBIA_OLLAMA_URL:-http://ollama:11434}"
-      SCRIBIA_LITELLM_URL: "${SCRIBIA_LITELLM_URL:-http://litellm:4000/v1}"
-      SCRIBIA_LITELLM_API_KEY: "${LITELLM_MASTER_KEY:-sk-scribia-litellm}"
       SCRIBIA_RAG_API_URL: "${SCRIBIA_RAG_API_URL:-http://192.168.9.16:8000}"
       SCRIBIA_RAG_API_KEY: "${SCRIBIA_RAG_API_KEY:-}"
-      SCRIBIA_USE_EXTERNAL_TRANSCRIPTION: "${SCRIBIA_USE_EXTERNAL_TRANSCRIPTION:-false}"
+      SCRIBIA_USE_EXTERNAL_TRANSCRIPTION: "${SCRIBIA_USE_EXTERNAL_TRANSCRIPTION:-true}"
+      SCRIBIA_USE_EXTERNAL_LLM: "${SCRIBIA_USE_EXTERNAL_LLM:-true}"
       # SCRIBIA_HF_TOKEN passé directement via env_file: .env
     ports:
       - "${BACKEND_PORT:-8001}:8000"
@@ -82,13 +52,6 @@ services:
       - audio_data:/data/audio
       - prep_docs:/data/prep_docs
       - ai_docs:/data/ai_docs
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
 
   frontend:
     build: ./frontend
@@ -146,7 +109,6 @@ volumes:
   audio_data:
   prep_docs:
   ai_docs:
-  ollama_data:
   redis_data:
   qdrant_data:
   minio_data:

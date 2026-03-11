@@ -1,13 +1,13 @@
-"""Client LLM centralisé — appels via LiteLLM Proxy (API OpenAI-compatible).
+"""Client LLM centralisé — appels via LiteLLM Proxy (API OpenAI-compatible)
+ou via le RAG externe (POST /v1/generate) selon settings.use_external_llm.
 
-Toutes les interactions avec les modèles LLM passent par ce module.
-Le proxy LiteLLM gère le routing, le load balancing et les retries.
 Les modèles cloud (préfixe "cloud/") sont routés directement vers le provider cloud.
 """
 
 import logging
 from typing import Generator
 
+import httpx
 from openai import OpenAI
 
 from app.config import settings
@@ -79,6 +79,64 @@ def _resolve_client_and_model(model: str) -> tuple[OpenAI, str]:
     return get_client(), model
 
 
+def _rag_generate(
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float,
+    max_tokens: int,
+) -> str:
+    """Appelle POST /v1/generate du RAG externe (mode non-stream)."""
+    url = f"{settings.rag_api_url}/v1/generate"
+    headers = {
+        "Authorization": f"Bearer {settings.rag_api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "prompt": user_prompt,
+        "system_prompt": system_prompt,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "stream": False,
+    }
+    try:
+        resp = httpx.post(url, json=payload, headers=headers, timeout=600.0)
+        resp.raise_for_status()
+        return resp.json()["text"]
+    except Exception as exc:
+        raise RuntimeError(f"Erreur RAG LLM : {exc}") from exc
+
+
+def _rag_generate_stream(
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float,
+    max_tokens: int,
+) -> Generator[str, None, None]:
+    """Appelle POST /v1/generate du RAG externe en streaming (SSE)."""
+    url = f"{settings.rag_api_url}/v1/generate"
+    headers = {
+        "Authorization": f"Bearer {settings.rag_api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "prompt": user_prompt,
+        "system_prompt": system_prompt,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "stream": True,
+    }
+    try:
+        with httpx.stream("POST", url, json=payload, headers=headers, timeout=600.0) as resp:
+            resp.raise_for_status()
+            for line in resp.iter_lines():
+                if line.startswith("data: "):
+                    chunk = line[6:]
+                    if chunk and chunk != "[DONE]":
+                        yield chunk
+    except Exception as exc:
+        raise RuntimeError(f"Erreur RAG LLM stream : {exc}") from exc
+
+
 def llm_generate_stream(
     model: str,
     system_prompt: str,
@@ -97,6 +155,10 @@ def llm_generate_stream(
         max_tokens: Nombre max de tokens à générer.
         extra_params: Paramètres supplémentaires (repeat_penalty, etc.).
     """
+    if settings.use_external_llm and not _is_cloud_model(model):
+        yield from _rag_generate_stream(system_prompt, user_prompt, temperature, max_tokens)
+        return
+
     is_cloud = _is_cloud_model(model)
     client, resolved_model = _resolve_client_and_model(model)
     messages = []
@@ -144,6 +206,9 @@ def llm_generate(
         response_format: Format de réponse (ex: {"type": "json_object"}).
         extra_params: Paramètres supplémentaires.
     """
+    if settings.use_external_llm and not _is_cloud_model(model):
+        return _rag_generate(system_prompt, user_prompt, temperature, max_tokens)
+
     is_cloud = _is_cloud_model(model)
     client, resolved_model = _resolve_client_and_model(model)
     messages = []
