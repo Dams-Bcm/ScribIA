@@ -269,8 +269,10 @@ def resolve_model(model_name: str) -> str:
 def llm_health_check() -> bool:
     """Vérifie que le proxy LiteLLM est accessible."""
     try:
-        client = get_client()
-        client.models.list()
-        return True
+        import httpx
+        # /health répond 200 même sans model_list déclaré (models.list() échoue dans ce cas)
+        base = settings.litellm_url.rstrip("/").removesuffix("/v1")
+        r = httpx.get(f"{base}/health", timeout=5.0)
+        return r.status_code < 500
     except Exception:
         return False
