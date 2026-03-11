@@ -86,23 +86,25 @@ def _rag_generate(
     temperature: float,
     max_tokens: int,
 ) -> str:
-    """Appelle POST /v1/generate du RAG externe (mode non-stream)."""
-    url = f"{settings.rag_api_url}/v1/generate"
+    """Appelle POST /v1/chat du RAG externe (mode non-stream, sans contexte RAG)."""
+    url = f"{settings.rag_api_url}/v1/chat"
     headers = {
         "Authorization": f"Bearer {settings.rag_api_key}",
         "Content-Type": "application/json",
     }
+    # Combine system + user prompts en un seul message
+    message = f"{system_prompt}\n\n{user_prompt}".strip() if system_prompt else user_prompt
     payload = {
-        "prompt": user_prompt,
-        "system_prompt": system_prompt,
+        "message": message,
         "max_tokens": max_tokens,
         "temperature": temperature,
         "stream": False,
+        "score_threshold": 0.99,  # Ignore le contexte RAG — génération LLM pure
     }
     try:
         resp = httpx.post(url, json=payload, headers=headers, timeout=600.0)
         resp.raise_for_status()
-        return resp.json()["text"]
+        return resp.json()["answer"]
     except Exception as exc:
         raise RuntimeError(f"Erreur RAG LLM : {exc}") from exc
 
@@ -113,18 +115,19 @@ def _rag_generate_stream(
     temperature: float,
     max_tokens: int,
 ) -> Generator[str, None, None]:
-    """Appelle POST /v1/generate du RAG externe en streaming (SSE)."""
-    url = f"{settings.rag_api_url}/v1/generate"
+    """Appelle POST /v1/chat du RAG externe en streaming (SSE, sans contexte RAG)."""
+    url = f"{settings.rag_api_url}/v1/chat"
     headers = {
         "Authorization": f"Bearer {settings.rag_api_key}",
         "Content-Type": "application/json",
     }
+    message = f"{system_prompt}\n\n{user_prompt}".strip() if system_prompt else user_prompt
     payload = {
-        "prompt": user_prompt,
-        "system_prompt": system_prompt,
+        "message": message,
         "max_tokens": max_tokens,
         "temperature": temperature,
         "stream": True,
+        "score_threshold": 0.99,  # Ignore le contexte RAG — génération LLM pure
     }
     try:
         with httpx.stream("POST", url, json=payload, headers=headers, timeout=600.0) as resp:
