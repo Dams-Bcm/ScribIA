@@ -125,7 +125,7 @@ def ingest_file(
     via multipart/form-data.
     """
     files = {"file": (filename, io.BytesIO(content.encode("utf-8")), content_type)}
-    data: dict[str, Any] = {}
+    data: dict[str, Any] = {"filename": filename}
     if metadata:
         data["metadata"] = json.dumps(metadata)
 
