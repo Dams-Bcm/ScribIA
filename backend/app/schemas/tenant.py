@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class TenantCreate(BaseModel):
@@ -22,6 +22,7 @@ class TenantUpdate(BaseModel):
     is_active: Optional[bool] = None
     whisper_initial_prompt: Optional[str] = None
     rag_project_id: Optional[str] = None
+    rag_api_key: Optional[str] = None
 
 
 class TenantModuleUpdate(BaseModel):
@@ -49,6 +50,21 @@ class TenantResponse(BaseModel):
     dedicated_db_name: Optional[str] = None
     whisper_initial_prompt: Optional[str] = None
     rag_project_id: Optional[str] = None
+    rag_api_key_set: bool = False
     modules: list[ModuleResponse] = []
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def compute_rag_api_key_set(cls, data):
+        """Masque la clé API et expose uniquement un booléen."""
+        if hasattr(data, "rag_api_key"):
+            # SQLAlchemy model
+            data_dict = {c.key: getattr(data, c.key) for c in data.__table__.columns}
+            data_dict["rag_api_key_set"] = bool(data.rag_api_key)
+            data_dict["modules"] = data.modules
+            return data_dict
+        if isinstance(data, dict):
+            data["rag_api_key_set"] = bool(data.get("rag_api_key"))
+        return data

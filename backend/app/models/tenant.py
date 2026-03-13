@@ -33,6 +33,7 @@ class Tenant(UUIDMixin, TimestampMixin, Base):
     dedicated_db_name = Column(String(100), nullable=True)               # e.g. 'scribia_tenant_abc123'
     whisper_initial_prompt = Column(Text, nullable=True)                  # vocabulaire métier pour Whisper
     rag_project_id = Column(String(100), nullable=True)                    # UUID projet dans le RAG externe
+    rag_api_key    = Column(String(255), nullable=True)                    # clé API rak_... pour ce tenant (scope client RAG)
 
     # Relationships
     parent           = relationship("Tenant", remote_side="Tenant.id", backref="children")

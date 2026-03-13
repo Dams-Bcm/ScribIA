@@ -136,6 +136,10 @@ def _add_missing_columns():
             conn.execute(text(
                 "ALTER TABLE tenants ADD rag_project_id VARCHAR(100) NULL"
             ))
+        if "rag_api_key" not in tenant_cols:
+            conn.execute(text(
+                "ALTER TABLE tenants ADD rag_api_key VARCHAR(255) NULL"
+            ))
 
         # procedure_templates: sector + make tenant_id nullable
         pt_cols = {c["name"] for c in insp.get_columns("procedure_templates")}

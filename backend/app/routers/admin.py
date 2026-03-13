@@ -118,6 +118,8 @@ def update_tenant(
         tenant.whisper_initial_prompt = body.whisper_initial_prompt or None
     if body.rag_project_id is not None:
         tenant.rag_project_id = body.rag_project_id or None
+    if body.rag_api_key is not None:
+        tenant.rag_api_key = body.rag_api_key or None
 
     db.commit()
     db.refresh(tenant)

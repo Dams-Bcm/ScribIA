@@ -29,36 +29,57 @@ logger = logging.getLogger(__name__)
 _TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0)
 
 
-def _headers() -> dict[str, str]:
-    """Headers communs : auth API Key uniquement."""
-    return {
-        "Authorization": f"Bearer {settings.rag_api_key}",
-    }
-
-
 def _base() -> str:
     return settings.rag_api_url.rstrip("/")
 
 
-def _get_rag_project_id(tenant_id: str) -> str | None:
-    """Résout le rag_project_id depuis le tenant ScribIA.
+def _resolve_rag_config(tenant_id: str) -> tuple[str, str | None]:
+    """Résout la clé API et le project_id depuis le tenant ScribIA.
 
-    Priorité : tenant.rag_project_id > settings.rag_project_id (fallback global).
+    Chaîne de résolution : tenant → parent → settings global.
+    Retourne (api_key, project_id).
     """
+    api_key = settings.rag_api_key
+    project_id = settings.rag_project_id or None
     try:
         from app.database import SessionLocal
         from app.models.tenant import Tenant
         db = SessionLocal()
         try:
             tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
-            if tenant and tenant.rag_project_id:
-                return tenant.rag_project_id
+            if tenant:
+                # project_id : depuis le tenant directement
+                if tenant.rag_project_id:
+                    project_id = tenant.rag_project_id
+                # api_key : tenant → parent → global
+                if tenant.rag_api_key:
+                    api_key = tenant.rag_api_key
+                elif tenant.parent_id:
+                    parent = db.query(Tenant).filter(Tenant.id == tenant.parent_id).first()
+                    if parent and parent.rag_api_key:
+                        api_key = parent.rag_api_key
         finally:
             db.close()
     except Exception:
         pass
-    # Fallback global (peut être vide)
-    return settings.rag_project_id if settings.rag_project_id != "default" else None
+    return api_key, project_id
+
+
+def _headers(tenant_id: str | None = None) -> dict[str, str]:
+    """Headers communs : auth API Key (résolue depuis le tenant si fourni)."""
+    if tenant_id:
+        api_key, _ = _resolve_rag_config(tenant_id)
+    else:
+        api_key = settings.rag_api_key
+    return {
+        "Authorization": f"Bearer {api_key}",
+    }
+
+
+def _get_rag_project_id(tenant_id: str) -> str | None:
+    """Résout le rag_project_id depuis le tenant ScribIA."""
+    _, project_id = _resolve_rag_config(tenant_id)
+    return project_id
 
 
 # ── Health ───────────────────────────────────────────────────────────────────
@@ -94,7 +115,7 @@ def search(
 
     r = httpx.post(
         f"{_base()}/v1/search", json=body,
-        headers=_headers(), timeout=_TIMEOUT,
+        headers=_headers(tenant_id), timeout=_TIMEOUT,
     )
     r.raise_for_status()
     return r.json()
@@ -129,7 +150,7 @@ def chat(
 
     r = httpx.post(
         f"{_base()}/v1/chat", json=body,
-        headers=_headers(), timeout=_TIMEOUT,
+        headers=_headers(tenant_id), timeout=_TIMEOUT,
     )
     r.raise_for_status()
     return r.json()
@@ -162,7 +183,7 @@ def ingest_file(
         f"{_base()}/v1/ingest",
         files=files,
         data=data,
-        headers=_headers(),
+        headers=_headers(tenant_id),
         timeout=_TIMEOUT,
     )
     r.raise_for_status()
@@ -194,7 +215,7 @@ def ingest_external(
 
     r = httpx.post(
         f"{_base()}/v1/ingest/external", json=body,
-        headers=_headers(), timeout=_TIMEOUT,
+        headers=_headers(tenant_id), timeout=_TIMEOUT,
     )
     r.raise_for_status()
     return r.json()
@@ -207,7 +228,7 @@ def list_documents(tenant_id: str) -> dict:
     """GET /v1/documents — liste les documents indexés pour ce tenant."""
     r = httpx.get(
         f"{_base()}/v1/documents",
-        headers=_headers(), timeout=_TIMEOUT,
+        headers=_headers(tenant_id), timeout=_TIMEOUT,
     )
     r.raise_for_status()
     return r.json()
@@ -217,7 +238,7 @@ def delete_document(tenant_id: str, doc_id: str) -> None:
     """DELETE /v1/documents/{doc_id} — soft-delete + suppression chunks/vecteurs/fichiers."""
     r = httpx.delete(
         f"{_base()}/v1/documents/{doc_id}",
-        headers=_headers(), timeout=_TIMEOUT,
+        headers=_headers(tenant_id), timeout=_TIMEOUT,
     )
     r.raise_for_status()
 
@@ -260,7 +281,7 @@ def transcribe(
             f"{_base()}/v1/transcribe",
             files=files,
             data=data,
-            headers=_headers(),
+            headers=_headers(tenant_id),
             timeout=_TRANSCRIBE_TIMEOUT,
         )
     if r.status_code == 422:
