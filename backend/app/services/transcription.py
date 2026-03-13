@@ -1,6 +1,6 @@
-"""Transcription service — Whisper pipeline with GPU semaphore.
+"""Transcription service — Whisper pipeline.
 
-Handles: audio conversion (FFmpeg), transcription (faster-whisper),
+Handles: audio conversion (FFmpeg), transcription (faster-whisper / external),
 progress reporting (event_bus), and background thread management.
 """
 
@@ -19,9 +19,6 @@ from app.models.transcription import TranscriptionJob, TranscriptionJobStatus, T
 from app.services.event_bus import event_bus
 
 logger = logging.getLogger(__name__)
-
-# ── GPU semaphore (1 transcription at a time) ────────────────────────────────
-_gpu_semaphore = threading.Semaphore(1)
 
 # ── Cancelled jobs set (thread-safe) ─────────────────────────────────────────
 _cancelled_jobs: set[str] = set()
@@ -936,9 +933,6 @@ def process_partial_analysis(job_id: str):
                         status=TranscriptionJobStatus.QUEUED,
                         progress=5,
                         progress_message="Consentement oral détecté — transcription + diarisation en file d'attente...")
-            # Release GPU semaphore before launching full diarisation
-            # (we're still inside the _gpu_semaphore context, so we launch in a thread
-            #  that will wait for the semaphore to be released)
             from app.services.diarisation import run_diarisation_job_in_thread
             run_diarisation_job_in_thread(job.id)
         else:
@@ -965,13 +959,11 @@ def process_partial_analysis(job_id: str):
 
 
 def run_partial_analysis_in_thread(job_id: str):
-    """Launch partial analysis in a background thread with GPU semaphore."""
+    """Launch partial analysis in a background thread."""
     def _worker():
-        logger.info(f"[GPU] Waiting for semaphore for partial analysis {job_id}...")
-        with _gpu_semaphore:
-            logger.info(f"[GPU] Acquired semaphore for partial analysis {job_id}")
-            process_partial_analysis(job_id)
-        logger.info(f"[GPU] Released semaphore for partial analysis {job_id}")
+        logger.info(f"Starting partial analysis {job_id}")
+        process_partial_analysis(job_id)
+        logger.info(f"Finished partial analysis {job_id}")
 
     thread = threading.Thread(target=_worker, name=f"partial-{job_id}", daemon=True)
     thread.start()
@@ -979,13 +971,11 @@ def run_partial_analysis_in_thread(job_id: str):
 
 
 def run_job_in_thread(job_id: str):
-    """Launch the transcription pipeline in a background thread with GPU semaphore."""
+    """Launch the transcription pipeline in a background thread."""
     def _worker():
-        logger.info(f"[GPU] Waiting for semaphore for job {job_id}...")
-        with _gpu_semaphore:
-            logger.info(f"[GPU] Acquired semaphore for job {job_id}")
-            process_transcription_job(job_id)
-        logger.info(f"[GPU] Released semaphore for job {job_id}")
+        logger.info(f"Starting transcription job {job_id}")
+        process_transcription_job(job_id)
+        logger.info(f"Finished transcription job {job_id}")
 
     thread = threading.Thread(target=_worker, name=f"transcription-{job_id}", daemon=True)
     thread.start()

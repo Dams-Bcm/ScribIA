@@ -21,7 +21,7 @@ from app.models.transcription import (
 )
 from app.services.event_bus import event_bus
 from app.services.transcription import (
-    _gpu_semaphore, _update_job, _get_tenant_prompt, _build_whisper_prompt,
+    _update_job, _get_tenant_prompt, _build_whisper_prompt,
     convert_to_wav, get_audio_duration,
     get_whisper_model, unload_whisper, run_transcription,
 )
@@ -842,13 +842,11 @@ def process_diarisation_job(job_id: str):
 
 
 def run_diarisation_job_in_thread(job_id: str):
-    """Launch diarisation pipeline in a background thread with GPU semaphore."""
+    """Launch diarisation pipeline in a background thread."""
     def _worker():
-        logger.info(f"[GPU] Waiting for semaphore for diarisation job {job_id}...")
-        with _gpu_semaphore:
-            logger.info(f"[GPU] Acquired semaphore for diarisation job {job_id}")
-            process_diarisation_job(job_id)
-        logger.info(f"[GPU] Released semaphore for diarisation job {job_id}")
+        logger.info(f"Starting diarisation job {job_id}")
+        process_diarisation_job(job_id)
+        logger.info(f"Finished diarisation job {job_id}")
 
     thread = threading.Thread(target=_worker, name=f"diarisation-{job_id}", daemon=True)
     thread.start()

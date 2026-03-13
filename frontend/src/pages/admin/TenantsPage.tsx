@@ -16,6 +16,14 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
+function slugify(text: string): string {
+  return text
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 export function TenantsPage() {
   const { data: tenants = [], isLoading } = useTenants();
   const createTenant = useCreateTenant();
@@ -31,7 +39,7 @@ export function TenantsPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", slug: "", tenant_type: "organization" as string, sector: null as string | null, modules: [] as string[] });
+  const [form, setForm] = useState({ name: "", slug: "", slugTouched: false, tenant_type: "organization" as string, sector: null as string | null, modules: [] as string[] });
   const [provisionResult, setProvisionResult] = useState<ProvisionResult | null>(null);
 
   function handleSectorChange(sector: string | null) {
@@ -53,16 +61,16 @@ export function TenantsPage() {
             provisionTenant.mutate(newTenant.id, {
               onSuccess: (result) => {
                 setProvisionResult(result);
-                setForm({ name: "", slug: "", tenant_type: "organization", sector: null, modules: [] });
+                setForm({ name: "", slug: "", slugTouched: false, tenant_type: "organization", sector: null, modules: [] });
               },
               onError: () => {
                 setShowCreate(false);
-                setForm({ name: "", slug: "", tenant_type: "organization", sector: null, modules: [] });
+                setForm({ name: "", slug: "", slugTouched: false, tenant_type: "organization", sector: null, modules: [] });
               },
             });
           } else {
             setShowCreate(false);
-            setForm({ name: "", slug: "", tenant_type: "organization", sector: null, modules: [] });
+            setForm({ name: "", slug: "", slugTouched: false, tenant_type: "organization", sector: null, modules: [] });
           }
         },
       },
@@ -318,7 +326,10 @@ export function TenantsPage() {
                     <input
                       type="text"
                       value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      onChange={(e) => {
+                        const name = e.target.value;
+                        setForm((f) => ({ ...f, name, ...(!f.slugTouched ? { slug: slugify(name) } : {}) }));
+                      }}
                       className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                       placeholder="Cabinet Gestion ABC"
                     />
@@ -329,7 +340,7 @@ export function TenantsPage() {
                     <input
                       type="text"
                       value={form.slug}
-                      onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                      onChange={(e) => setForm({ ...form, slug: e.target.value, slugTouched: true })}
                       className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                       placeholder="cabinet-gestion-abc"
                     />
