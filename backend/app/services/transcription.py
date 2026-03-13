@@ -684,49 +684,66 @@ def _process_external_partial_analysis(job_id: str):
             ))
         db.commit()
 
-        # ── Step 4: Detect oral consent ────────────────────────────────────
-        _update_job(db, job,
-                    progress=90,
-                    progress_message="Détection automatique du consentement oral...")
-
-        try:
-            from app.services.consent_detection import detect_oral_consent
+        # ── Step 4: Detect oral consent (or skip in test mode) ────────────
+        if settings.skip_consent_check:
+            logger.info(f"[EXT-PARTIAL] Job {job_id} — skip_consent_check=True, auto-accepting all attendees")
             import json as _json
-            result_consent = detect_oral_consent(db, job)
-            job.consent_detection_result = _json.dumps(result_consent)
-            if result_consent.get("detected") and result_consent.get("detection_type") == "collective_consent":
-                try:
-                    raw_attendees = _json.loads(job.attendees) if job.attendees else []
-                    updated = False
-                    for att in raw_attendees:
-                        if att.get("status") == "pending_oral":
-                            att["status"] = "accepted_oral"
-                            att["evidence_type"] = "oral_auto"
-                            updated = True
-                    if updated:
-                        job.attendees = _json.dumps(raw_attendees)
-                        statuses = {a.get("status") for a in raw_attendees}
-                        if "refused" in statuses or "withdrawn" in statuses:
-                            job.recording_validity = "invalidated"
-                        elif all(s in ("accepted_email", "accepted_oral") for s in statuses):
-                            job.recording_validity = "valid"
-                        else:
-                            job.recording_validity = "pending"
-                except (ValueError, TypeError):
-                    pass
-            db.commit()
-        except Exception as exc:
-            logger.warning(f"[EXT-PARTIAL] Consent detection failed for job {job_id}: {exc}")
+            try:
+                raw_attendees = _json.loads(job.attendees) if job.attendees else []
+                for att in raw_attendees:
+                    if att.get("status") == "pending_oral":
+                        att["status"] = "accepted_oral"
+                        att["evidence_type"] = "oral_auto_skip"
+                job.attendees = _json.dumps(raw_attendees)
+                job.recording_validity = "valid"
+                job.consent_detection_result = _json.dumps({"detected": True, "type": "skip_consent_check", "explanation": "Consentement ignoré (mode test)"})
+                db.commit()
+            except (ValueError, TypeError):
+                pass
+            all_accepted = True
+        else:
+            _update_job(db, job,
+                        progress=90,
+                        progress_message="Détection automatique du consentement oral...")
 
-        # ── Step 5: All consented? → full external transcription ──────────
-        all_accepted = False
-        try:
-            import json as _json2
-            raw = _json2.loads(job.attendees) if job.attendees else []
-            statuses = {a.get("status") for a in raw}
-            all_accepted = bool(raw) and all(s in ("accepted_email", "accepted_oral") for s in statuses)
-        except (ValueError, TypeError):
-            pass
+            try:
+                from app.services.consent_detection import detect_oral_consent
+                import json as _json
+                result_consent = detect_oral_consent(db, job)
+                job.consent_detection_result = _json.dumps(result_consent)
+                if result_consent.get("detected") and result_consent.get("detection_type") == "collective_consent":
+                    try:
+                        raw_attendees = _json.loads(job.attendees) if job.attendees else []
+                        updated = False
+                        for att in raw_attendees:
+                            if att.get("status") == "pending_oral":
+                                att["status"] = "accepted_oral"
+                                att["evidence_type"] = "oral_auto"
+                                updated = True
+                        if updated:
+                            job.attendees = _json.dumps(raw_attendees)
+                            statuses = {a.get("status") for a in raw_attendees}
+                            if "refused" in statuses or "withdrawn" in statuses:
+                                job.recording_validity = "invalidated"
+                            elif all(s in ("accepted_email", "accepted_oral") for s in statuses):
+                                job.recording_validity = "valid"
+                            else:
+                                job.recording_validity = "pending"
+                    except (ValueError, TypeError):
+                        pass
+                db.commit()
+            except Exception as exc:
+                logger.warning(f"[EXT-PARTIAL] Consent detection failed for job {job_id}: {exc}")
+
+            # Check if all consented
+            all_accepted = False
+            try:
+                import json as _json2
+                raw = _json2.loads(job.attendees) if job.attendees else []
+                statuses = {a.get("status") for a in raw}
+                all_accepted = bool(raw) and all(s in ("accepted_email", "accepted_oral") for s in statuses)
+            except (ValueError, TypeError):
+                pass
 
         if all_accepted:
             logger.info(f"[EXT-PARTIAL] Job {job_id} — all consents OK, proceeding to full external transcription")
@@ -849,54 +866,66 @@ def process_partial_analysis(job_id: str):
             db.add(segment)
         db.commit()
 
-        # ── Step 4: Detect oral consent (always run for partial analysis) ─
-        _update_job(db, job,
-                    progress=90,
-                    progress_message="Détection automatique du consentement oral...")
-
-        try:
-            from app.services.consent_detection import detect_oral_consent
+        # ── Step 4: Detect oral consent (or skip in test mode) ─────────
+        if settings.skip_consent_check:
+            logger.info(f"[PARTIAL] Job {job_id} — skip_consent_check=True, auto-accepting all attendees")
             import json as _json
-            # Always run LLM detection for partial analysis (bypass has_pending_oral gate)
-            result = detect_oral_consent(db, job)
-            job.consent_detection_result = _json.dumps(result)
-            # If collective consent detected, update pending_oral attendees
-            if result.get("detected") and result.get("detection_type") == "collective_consent":
-                try:
-                    raw_attendees = _json.loads(job.attendees) if job.attendees else []
-                    updated = False
-                    for att in raw_attendees:
-                        if att.get("status") == "pending_oral":
-                            att["status"] = "accepted_oral"
-                            att["evidence_type"] = "oral_auto"
-                            updated = True
-                    if updated:
-                        job.attendees = _json.dumps(raw_attendees)
-                        # Recompute recording_validity
-                        statuses = {a.get("status") for a in raw_attendees}
-                        if "refused" in statuses or "withdrawn" in statuses:
-                            job.recording_validity = "invalidated"
-                        elif all(s in ("accepted_email", "accepted_oral") for s in statuses):
-                            job.recording_validity = "valid"
-                        else:
-                            job.recording_validity = "pending"
-                except (ValueError, TypeError):
-                    pass
-            db.commit()
-        except Exception as exc:
-            logger.warning(f"[CONSENT] Auto-detection failed for partial job {job_id}: {exc}")
+            try:
+                raw_attendees = _json.loads(job.attendees) if job.attendees else []
+                for att in raw_attendees:
+                    if att.get("status") == "pending_oral":
+                        att["status"] = "accepted_oral"
+                        att["evidence_type"] = "oral_auto_skip"
+                job.attendees = _json.dumps(raw_attendees)
+                job.recording_validity = "valid"
+                job.consent_detection_result = _json.dumps({"detected": True, "type": "skip_consent_check", "explanation": "Consentement ignoré (mode test)"})
+                db.commit()
+            except (ValueError, TypeError):
+                pass
+            all_accepted = True
+        else:
+            _update_job(db, job,
+                        progress=90,
+                        progress_message="Détection automatique du consentement oral...")
 
-        # ── Step 5: Check if consent is fully resolved ──────────────────
-        # If all attendees now have accepted status, proceed directly to
-        # full diarisation without stopping at consent_check.
-        all_accepted = False
-        try:
-            import json as _json2
-            raw = _json2.loads(job.attendees) if job.attendees else []
-            statuses = {a.get("status") for a in raw}
-            all_accepted = bool(raw) and all(s in ("accepted_email", "accepted_oral") for s in statuses)
-        except (ValueError, TypeError):
-            pass
+            try:
+                from app.services.consent_detection import detect_oral_consent
+                import json as _json
+                result = detect_oral_consent(db, job)
+                job.consent_detection_result = _json.dumps(result)
+                if result.get("detected") and result.get("detection_type") == "collective_consent":
+                    try:
+                        raw_attendees = _json.loads(job.attendees) if job.attendees else []
+                        updated = False
+                        for att in raw_attendees:
+                            if att.get("status") == "pending_oral":
+                                att["status"] = "accepted_oral"
+                                att["evidence_type"] = "oral_auto"
+                                updated = True
+                        if updated:
+                            job.attendees = _json.dumps(raw_attendees)
+                            statuses = {a.get("status") for a in raw_attendees}
+                            if "refused" in statuses or "withdrawn" in statuses:
+                                job.recording_validity = "invalidated"
+                            elif all(s in ("accepted_email", "accepted_oral") for s in statuses):
+                                job.recording_validity = "valid"
+                            else:
+                                job.recording_validity = "pending"
+                    except (ValueError, TypeError):
+                        pass
+                db.commit()
+            except Exception as exc:
+                logger.warning(f"[CONSENT] Auto-detection failed for partial job {job_id}: {exc}")
+
+            # Check if all consented
+            all_accepted = False
+            try:
+                import json as _json2
+                raw = _json2.loads(job.attendees) if job.attendees else []
+                statuses = {a.get("status") for a in raw}
+                all_accepted = bool(raw) and all(s in ("accepted_email", "accepted_oral") for s in statuses)
+            except (ValueError, TypeError):
+                pass
 
         if all_accepted:
             logger.info(f"[PARTIAL] Job {job_id} — all consents OK, proceeding to full diarisation")

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search, Mic, Users, ChevronDown, CheckCircle2, XCircle, Cloud, Eye, EyeOff, Zap } from "lucide-react";
+import { Sparkles, Save, Download, Trash2, Loader2, Check, AlertCircle, Search, Mic, Users, ChevronDown, CheckCircle2, XCircle, Cloud, Eye, EyeOff, Zap, ShieldOff } from "lucide-react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface AIUsage {
@@ -189,6 +189,22 @@ interface PullState {
   completed?: number;
 }
 
+function useConsentSettings() {
+  return useQuery({
+    queryKey: ["consent-settings"],
+    queryFn: () => api.get<{ skip_consent_check: boolean }>("/admin/consent-settings"),
+  });
+}
+
+function useUpdateConsentSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { skip_consent_check: boolean }) =>
+      api.put("/admin/consent-settings", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["consent-settings"] }),
+  });
+}
+
 function useDeleteModel() {
   const qc = useQueryClient();
   return useMutation({
@@ -212,6 +228,8 @@ export function AISettingsPage() {
   const updateCloud = useUpdateCloudProvider();
   const testCloud = useTestCloudProvider();
   const deleteModel = useDeleteModel();
+  const { data: consentData } = useConsentSettings();
+  const updateConsent = useUpdateConsentSettings();
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [overrides, setOverrides] = useState<Record<string, string | null>>({});
@@ -957,6 +975,44 @@ export function AISettingsPage() {
               <p className="text-xs text-muted-foreground mt-4">
                 Le changement du seuil de clustering décharge le pipeline — il sera rechargé à la prochaine diarisation.
               </p>
+            </div>
+          )}
+
+          {/* Consent Settings (test mode) */}
+          {consentData && (
+            <div className="bg-background rounded-xl border border-border p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <ShieldOff className="w-4 h-4" />
+                <h2 className="text-lg font-semibold">Consentement (mode test)</h2>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Ignorer la vérification du consentement</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Active l'acceptation automatique du consentement oral pour tous les participants.
+                    Utile pour les tests — ne pas activer en production.
+                  </p>
+                </div>
+                <button
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    consentData.skip_consent_check ? "bg-amber-500" : "bg-muted"
+                  }`}
+                  onClick={() => updateConsent.mutate({ skip_consent_check: !consentData.skip_consent_check })}
+                  disabled={updateConsent.isPending}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      consentData.skip_consent_check ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+              {consentData.skip_consent_check && (
+                <div className="mt-3 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  Mode test actif — le consentement est automatiquement accepté pour toutes les sessions.
+                </div>
+              )}
             </div>
           )}
 

@@ -193,7 +193,7 @@ def delete_document(tenant_id: str, doc_id: str) -> None:
 # ── Transcription ────────────────────────────────────────────────────────────
 
 # Timeout long pour la transcription (audio de 1h+ → plusieurs minutes de traitement)
-_TRANSCRIBE_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=120.0, pool=10.0)
+_TRANSCRIBE_TIMEOUT = httpx.Timeout(connect=10.0, read=1800.0, write=300.0, pool=10.0)
 
 
 def transcribe(

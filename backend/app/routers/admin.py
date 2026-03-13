@@ -1452,6 +1452,27 @@ def update_rag_settings(
     return {"message": "Paramètres RAG mis à jour"}
 
 
+# ── Consent Settings (test mode) ─────────────────────────────────────────────
+
+@router.get("/consent-settings")
+def get_consent_settings(
+    _: User = Depends(require_super_admin),
+):
+    """Retourne la configuration du consentement."""
+    return {"skip_consent_check": settings.skip_consent_check}
+
+
+@router.put("/consent-settings")
+def update_consent_settings(
+    body: dict,
+    _: User = Depends(require_super_admin),
+):
+    """Active/désactive le skip du consentement (mode test)."""
+    if "skip_consent_check" in body:
+        settings.skip_consent_check = bool(body["skip_consent_check"])
+    return {"skip_consent_check": settings.skip_consent_check}
+
+
 # ── Email / SMTP Settings ────────────────────────────────────────────────────
 
 EMAIL_SETTINGS_KEYS = {

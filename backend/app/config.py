@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     rag_score_threshold: float = 0.5                 # seuil de score pour /v1/search
     use_external_transcription: bool = False         # si True, délègue Whisper+pyannote au rag-api
     use_external_llm: bool = False                   # si True, délègue les appels LLM au rag-api /v1/generate
+    skip_consent_check: bool = False                 # si True, skip la détection de consentement (mode test)
 
     # ── Email (SMTP) ─────────────────────────────────────────────────────────
     smtp_host: str = ""
