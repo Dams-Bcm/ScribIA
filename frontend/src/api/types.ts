@@ -61,6 +61,8 @@ export interface Tenant {
   db_mode: "shared" | "dedicated";
   dedicated_db_name: string | null;
   whisper_initial_prompt: string | null;
+  rag_project_id: string | null;
+  rag_api_key_set: boolean;
   modules: TenantModule[];
 }
 
@@ -88,6 +90,8 @@ export interface TenantUpdate {
   is_large?: boolean;
   is_active?: boolean;
   whisper_initial_prompt?: string | null;
+  rag_project_id?: string | null;
+  rag_api_key?: string | null;
 }
 
 // ── Modules ──────────────────────────────────────────────────────────────────

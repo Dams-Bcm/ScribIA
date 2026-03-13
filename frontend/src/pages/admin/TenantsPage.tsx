@@ -11,7 +11,7 @@ import {
 } from "../../api/hooks/useTenants";
 import { AVAILABLE_MODULES, type Tenant, type ProvisionResult } from "../../api/types";
 import { useSectors } from "../../api/hooks/useSectors";
-import { Building2, Plus, Trash2, X, CheckCircle2, Sparkles, Database, Loader2, Save } from "lucide-react";
+import { Building2, Plus, Trash2, X, CheckCircle2, Sparkles, Database, Loader2, Save, Key } from "lucide-react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -176,6 +176,13 @@ export function TenantsPage() {
 
               {/* Prompt Whisper */}
               <WhisperPromptEditor tenant={selected} onSave={(prompt) => updateTenant.mutate({ id: selected.id, data: { whisper_initial_prompt: prompt } })} saving={updateTenant.isPending} />
+
+              {/* RAG API Config */}
+              <RagConfigEditor
+                tenant={selected}
+                onSave={(data) => updateTenant.mutate({ id: selected.id, data })}
+                saving={updateTenant.isPending}
+              />
 
               {/* Base de données dédiée */}
               <div className="mt-6 pt-6 border-t border-border">
@@ -443,6 +450,92 @@ function WhisperPromptEditor({ tenant, onSave, saving }: { tenant: Tenant; onSav
           onClick={() => onSave(draft)}
           disabled={saving}
           className="mt-2 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+        >
+          <Save className="w-3.5 h-3.5" />
+          {saving ? "Enregistrement…" : "Enregistrer"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function RagConfigEditor({
+  tenant,
+  onSave,
+  saving,
+}: {
+  tenant: Tenant;
+  onSave: (data: { rag_project_id?: string | null; rag_api_key?: string | null }) => void;
+  saving: boolean;
+}) {
+  const [projectId, setProjectId] = useState(tenant.rag_project_id ?? "");
+  const [apiKey, setApiKey] = useState("");
+  const [prevId, setPrevId] = useState(tenant.id);
+
+  if (tenant.id !== prevId) {
+    setPrevId(tenant.id);
+    setProjectId(tenant.rag_project_id ?? "");
+    setApiKey("");
+  }
+
+  const projectChanged = projectId !== (tenant.rag_project_id ?? "");
+  const keyChanged = apiKey !== "";
+  const hasChanges = projectChanged || keyChanged;
+
+  function handleSave() {
+    const data: { rag_project_id?: string | null; rag_api_key?: string | null } = {};
+    if (projectChanged) data.rag_project_id = projectId || null;
+    if (keyChanged) data.rag_api_key = apiKey || null;
+    onSave(data);
+    setApiKey("");
+  }
+
+  return (
+    <div className="mt-6 pt-6 border-t border-border">
+      <h3 className="text-sm font-semibold mb-1 flex items-center gap-2">
+        <Key className="w-4 h-4" />
+        RAG externe
+      </h3>
+      <p className="text-xs text-muted-foreground mb-3">
+        Clé API et projet pour l'accès au RAG externe (recherche, ingestion, transcription).
+      </p>
+
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium mb-1">Project ID</label>
+          <input
+            type="text"
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+            placeholder="UUID du projet RAG"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium mb-1">
+            Clé API
+            {tenant.rag_api_key_set && (
+              <span className="ml-2 text-green-600 dark:text-green-400 font-normal">
+                (clé définie)
+              </span>
+            )}
+          </label>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+            placeholder={tenant.rag_api_key_set ? "••••••••  (laisser vide pour ne pas modifier)" : "rak_..."}
+          />
+        </div>
+      </div>
+
+      {hasChanges && (
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
           <Save className="w-3.5 h-3.5" />
           {saving ? "Enregistrement…" : "Enregistrer"}
