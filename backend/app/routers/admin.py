@@ -116,6 +116,8 @@ def update_tenant(
         tenant.is_active = body.is_active
     if body.whisper_initial_prompt is not None:
         tenant.whisper_initial_prompt = body.whisper_initial_prompt or None
+    if body.rag_project_id is not None:
+        tenant.rag_project_id = body.rag_project_id or None
 
     db.commit()
     db.refresh(tenant)

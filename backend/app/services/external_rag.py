@@ -11,7 +11,8 @@ Endpoints utilisés :
   - POST /v1/transcribe      : transcription audio (Whisper + pyannote)
 
 Auth : API Key (rak_...) via header Authorization.
-Multi-tenancy : X-Tenant-ID + X-Project-ID sur chaque requête.
+Multi-tenancy : déduit de la clé API côté RAG (tenant/client/projet).
+  - Si clé scope tenant/client, on passe project_id dans le body.
 """
 
 import io
@@ -28,17 +29,36 @@ logger = logging.getLogger(__name__)
 _TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0)
 
 
-def _headers(tenant_id: str) -> dict[str, str]:
-    """Headers communs : auth API Key + isolation multi-tenant."""
+def _headers() -> dict[str, str]:
+    """Headers communs : auth API Key uniquement."""
     return {
         "Authorization": f"Bearer {settings.rag_api_key}",
-        "X-Tenant-ID": tenant_id,
-        "X-Project-ID": settings.rag_project_id,
     }
 
 
 def _base() -> str:
     return settings.rag_api_url.rstrip("/")
+
+
+def _get_rag_project_id(tenant_id: str) -> str | None:
+    """Résout le rag_project_id depuis le tenant ScribIA.
+
+    Priorité : tenant.rag_project_id > settings.rag_project_id (fallback global).
+    """
+    try:
+        from app.database import SessionLocal
+        from app.models.tenant import Tenant
+        db = SessionLocal()
+        try:
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+            if tenant and tenant.rag_project_id:
+                return tenant.rag_project_id
+        finally:
+            db.close()
+    except Exception:
+        pass
+    # Fallback global (peut être vide)
+    return settings.rag_project_id if settings.rag_project_id != "default" else None
 
 
 # ── Health ───────────────────────────────────────────────────────────────────
@@ -68,10 +88,13 @@ def search(
         body["top_k"] = top_k
     if score_threshold is not None:
         body["score_threshold"] = score_threshold
+    project_id = _get_rag_project_id(tenant_id)
+    if project_id:
+        body["project_id"] = project_id
 
     r = httpx.post(
         f"{_base()}/v1/search", json=body,
-        headers=_headers(tenant_id), timeout=_TIMEOUT,
+        headers=_headers(), timeout=_TIMEOUT,
     )
     r.raise_for_status()
     return r.json()
@@ -100,10 +123,13 @@ def chat(
         body["top_k"] = top_k
     if score_threshold is not None:
         body["score_threshold"] = score_threshold
+    project_id = _get_rag_project_id(tenant_id)
+    if project_id:
+        body["project_id"] = project_id
 
     r = httpx.post(
         f"{_base()}/v1/chat", json=body,
-        headers=_headers(tenant_id), timeout=_TIMEOUT,
+        headers=_headers(), timeout=_TIMEOUT,
     )
     r.raise_for_status()
     return r.json()
@@ -128,12 +154,15 @@ def ingest_file(
     data: dict[str, Any] = {"filename": filename}
     if metadata:
         data["metadata"] = json.dumps(metadata)
+    project_id = _get_rag_project_id(tenant_id)
+    if project_id:
+        data["project_id"] = project_id
 
     r = httpx.post(
         f"{_base()}/v1/ingest",
         files=files,
         data=data,
-        headers=_headers(tenant_id),
+        headers=_headers(),
         timeout=_TIMEOUT,
     )
     r.raise_for_status()
@@ -159,10 +188,13 @@ def ingest_external(
         body["content_type"] = content_type
     if metadata:
         body["metadata"] = metadata
+    project_id = _get_rag_project_id(tenant_id)
+    if project_id:
+        body["project_id"] = project_id
 
     r = httpx.post(
         f"{_base()}/v1/ingest/external", json=body,
-        headers=_headers(tenant_id), timeout=_TIMEOUT,
+        headers=_headers(), timeout=_TIMEOUT,
     )
     r.raise_for_status()
     return r.json()
@@ -175,7 +207,7 @@ def list_documents(tenant_id: str) -> dict:
     """GET /v1/documents — liste les documents indexés pour ce tenant."""
     r = httpx.get(
         f"{_base()}/v1/documents",
-        headers=_headers(tenant_id), timeout=_TIMEOUT,
+        headers=_headers(), timeout=_TIMEOUT,
     )
     r.raise_for_status()
     return r.json()
@@ -185,7 +217,7 @@ def delete_document(tenant_id: str, doc_id: str) -> None:
     """DELETE /v1/documents/{doc_id} — soft-delete + suppression chunks/vecteurs/fichiers."""
     r = httpx.delete(
         f"{_base()}/v1/documents/{doc_id}",
-        headers=_headers(tenant_id), timeout=_TIMEOUT,
+        headers=_headers(), timeout=_TIMEOUT,
     )
     r.raise_for_status()
 
@@ -228,7 +260,7 @@ def transcribe(
             f"{_base()}/v1/transcribe",
             files=files,
             data=data,
-            headers=_headers(tenant_id),
+            headers=_headers(),
             timeout=_TRANSCRIBE_TIMEOUT,
         )
     if r.status_code == 422:

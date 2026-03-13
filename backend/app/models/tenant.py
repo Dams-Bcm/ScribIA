@@ -32,6 +32,7 @@ class Tenant(UUIDMixin, TimestampMixin, Base):
     db_mode     = Column(String(20), nullable=False, default="shared")   # 'shared' | 'dedicated'
     dedicated_db_name = Column(String(100), nullable=True)               # e.g. 'scribia_tenant_abc123'
     whisper_initial_prompt = Column(Text, nullable=True)                  # vocabulaire métier pour Whisper
+    rag_project_id = Column(String(100), nullable=True)                    # UUID projet dans le RAG externe
 
     # Relationships
     parent           = relationship("Tenant", remote_side="Tenant.id", backref="children")

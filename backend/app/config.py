@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     # ── RAG externe ──────────────────────────────────────────────────────────────
     rag_api_url: str = "http://192.168.9.16:8000"   # URL du rag-api externe
     rag_api_key: str = ""                            # API key rak_... pour auth service-to-service
-    rag_project_id: str = "default"                  # project_id fixe (Option A : 1 projet par tenant)
+    rag_project_id: str = ""                           # project_id global fallback (utilisé si tenant.rag_project_id vide)
     rag_top_k: int = 10                              # nombre de résultats pour /v1/search
     rag_score_threshold: float = 0.5                 # seuil de score pour /v1/search
     use_external_transcription: bool = False         # si True, délègue Whisper+pyannote au rag-api
