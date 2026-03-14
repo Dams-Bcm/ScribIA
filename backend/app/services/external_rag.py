@@ -26,7 +26,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-_TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0)
+_TIMEOUT = httpx.Timeout(connect=10.0, read=1800.0, write=300.0, pool=10.0)
 
 
 def _base() -> str:
