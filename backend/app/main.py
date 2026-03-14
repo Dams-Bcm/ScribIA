@@ -321,6 +321,29 @@ def _add_missing_columns():
                     "ALTER TABLE contact_groups ADD is_default BIT NOT NULL DEFAULT 0"
                 ))
 
+        # contact_group_members: fix FK to CASCADE (was NO ACTION)
+        if "contact_group_members" in tables:
+            fk_fix_rows = conn.execute(text("""
+                SELECT fk.name, OBJECT_NAME(fk.referenced_object_id) AS ref_table
+                FROM sys.foreign_keys fk
+                WHERE OBJECT_NAME(fk.parent_object_id) = 'contact_group_members'
+                  AND fk.delete_referential_action_desc = 'NO_ACTION'
+            """)).fetchall()
+            for row in fk_fix_rows:
+                fk_name, ref_table = row[0], row[1]
+                if ref_table == "contacts":
+                    conn.execute(text(f"ALTER TABLE contact_group_members DROP CONSTRAINT [{fk_name}]"))
+                    conn.execute(text(
+                        "ALTER TABLE contact_group_members ADD CONSTRAINT [FK_cgm_contact] "
+                        "FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE"
+                    ))
+                elif ref_table == "contact_groups":
+                    conn.execute(text(f"ALTER TABLE contact_group_members DROP CONSTRAINT [{fk_name}]"))
+                    conn.execute(text(
+                        "ALTER TABLE contact_group_members ADD CONSTRAINT [FK_cgm_group] "
+                        "FOREIGN KEY (group_id) REFERENCES contact_groups(id) ON DELETE CASCADE"
+                    ))
+
         # planned_meeting_participants: consent_status
         if "planned_meeting_participants" in tables:
             pmp_cols = {c["name"] for c in insp.get_columns("planned_meeting_participants")}
